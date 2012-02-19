@@ -1,9 +1,11 @@
+import cgi
+import logging, logging.handlers
 import os
-import threading
-import time
 import pickle
 import Queue
-import cgi
+import sys
+import threading
+import time
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import gtk
@@ -17,6 +19,7 @@ import excepthook
 from dataframe_utilities import (concat_with_padding, 
                                  get_dataframe_from_shot, 
                                  replace_with_padding)
+                                 
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
@@ -27,6 +30,29 @@ if os.name == 'nt':
     settings.set_string_property('gtk-theme-name', 'Clearlooks', '')
     settings.set_string_property('gtk-font-name', 'ubuntu 9', '')
     settings.props.gtk_button_images = True
+
+def setup_logging():
+    logger = logging.getLogger('LYSE')
+    handler = logging.handlers.RotatingFileHandler(r'C:\\pythonlib\lyse\lyse.log', maxBytes=1024*1024*50)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+    handler.setFormatter(formatter)
+    handler.setLevel(logging.DEBUG)
+    logger.addHandler(handler)
+    if sys.stdout.isatty():
+        terminalhandler = logging.StreamHandler(sys.stdout)
+        terminalhandler.setFormatter(formatter)
+        terminalhandler.setLevel(logging.INFO) # only display info or higher in the terminal
+        logger.addHandler(terminalhandler)
+    else:
+        # Prevent bug on windows where writing to stdout without a command
+        # window causes a crash:
+        sys.stdout = sys.stderr = open(os.devnull,'w')
+    logger.setLevel(logging.DEBUG)
+    return logger
+    
+logger = setup_logging()
+excepthook.set_logger(logger)
+logger.info('\n\n===============starting===============\n')
         
 class RoutineBox(object):
 
