@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk+" version="2.24"/>
+  <!-- interface-naming-policy project-wide -->
+  <object class="GtkCheckButton" id="enable_all">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="receives_default">False</property>
+    <property name="tooltip_text" translatable="yes">Select which analysis routines you would like to be executed.</property>
+    <property name="use_action_appearance">False</property>
+    <property name="draw_indicator">True</property>
+  </object>
+  <object class="GtkImage" id="image9">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="stock">gtk-info</property>
+    <property name="icon-size">1</property>
+  </object>
+  <object class="GtkListStore" id="liststore">
+    <columns>
+      <!-- column-name Script -->
+      <column type="gchararray"/>
+      <!-- column-name Enable -->
+      <column type="gboolean"/>
+      <!-- column-name show -->
+      <column type="gboolean"/>
+      <!-- column-name plot_multiple -->
+      <column type="gboolean"/>
+      <!-- column-name working -->
+      <column type="gboolean"/>
+      <!-- column-name error -->
+      <column type="gboolean"/>
+      <!-- column-name success -->
+      <column type="gboolean"/>
+      <!-- column-name pulse -->
+      <column type="gint"/>
+      <!-- column-name show_plots_inconsistent -->
+      <column type="gboolean"/>
+      <!-- column-name tooltip -->
+      <column type="gchararray"/>
+      <!-- column-name checkbuttons_sensitive -->
+      <column type="gboolean"/>
+    </columns>
+  </object>
+  <object class="GtkCheckButton" id="multiplot_all">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="receives_default">False</property>
+    <property name="has_tooltip">True</property>
+    <property name="tooltip_text" translatable="yes">Enable to make new plots be shown in separate windows, instead of replacing previous plots.</property>
+    <property name="use_action_appearance">False</property>
+    <property name="draw_indicator">True</property>
+    <child>
+      <object class="GtkImage" id="image8">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="pixbuf">new_plot_icon.png</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkFileFilter" id="output_filefilter"/>
+  <object class="GtkCheckButton" id="plot_all">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="receives_default">False</property>
+    <property name="has_tooltip">True</property>
+    <property name="tooltip_text" translatable="yes">If enabled, plots from the analysis routine will be displayed in separate windows. Otherwise they will be hidden.</property>
+    <property name="use_action_appearance">False</property>
+    <property name="draw_indicator">True</property>
+    <child>
+      <object class="GtkImage" id="image7">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="pixbuf">plot_icon.png</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkFrame" id="toplevel">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="label_xalign">0</property>
+    <child>
+      <object class="GtkHBox" id="hbox2">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <child>
+          <object class="GtkVBox" id="vbox1">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkLabel" id="label2">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button1">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <property name="relief">none</property>
+                <signal name="clicked" handler="move_top" swapped="no"/>
+                <child>
+                  <object class="GtkImage" id="image1">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="stock">gtk-goto-top</property>
+                    <property name="icon-size">1</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">1</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button3">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <property name="relief">none</property>
+                <signal name="clicked" handler="move_up" swapped="no"/>
+                <child>
+                  <object class="GtkImage" id="image2">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="stock">gtk-go-up</property>
+                    <property name="icon-size">1</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button2">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <property name="relief">none</property>
+                <signal name="clicked" handler="move_down" swapped="no"/>
+                <child>
+                  <object class="GtkImage" id="image3">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="stock">gtk-go-down</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">3</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="button4">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="receives_default">True</property>
+                <property name="use_action_appearance">False</property>
+                <property name="relief">none</property>
+                <signal name="clicked" handler="move_bottom" swapped="no"/>
+                <child>
+                  <object class="GtkImage" id="image4">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="stock">gtk-goto-bottom</property>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="position">4</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label3">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+              </object>
+              <packing>
+                <property name="expand">True</property>
+                <property name="fill">True</property>
+                <property name="position">5</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">True</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkScrolledWindow" id="scrolledwindow2">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="hscrollbar_policy">automatic</property>
+            <property name="vscrollbar_policy">automatic</property>
+            <child>
+              <object class="GtkTreeView" id="treeview">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="model">liststore</property>
+                <property name="headers_clickable">False</property>
+                <property name="search_column">0</property>
+                <property name="rubber_banding">True</property>
+                <property name="tooltip_column">9</property>
+                <child>
+                  <object class="GtkTreeViewColumn" id="treeviewcolumn4">
+                    <property name="title" translatable="yes"> info</property>
+                    <property name="widget">image9</property>
+                    <child>
+                      <object class="GtkCellRendererSpinner" id="working"/>
+                      <attributes>
+                        <attribute name="active">4</attribute>
+                        <attribute name="pulse">7</attribute>
+                      </attributes>
+                    </child>
+                    <child>
+                      <object class="GtkCellRendererPixbuf" id="error">
+                        <property name="stock_id">gtk-dialog-warning</property>
+                      </object>
+                      <attributes>
+                        <attribute name="visible">5</attribute>
+                      </attributes>
+                    </child>
+                    <child>
+                      <object class="GtkCellRendererPixbuf" id="success">
+                        <property name="stock_id">gtk-ok</property>
+                      </object>
+                      <attributes>
+                        <attribute name="visible">6</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn" id="treeviewcolumn1">
+                    <property name="title" translatable="yes">enable</property>
+                    <property name="clickable">True</property>
+                    <property name="widget">enable_all</property>
+                    <signal name="clicked" handler="enable_all_clicked" swapped="no"/>
+                    <child>
+                      <object class="GtkCellRendererToggle" id="enable_renderer">
+                        <signal name="toggled" handler="enable_toggled" swapped="no"/>
+                      </object>
+                      <attributes>
+                        <attribute name="active">1</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn" id="treeviewcolumn2">
+                    <property name="title" translatable="yes">script</property>
+                    <property name="expand">True</property>
+                    <child>
+                      <object class="GtkCellRendererText" id="script_renderer"/>
+                      <attributes>
+                        <attribute name="sensitive">1</attribute>
+                        <attribute name="single-paragraph-mode">1</attribute>
+                        <attribute name="text">0</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn" id="treeviewcolumn3">
+                    <property name="title" translatable="yes">plot_show</property>
+                    <property name="clickable">True</property>
+                    <property name="widget">plot_all</property>
+                    <signal name="clicked" handler="plot_all_clicked" swapped="no"/>
+                    <child>
+                      <object class="GtkCellRendererToggle" id="plot_show_renderer">
+                        <signal name="toggled" handler="plot_show_toggled" swapped="no"/>
+                      </object>
+                      <attributes>
+                        <attribute name="sensitive">1</attribute>
+                        <attribute name="activatable">1</attribute>
+                        <attribute name="active">2</attribute>
+                        <attribute name="inconsistent">8</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkTreeViewColumn" id="plot_multi">
+                    <property name="title" translatable="yes">multiplot_show</property>
+                    <property name="clickable">True</property>
+                    <property name="widget">multiplot_all</property>
+                    <signal name="clicked" handler="multiplot_all_clicked" swapped="no"/>
+                    <child>
+                      <object class="GtkCellRendererToggle" id="multiplot_show_renderer">
+                        <signal name="toggled" handler="multiplot_toggled" swapped="no"/>
+                      </object>
+                      <attributes>
+                        <attribute name="sensitive">1</attribute>
+                        <attribute name="activatable">1</attribute>
+                        <attribute name="active">3</attribute>
+                      </attributes>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+    <child type="label">
+      <object class="GtkHBox" id="buttonbox">
+        <property name="visible">True</property>
+        <property name="can_focus">False</property>
+        <property name="spacing">10</property>
+        <child>
+          <object class="GtkLabel" id="label">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="label" translatable="yes">&lt;b&gt;Single shot routines&lt;/b&gt;</property>
+            <property name="use_markup">True</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">0</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="button6">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="receives_default">True</property>
+            <property name="use_action_appearance">False</property>
+            <property name="relief">none</property>
+            <signal name="clicked" handler="add_routine" swapped="no"/>
+            <child>
+              <object class="GtkImage" id="image5">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="stock">gtk-add</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">1</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="button5">
+            <property name="visible">True</property>
+            <property name="can_focus">False</property>
+            <property name="receives_default">True</property>
+            <property name="use_action_appearance">False</property>
+            <property name="relief">none</property>
+            <signal name="clicked" handler="delete_selection" swapped="no"/>
+            <child>
+              <object class="GtkImage" id="image6">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="stock">gtk-remove</property>
+                <property name="icon-size">1</property>
+              </object>
+            </child>
+          </object>
+          <packing>
+            <property name="expand">False</property>
+            <property name="fill">False</property>
+            <property name="position">2</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkFileChooserButton" id="filechooserbutton">
+            <property name="width_request">196</property>
+            <property name="can_focus">False</property>
+            <property name="action">save</property>
+            <property name="filter">output_filefilter</property>
+            <property name="title" translatable="yes">Select file to save output</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="padding">19</property>
+            <property name="position">3</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
