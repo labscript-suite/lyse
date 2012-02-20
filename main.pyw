@@ -1,11 +1,12 @@
 import cgi
 import logging, logging.handlers
 import os
-import pickle
+import cPickle as pickle
 import Queue
 import sys
 import threading
 import time
+import traceback
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import gtk
@@ -588,6 +589,7 @@ class FileBox(object):
             self.timing_condition.notify_all()
             
     def update_row(self, filepath):
+        print 'updating row', filepath
         row = get_dataframe_from_shot(filepath)
         index = numpy.where(self.dataframe['filepath'].values == row['filepath'].values)
         index = index[0][0]
@@ -652,7 +654,7 @@ class FileBox(object):
             self.liststore.append(store_row)
             
     def on_add_files_clicked(self, button):
-        dialog = dialog = gtk.FileSelection('Select files to add')
+        dialog = gtk.FileSelection('Select files to add')
         # Make the dialog only show h5 files:
 #        h5_filefilter = gtk.FileFilter()
 #        h5_filefilter.add_pattern('*.h5')
@@ -668,7 +670,7 @@ class FileBox(object):
         files = dialog.get_selections()
         dialog.destroy()
         if response == gtk.RESPONSE_OK:
-            self.incoming_queue.put(files)
+            self.incoming_queue.put([f for f in files if f.endswith('.h5')])
     
     def delete_selection(self, button):
         model, selection = self.treeselection.get_selected_rows()
@@ -772,7 +774,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(pickle.dumps(app.filebox.dataframe))
         self.wfile.close()
-        
+
+               
 class AnalysisApp(object):
     port = 42519
 
@@ -818,7 +821,7 @@ class AnalysisApp(object):
         self.window.resize(1600, 900)
         self.window.maximize()
         self.window.show()
-
+        print 'number of threads is:', threading.active_count()
 
 if __name__ == '__main__':
     gtk.gdk.threads_init()

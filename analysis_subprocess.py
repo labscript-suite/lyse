@@ -97,7 +97,6 @@ class AnalysisWorker(object):
                 f.images = []
                 f.legends = []
                 f.lines = []
-                f.patches = []
                 f.texts = []
                 for a in f.axes:
                     # Clear the axis:
@@ -105,7 +104,7 @@ class AnalysisWorker(object):
                     # Set the autoscale according to our settings:
                     a.autoscale(self.autoscaling[f].get_active())
         # The namespace the routine will run in:
-        sandbox = {'path':path}
+        sandbox = {'path':path,'__file__':self.filepath}
         # Tell pylab to set the current figure to no. 1:
         pylab.figure(1)
         # Connect the output redirection:

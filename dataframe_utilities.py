@@ -49,12 +49,45 @@ def flat_dict_to_hierarchical_dataframe(dictionary):
         result[newkey] = dictionary[key]    
     index = pandas.MultiIndex.from_tuples(sorted(result.keys()))
     return pandas.DataFrame([result],columns=index)  
-      
+
+def workaround_empty_string_bug(dictionary):
+    # It doesn't look like this funciton does anything, but it does. It
+    # converts numpy empty strings to python empty strings. This is
+    # to workaround the fact that h5py returns empty stings as a numpy
+    # datatype which numpy itself actually can'y handle. Numpy never uses
+    # length zero strings, only length one or greater. So by replacing
+    # all empty strings with ordinary python ones, numpy will convert them
+    # (when it needs to) to a datatype it can handle.
+    for key, value in dictionary.items():
+        if value == '':
+            dictionary[key] = ''
+            
+def flat_dict_to_flat_series(dictionary):
+    max_tuple_length = 2 # Must have at least two levels to make a MultiIndex
+    result = {}
+    for key in dictionary:
+        if len(key) > 1:
+            result[key] = dictionary[key]
+        else:
+            result[key[0]] = dictionary[key]
+    keys = result.keys()
+    keys.sort(key = lambda item: 
+        (len(item),) + item if isinstance(item, tuple) else (1,item))
+    return pandas.Series(result,index=keys)  
+          
 def get_dataframe_from_shot(filepath):
     nested_dict = get_nested_dict_from_shot(filepath)
     flat_dict =  flatten_dict(nested_dict)
+    workaround_empty_string_bug(flat_dict)
     df = flat_dict_to_hierarchical_dataframe(flat_dict)
     return df
+    
+def get_series_from_shot(filepath):
+    nested_dict = get_nested_dict_from_shot(filepath)
+    flat_dict =  flatten_dict(nested_dict)
+    workaround_empty_string_bug(flat_dict)
+    s = flat_dict_to_flat_series(flat_dict)
+    return s
     
 def pad_columns(df, n):
     """Add depth to hiererchical column labels with empty strings"""
