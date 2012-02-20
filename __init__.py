@@ -5,6 +5,7 @@ import urllib2
 import socket
 import cPickle as pickle
 import inspect
+import sys
 
 import h5py
 import pandas
@@ -22,23 +23,40 @@ def data(filepath=None, host='localhost'):
         return df
  
 class Run(object):
-    def __init__(self,h5_path):
-        self.no_write = False
+    def __init__(self,h5_path,no_write=False):
+        self.no_write = no_write
         self.h5_path = h5_path
-        frame = inspect.currentframe()
-        
-        # The group were this run's results will be stored in the h5 file
-        # will be the name of the python script which is instantiating
-        # this Run object:
-        calling_file = frame.f_back.f_locals['__file__']
-        self.group = os.path.basename(calling_file).split('.py')[0]
         with h5py.File(h5_path) as h5_file:
-            self.globals = dict(h5_file['globals'].attrs)
             if not 'results' in h5_file:
                  h5_file.create_group('results')
+                     
+        try:
+            if not self.no_write:
+                # The group were this run's results will be stored in the h5 file
+                # will be the name of the python script which is instantiating
+                # this Run object:
+                frame = inspect.currentframe()
+                __file__ = frame.f_back.f_locals['__file__']
+                self.group = os.path.basename(__file__).split('.py')[0]
+                with h5py.File(h5_path) as h5_file:
+                    if not self.group in h5_file['results']:
+                         h5_file['results'].create_group(self.group)
+        except KeyError:
+            sys.stderr.write('Warning: to write results, call '
+            'Run.set_group(groupname), specifying the name of the group '
+            'you would like to save results to. This normally comes from '
+            'the filename of your script, but since you\'re in interactive '
+            'mode, there is no scipt name. Opening in read only mode for '
+            'the moment.\n')
+            self.no_write = True
+            
+    def set_group(self, groupname):
+        self.group = groupname
+        with h5py.File(self.h5_path) as h5_file:
             if not self.group in h5_file['results']:
                  h5_file['results'].create_group(self.group)
-                
+        self.no_write = False
+        
     def get_trace(self,name):
         with h5py.File(self.h5_path) as h5_file:
             if not name in h5_file['data']['traces']:
@@ -123,13 +141,30 @@ class Run(object):
 class Sequence(Run):
     def __init__(self,h5_path,run_paths):
         self.h5_path = h5_path
-        self.runs = {path: Run(path,no_write=True) for path in run_paths}
         self.no_write = False
-        for run in self.runs.values():
-            run.no_write = True
         with h5py.File(h5_path) as h5_file:
             if not 'results' in h5_file:
                  h5_file.create_group('results')
+                     
+        # The group were the results will be stored in the h5 file will
+        # be the name of the python script which is instantiating this
+        # Sequence object:
+        frame = inspect.currentframe()
+        try:
+            __file__ = frame.f_back.f_locals['__file__']
+            self.runs = {path: Run(path,no_write=True) for path in run_paths}
+            self.group = os.path.basename(__file__).split('.py')[0]
+            with h5py.File(h5_path) as h5_file:
+                if not self.group in h5_file['results']:
+                     h5_file['results'].create_group(self.group)
+        except KeyError:
+            sys.stderr.write('Warning: to write results, call '
+            'Run.set_group(groupname), specifying the name of the group '
+            'you would like to save results to. This normally comes from '
+            'the filename of your script, but since you\'re in interactive '
+            'mode, there is no scipt name. Opening in read only mode for '
+            'the moment.\n')
+            self.no_write = True
         
     def get_trace(self,*args):
         return {path:run.get_trace(*args) for run,path in self.runs.items()}
