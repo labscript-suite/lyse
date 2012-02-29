@@ -89,20 +89,14 @@ class AnalysisWorker(object):
         
     def do_analysis(self,task,path):
         print 'worker: in do_analysis'
+        axis_limits = {}
         with gtk.gdk.lock:
             print 'worker: acquired gtk lock'
             for f in self.figures:
-                # Clear all aspects of the figure except the axes:
-                f.patches = []
-                f.images = []
-                f.legends = []
-                f.lines = []
-                f.texts = []
-                for a in f.axes:
-                    # Clear the axis:
-                    a.clear()
-                    # Set the autoscale according to our settings:
-                    a.autoscale(self.autoscaling[f].get_active())
+                for i, a in enumerate(f.axes):
+                    # Save the limits of the axes to restore them afterward:
+                    axis_limits[f,i] = a.get_xlim(), a.get_ylim()
+                f.clear()
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath}
         # Tell pylab to set the current figure to no. 1:
@@ -143,7 +137,18 @@ class AnalysisWorker(object):
                     self.canvases.append(c)
                     self.figures.append(fig)
                     self.autoscaling[fig] = b
+            if not self.autoscaling[fig].get_active():
+                with gtk.gdk.lock:
+                    # Restore the axis limits:
+                    for j, a in enumerate(fig.axes):
+                        try:
+                            xlim, ylim = axis_limits[fig,j]
+                            a.set_xlim(xlim)
+                            a.set_ylim(ylim)
+                        except KeyError:
+                            continue
             i += 1
+        
         # Redraw all figures:
         with gtk.gdk.lock:
             for canvas in self.canvases:
