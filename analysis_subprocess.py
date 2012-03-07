@@ -67,7 +67,6 @@ class AnalysisWorker(object):
             task, data = self.from_parent.get()
             print 'worker: got task', task
             if task == 'quit':
-                self.to_parent.put(['quit',None])
                 break
             elif task == 'reset figs':
                 self.reset_figs()
