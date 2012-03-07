@@ -138,6 +138,7 @@ class AnalysisRoutine(object):
         # We don't even care if it's single shot or multi shot. Pass
         # the task and data directly to the worker process and it will
         # work it out:
+        print 'do_analysis: about to put to worker'
         self.to_worker.put([task,data])
         print 'do_analysis: asked for task to be done'
         # This data comes not directly from the worker but via the

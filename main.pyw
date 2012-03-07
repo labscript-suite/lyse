@@ -601,7 +601,12 @@ class FileBox(object):
             for rowindex, store_row in enumerate(self.liststore):
                 if store_row[self.column_labels[('filepath',)]] == filepath:
                     for label, colindex in self.column_labels.items():
-                        store_row[colindex] = self.dataframe[label].values[index]
+                        item = self.dataframe[label].values[index]
+                        if isinstance(item, str):
+                            lines = item.splitlines()
+                            if len(lines) > 1:
+                                item = lines[0] + ' ...'
+                        store_row[colindex] = item
             
     def update_liststore(self):
         print 'updating liststore!'
