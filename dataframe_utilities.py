@@ -1,5 +1,6 @@
 import h5py
 import pandas
+import os
 
 def get_nested_dict_from_shot(filepath):
     with h5py.File(filepath,'r') as h5_file:
@@ -19,8 +20,16 @@ def get_nested_dict_from_shot(filepath):
                             group[image].attrs)
         row['filepath'] = filepath
         row['labscript'] = h5_file['script'].attrs['name']
-        row['run time'] = h5_file.attrs['run time']
-        row['run number'] = h5_file.attrs['run number']
+        try:
+            row['run time'] = h5_file.attrs['run time']
+        except KeyError:
+            # use compile time instead
+            row['run time'] = os.path.split(filepath)[1].replace('.py','').split('_')[1]
+        try:    
+            row['run number'] = h5_file.attrs['run number']
+        except KeyError:
+            # Used to be called run_no:
+            row['run number'] = h5_file.attrs['run_no']
         return row
             
 def flatten_dict(dictionary, keys=tuple()):

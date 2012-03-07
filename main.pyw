@@ -30,7 +30,6 @@ if os.name == 'nt':
     settings.set_string_property('gtk-icon-theme-name', 'gnome-human', '')
     settings.set_string_property('gtk-theme-name', 'Clearlooks', '')
     settings.set_string_property('gtk-font-name', 'ubuntu 9', '')
-    settings.props.gtk_button_images = True
 
 def setup_logging():
     logger = logging.getLogger('LYSE')
@@ -784,12 +783,13 @@ class AnalysisApp(object):
         builder = gtk.Builder()
         builder.add_from_file('main_interface.glade')
 
-        self.window = builder.get_object('window1')
+        self.window = builder.get_object('window')
         singleshot_container = builder.get_object('singleshot_container')
         multishot_container = builder.get_object('multishot_container')
         filebox_container = builder.get_object('filebox_container')
         outputbox_container = builder.get_object('outputbox_container')
         
+        self.window.connect('destroy', gtk.main_quit)
         # All running analysis routines will have their output streams
         # redirected to the outputbox via this queue:
         to_outputbox = Queue.Queue()
