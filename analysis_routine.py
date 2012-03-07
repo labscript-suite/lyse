@@ -96,10 +96,8 @@ class AnalysisRoutine(object):
     
     def destroy(self):
         print 'destroy happening!'
-        # Kill the listener thread:
-        self.from_worker.put(['quit',None])
-        # Kill the worker process:
-        self.worker.terminate()
+        # Kill the worker process,it should in turn kill the listener thread:
+        self.to_worker.put(['quit',None])
         # Stop the timeout attempting to update the spinner:
         if self.pulse_timeout is not None:
             gobject.source_remove(self.pulse_timeout)
