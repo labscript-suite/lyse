@@ -3,7 +3,7 @@ import os
 import urllib
 import urllib2
 import socket
-import cPickle as pickle
+import pickle as pickle
 import inspect
 import sys
 

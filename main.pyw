@@ -649,7 +649,10 @@ class FileBox(object):
                 for colindex, label in enumerate(self.storecolumns):
                     store_row[colindex] = self.defaults[label]
                 for label, colindex in self.column_labels.items():
-                    store_row[colindex] = self.dataframe[label].values[rowindex]
+                    item = self.dataframe[label].values[rowindex]
+                    if isinstance(item, str):
+                        item = item.splitlines()[0] + ' ...'
+                    store_row[colindex] = item
             self.liststore.append(store_row)
             
     def on_add_files_clicked(self, button):
