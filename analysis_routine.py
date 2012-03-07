@@ -39,7 +39,7 @@ class AnalysisRoutine(object):
         # routine, The worker process itself (a subprocess.Popen object),
         # and a multiprocessing.Manager for sharing the queues between
         # processes:
-        self.to_worker, self.from_worker, self.worker, self.manager = objs
+        self.to_worker, self.from_worker, self.worker = objs
 
         # The reason why I'm managing IPC with queues and a manager
         # instead of instantiating a multiprocessing.Process right

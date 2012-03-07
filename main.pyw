@@ -651,7 +651,9 @@ class FileBox(object):
                 for label, colindex in self.column_labels.items():
                     item = self.dataframe[label].values[rowindex]
                     if isinstance(item, str):
-                        item = item.splitlines()[0] + ' ...'
+                        lines = item.splitlines()
+                        if len(lines) > 1:
+                            item = lines[0] + ' ...'
                     store_row[colindex] = item
             self.liststore.append(store_row)
             
