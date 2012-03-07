@@ -3,6 +3,7 @@ import threading
 import traceback
 
 import gtk
+import gobject
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 import pylab
@@ -121,23 +122,8 @@ class AnalysisWorker(object):
             elif not fig in self.figures:
                 # If we don't already have this figure, make a window
                 # to put it in:
-                with gtk.gdk.lock:
-                    window = gtk.Window()
-                    l, w = fig.get_size_inches()
-                    window.resize(int(l*100),int(w*100))
-                    c = FigureCanvas(fig)
-                    v = gtk.VBox()
-                    n = NavigationToolbar(c,window)
-                    b = gtk.ToggleButton('Autoscale')
-                    v.pack_start(b,False,False)
-                    v.pack_start(c)
-                    v.pack_start(n,False,False)
-                    window.add(v)
-                    window.show_all()
-                    self.canvases.append(c)
-                    self.figures.append(fig)
-                    self.autoscaling[fig] = b
-            if not self.autoscaling[fig].get_active():
+                gobject.idle_add(self.new_figure,fig)
+            elif not self.autoscaling[fig].get_active():
                 with gtk.gdk.lock:
                     # Restore the axis limits:
                     for j, a in enumerate(fig.axes):
@@ -153,7 +139,25 @@ class AnalysisWorker(object):
         with gtk.gdk.lock:
             for canvas in self.canvases:
                 canvas.draw_idle()
-            
+    
+    def new_figure(self, fig):
+        window = gtk.Window()
+        l, w = fig.get_size_inches()
+        window.resize(int(l*100),int(w*100))
+        c = FigureCanvas(fig)
+        v = gtk.VBox()
+        n = NavigationToolbar(c,window)
+        b = gtk.ToggleButton('Autoscale')
+        v.pack_start(b,False,False)
+        v.pack_start(c)
+        v.pack_start(n,False,False)
+        window.add(v)
+        window.show_all()
+        window.present()
+        self.canvases.append(c)
+        self.figures.append(fig)
+        self.autoscaling[fig] = b
+        
     def reset_figs(self):
         pass
         
