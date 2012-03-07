@@ -63,7 +63,7 @@ class Run(object):
             if not name in h5_file['data']['traces']:
                 raise Exception('The trace \'%s\' doesn not exist'%name)
             trace = h5_file['data']['traces'][name]
-            return trace['t'],array(trace['values'],dtype=float)
+            return array(trace['t'],dtype=float),array(trace['values'],dtype=float)
            
     def get_result_array(self,group,name):
         with h5py.File(self.h5_path) as h5_file:
