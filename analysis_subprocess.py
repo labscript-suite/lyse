@@ -1,4 +1,5 @@
 import sys
+import os
 import threading
 import traceback
 
@@ -11,7 +12,11 @@ import pylab
 import excepthook
 import subproc_utils
 
-
+if not sys.stdout.isatty():
+    # Prevent bug on windows where writing to stdout without a command
+    # window causes a crash:
+    sys.stdout = sys.stderr = open(os.devnull,'w')
+        
 class OutputInterceptor(object):
 
     def __init__(self, queue, streamname='stdout'):
