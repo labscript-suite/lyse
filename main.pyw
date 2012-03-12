@@ -567,14 +567,16 @@ class FileBox(object):
         self.scrolled = True
         
     def add_files(self, filepaths, marked=False):
-        dfs = [self.dataframe]
         for i, filepath in enumerate(filepaths):
-            print 'adding file', i
-            if filepath in self.dataframe['filepath'].values:
-                # Ignore duplicates:
-                continue
-            row = get_dataframe_from_shot(filepath)
-            self.dataframe = concat_with_padding(self.dataframe,row)
+            # Using the lock so as to prevent modifying the dataframe
+            # whilst update_liststore is mid-loop over it:
+            with gtk.gdk.lock:
+                print 'adding file', i
+                if filepath in self.dataframe['filepath'].values:
+                    # Ignore duplicates:
+                    continue
+                row = get_dataframe_from_shot(filepath)
+                self.dataframe = concat_with_padding(self.dataframe,row)
         with gtk.gdk.lock:
             self.update_liststore()
         if self.scrolled:
