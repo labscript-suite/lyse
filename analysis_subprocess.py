@@ -71,26 +71,27 @@ class AnalysisWorker(object):
         while True:
             print 'worker: waiting for next task'
             task, data = self.from_parent.get()
-            print 'worker: got task', task
-            if task == 'quit':
-                break
-            elif task == 'reset figs':
-                self.reset_figs()
-            elif task == 'single' or task == 'multi':
-                try:
-                    print 'worker: calling do_analysis'
-                    self.do_analysis(task,data)
-                    print 'worker: finished analysis'
-                    self.to_parent.put(['done',None])
-                except:
-                    print 'worker: there was an exception'
-                    traceback_lines = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
-                    del traceback_lines[1:3]
-                    message = ''.join(traceback_lines)
-                    self.to_parent.put(['stderr',message])
-                    self.to_parent.put(['error', message])
-            else:
-                self.to_parent.put(['error','invalid task %s'%str(task)])
+            with kill_lock:
+                print 'worker: got task', task
+                if task == 'quit':
+                    break
+                elif task == 'reset figs':
+                    self.reset_figs()
+                elif task == 'single' or task == 'multi':
+                    try:
+                        print 'worker: calling do_analysis'
+                        self.do_analysis(task,data)
+                        print 'worker: finished analysis'
+                        self.to_parent.put(['done',None])
+                    except:
+                        print 'worker: there was an exception'
+                        traceback_lines = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
+                        del traceback_lines[1:3]
+                        message = ''.join(traceback_lines)
+                        self.to_parent.put(['stderr',message])
+                        self.to_parent.put(['error', message])
+                else:
+                    self.to_parent.put(['error','invalid task %s'%str(task)])
         print 'worker: broke out of loop!'
         
     def do_analysis(self,task,path):
@@ -169,7 +170,7 @@ class AnalysisWorker(object):
         
 if __name__ == '__main__':
     gtk.threads_init()
-    to_parent, from_parent = subproc_utils.setup_connection_with_parent()
+    to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     with gtk.gdk.lock:
