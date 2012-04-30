@@ -41,6 +41,40 @@ class OutputInterceptor(object):
         self.disconnect()
         sys.stdout.close()
         
+
+class ModuleWatcher(object):
+     def __init__(self):
+         # The whitelist is the list of names of currently loaded modules:
+         self.whitelist = set(sys.modules)
+         self.modified_times = {}
+ 
+     def check_and_unload(self):
+         # Look through currently loaded modules:
+         for name, module in sys.modules.items():
+            # Look only at the modules not in the the whitelist:
+            if name not in self.whitelist and hasattr(module,'__file__'):
+                # Only consider modules which are .py files, no C extensions:
+                module_file = module.__file__.replace('.pyc', '.py')
+                if not module_file.endswith('.py') or not os.path.exists(module_file):
+                    continue
+                # Check and store the modified time of the .py file:
+                modified_time = os.path.getmtime(module_file)
+                previous_modified_time = self.modified_times.setdefault(name, modified_time)
+                self.modified_times[name] = modified_time
+                if modified_time != previous_modified_time:
+                    # A module has been modified! Unload all modules
+                    # not in the whitelist:
+                    for name in sys.modules.copy():
+                        if name not in self.whitelist:
+                            # This unloads a module. This is slightly
+                            # more general than reload(module), but
+                            # has the same caveats regarding existing
+                            # references. This also means that any
+                            # exception in the import will occur later,
+                            # once the module is (re)imported, rather
+                            # than now where catching the exception
+                            # would have to be handled differently.
+                            del sys.modules[name]
         
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
@@ -59,6 +93,10 @@ class AnalysisWorker(object):
         
         # Whether or not to autoscale each figure with new data:
         self.autoscaling = {}
+        
+        # An object with a method to unload user modules if any have
+        # changed on disk:
+        self.modulewatcher = ModuleWatcher()
         
         # Start the thread that listens for instructions from the
         # parent process:
@@ -111,6 +149,8 @@ class AnalysisWorker(object):
         # Connect the output redirection:
         self.stdout.connect()
         self.stderr.connect()
+        # Unload user modules if there have been changes on disk:
+        self.modulewatcher.check_and_unload()
         try:
             # Actually run the user's analysis!
             execfile(self.filepath,sandbox,sandbox)
