@@ -2,6 +2,7 @@ import sys
 import os
 import threading
 import traceback
+import time
 
 import gtk
 import gobject
@@ -43,11 +44,21 @@ class OutputInterceptor(object):
         
 
 class ModuleWatcher(object):
-     def __init__(self):
+     def __init__(self,stderr):
          # The whitelist is the list of names of currently loaded modules:
          self.whitelist = set(sys.modules)
          self.modified_times = {}
- 
+         self.main = threading.Thread(target=self.mainloop)
+         self.main.daemon = True
+         self.stderr = stderr
+         self.main.start()
+
+         
+     def mainloop(self):
+         while True:
+             time.sleep(1)
+             self.check_and_unload()
+             
      def check_and_unload(self):
          # Look through currently loaded modules:
          for name, module in sys.modules.items():
@@ -64,6 +75,7 @@ class ModuleWatcher(object):
                 if modified_time != previous_modified_time:
                     # A module has been modified! Unload all modules
                     # not in the whitelist:
+                    self.stderr.write('%s modified: all modules will be reloaded next run.\n'%module_file)
                     for name in sys.modules.copy():
                         if name not in self.whitelist:
                             # This unloads a module. This is slightly
@@ -75,6 +87,8 @@ class ModuleWatcher(object):
                             # than now where catching the exception
                             # would have to be handled differently.
                             del sys.modules[name]
+                            if name in self.modified_times:
+                                del self.modified_times[name]
         
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
@@ -96,7 +110,7 @@ class AnalysisWorker(object):
         
         # An object with a method to unload user modules if any have
         # changed on disk:
-        self.modulewatcher = ModuleWatcher()
+        self.modulewatcher = ModuleWatcher(self.stderr)
         
         # Start the thread that listens for instructions from the
         # parent process:
@@ -149,8 +163,6 @@ class AnalysisWorker(object):
         # Connect the output redirection:
         self.stdout.connect()
         self.stderr.connect()
-        # Unload user modules if there have been changes on disk:
-        self.modulewatcher.check_and_unload()
         try:
             # Actually run the user's analysis!
             execfile(self.filepath,sandbox,sandbox)
