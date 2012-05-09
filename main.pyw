@@ -229,7 +229,7 @@ class RoutineBox(object):
 
     def add_routine(self, button):
             dialog = gtk.FileChooserDialog(
-                'Select files to add', self.app.window,
+                'Select routine(s) to add', self.app.window,
                 gtk.FILE_CHOOSER_ACTION_OPEN,
                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
                          gtk.STOCK_OPEN, gtk.RESPONSE_OK))
@@ -579,7 +579,6 @@ class FileBox(object):
                 if filepath in self.dataframe['filepath'].values:
                     # Ignore duplicates:
                     continue
-                print 'FILEPATH::::', filepath
                 row = get_dataframe_from_shot(filepath)
                 self.dataframe = concat_with_padding(self.dataframe,row)
         with gtk.gdk.lock:
@@ -670,20 +669,25 @@ class FileBox(object):
             self.liststore.append(store_row)
             
     def on_add_files_clicked(self, button):
-        dialog = gtk.FileSelection('Select files to add')
+        dialog = gtk.FileChooserDialog(
+            'Select shot(s) to add', self.app.window,
+            gtk.FILE_CHOOSER_ACTION_OPEN,
+            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                     gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         # Make the dialog only show h5 files:
-#        h5_filefilter = gtk.FileFilter()
-#        h5_filefilter.add_pattern('*.h5')
-#        h5_filefilter.set_name('HDF5 files')
-#        dialog.add_filter(h5_filefilter)
+        h5_filefilter = gtk.FileFilter()
+        h5_filefilter.add_pattern('*.h5')
+        h5_filefilter.set_name('HDF5 files')
+        dialog.add_filter(h5_filefilter)
         # Other settings:
         dialog.set_select_multiple(True)
-#        dialog.set_current_folder(r'Z:\\Experiments')
-#        dialog.set_default_response(gtk.RESPONSE_OK)
+        dialog.set_local_only(False)
+        dialog.set_current_folder(os.path.join(shared_drive_prefix,'Experiments'))
+        dialog.set_default_response(gtk.RESPONSE_OK)
         # Run the dialog, get the files and add them to the list of
         # opened files:
         response = dialog.run()
-        files = dialog.get_selections()
+        files = dialog.get_filenames()
         dialog.destroy()
         if response == gtk.RESPONSE_OK:
             self.incoming_queue.put([f for f in files if f.endswith('.h5')])
