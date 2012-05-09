@@ -16,7 +16,7 @@ import h5py
 import numpy
 import pandas
 import excepthook
-
+import shared_drive
 from dataframe_utilities import (concat_with_padding, 
                                  get_dataframe_from_shot, 
                                  replace_with_padding)
@@ -24,6 +24,7 @@ from dataframe_utilities import (concat_with_padding,
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
+shared_drive_prefix = shared_drive.get_prefix('monashbec')
 if os.name == 'nt':
     # Make it not look so terrible (if icons and themes are installed):
     settings = gtk.settings_get_default()
@@ -568,6 +569,9 @@ class FileBox(object):
         
     def add_files(self, filepaths, marked=False):
         for i, filepath in enumerate(filepaths):
+            filepath = filepath.replace('Z:',shared_drive_prefix)
+            if not os.name == 'nt':
+                filepath = filepath.replace('\\','/')
             # Using the lock so as to prevent modifying the dataframe
             # whilst update_liststore is mid-loop over it:
             with gtk.gdk.lock:
@@ -575,6 +579,7 @@ class FileBox(object):
                 if filepath in self.dataframe['filepath'].values:
                     # Ignore duplicates:
                     continue
+                print 'FILEPATH::::', filepath
                 row = get_dataframe_from_shot(filepath)
                 self.dataframe = concat_with_padding(self.dataframe,row)
         with gtk.gdk.lock:

@@ -28,8 +28,8 @@ def get_nested_dict_from_shot(filepath):
         try:    
             row['run number'] = h5_file.attrs['run number']
         except KeyError:
-            # Used to be called run_no:
-            row['run number'] = h5_file.attrs['run_no']
+            # ignore:
+            pass
         return row
             
 def flatten_dict(dictionary, keys=tuple()):
