@@ -1,4 +1,4 @@
-import figure_manager
+import lyse.figure_manager
 
 import sys
 import os
