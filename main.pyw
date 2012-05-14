@@ -390,11 +390,9 @@ class RoutineBox(object):
         routine = self.routines[int(index)]
         filepath = routine.filepath
         if os.name == 'nt':
-            subprocess.Popen(['start', filepath])
+            subprocess.Popen([r'C:\Program Files\Notepad++\notepad++', filepath])
         elif 'linux' in sys.platform:
-            subprocess.Popen(['xdg-open',filepath])
-        elif 'darwin' in sys.platform:
-            subprocess.Popen(['open',filepath])
+            subprocess.Popen(['gedit',filepath])
                 
 class FileBox(object):
     storecolumns = ['progress_visible',
