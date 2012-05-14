@@ -24,7 +24,15 @@ from dataframe_utilities import (concat_with_padding,
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
+try:
+    import analysislib
+    analysislib_prefix = os.path.dirname(analysislib.__file__)
+except Exception:
+    analysislib_prefix = None
+    
 shared_drive_prefix = shared_drive.get_prefix('monashbec')
+
+
 if os.name == 'nt':
     # Make it not look so terrible (if icons and themes are installed):
     settings = gtk.settings_get_default()
@@ -77,6 +85,9 @@ class RoutineBox(object):
         # the liststore.
         self.routines = []
 
+        # The folder path that the add-routine file browser will open to:
+        self.current_folder = analysislib_prefix
+        
         # Make a gtk builder, get the widgets we need, connect signals:
         builder = gtk.Builder()
         builder.add_from_file('routinebox.glade')
@@ -240,7 +251,7 @@ class RoutineBox(object):
             dialog.add_filter(py_filefilter)
             # Other settings:
             dialog.set_select_multiple(True)
-            dialog.set_current_folder(r'Z:\\Experiments')
+            dialog.set_current_folder(self.current_folder)
             dialog.set_default_response(gtk.RESPONSE_OK)
             # Run the dialog, get the files and add them to the list of
             # opened files:
@@ -252,6 +263,7 @@ class RoutineBox(object):
                     if file_ not in [routine.filepath for routine in
                                      self.routines]:
                         self.routines.append(AnalysisRoutine(file_, self))
+                self.current_folder = os.path.dirname(file_)
             self.refresh_overall_checkbuttons()
 
     def enable_all_clicked(self, column):
@@ -399,6 +411,9 @@ class FileBox(object):
         self.to_multishot = to_multishot
         self.from_singleshot = from_singleshot
         self.from_multishot = from_multishot
+        
+        # The folder that the add-shots dialog will open to:
+        self.current_folder = os.path.join(shared_drive_prefix,'Experiments')
         
         # Make a gtk builder, get the widgets we need, connect signals:
         builder = gtk.Builder()
@@ -682,7 +697,7 @@ class FileBox(object):
         # Other settings:
         dialog.set_select_multiple(True)
         dialog.set_local_only(False)
-        dialog.set_current_folder(os.path.join(shared_drive_prefix,'Experiments'))
+        dialog.set_current_folder(self.current_folder)
         dialog.set_default_response(gtk.RESPONSE_OK)
         # Run the dialog, get the files and add them to the list of
         # opened files:
@@ -691,7 +706,8 @@ class FileBox(object):
         dialog.destroy()
         if response == gtk.RESPONSE_OK:
             self.incoming_queue.put([f for f in files if f.endswith('.h5')])
-    
+            self.current_folder = os.path.dirname(files[0])
+            
     def delete_selection(self, button):
         model, selection = self.treeselection.get_selected_rows()
         print selection
