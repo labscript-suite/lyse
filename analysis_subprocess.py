@@ -1,3 +1,5 @@
+import figure_manager
+
 import sys
 import os
 import threading

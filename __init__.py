@@ -1,3 +1,5 @@
+import figure_manager
+
 from dataframe_utilities import get_series_from_shot as _get_singleshot
 import os
 import urllib
