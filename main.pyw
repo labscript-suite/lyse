@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import traceback
+import subprocess
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import gtk
@@ -384,7 +385,17 @@ class RoutineBox(object):
         else:
             self.multiplot_all.set_inconsistent(True)
 
-        
+    def on_row_activated(self, treeview, path, column):
+        index = path[0]
+        routine = self.routines[int(index)]
+        filepath = routine.filepath
+        if os.name == 'nt':
+            subprocess.Popen(['start', filepath])
+        elif 'linux' in sys.platform:
+            subprocess.Popen(['xdg-open',filepath])
+        elif 'darwin' in sys.platform:
+            subprocess.Popen(['open',filepath])
+                
 class FileBox(object):
     storecolumns = ['progress_visible',
                'progress_value',

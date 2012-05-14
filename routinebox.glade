@@ -221,6 +221,7 @@
                 <property name="search_column">0</property>
                 <property name="rubber_banding">True</property>
                 <property name="tooltip_column">9</property>
+                <signal name="row-activated" handler="on_row_activated" swapped="no"/>
                 <child>
                   <object class="GtkTreeViewColumn" id="treeviewcolumn4">
                     <property name="title" translatable="yes"> info</property>
