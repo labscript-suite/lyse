@@ -19,7 +19,22 @@ if not sys.stdout.isatty():
     # Prevent bug on windows where writing to stdout without a command
     # window causes a crash:
     sys.stdout = sys.stderr = open(os.devnull,'w')
-        
+
+if os.name == 'nt':
+    # Make it not look so terrible (if icons and themes are installed):
+    settings = gtk.settings_get_default()
+    settings.set_string_property('gtk-icon-theme-name', 'gnome-human', '')
+    settings.set_string_property('gtk-theme-name', 'Clearlooks', '')
+    settings.set_string_property('gtk-font-name', 'ubuntu 9', '')
+    # Have Windows 7 consider this program to be a separate app, and not
+    # group it with other Python programs in the taskbar:
+    import ctypes
+    myappid = 'monashbec.labscript.lyse.1-0' # arbitrary string
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except:
+        pass
+                
 class OutputInterceptor(object):
 
     def __init__(self, queue, streamname='stdout'):
@@ -204,6 +219,8 @@ class AnalysisWorker(object):
         window = gtk.Window()
         l, w = fig.get_size_inches()
         window.resize(int(l*100),int(w*100))
+        window.set_title(os.path.basename(self.filepath))
+        window.set_icon_from_file('icon.png')
         c = FigureCanvas(fig)
         v = gtk.VBox()
         n = NavigationToolbar(c,window)

@@ -40,6 +40,14 @@ if os.name == 'nt':
     settings.set_string_property('gtk-icon-theme-name', 'gnome-human', '')
     settings.set_string_property('gtk-theme-name', 'Clearlooks', '')
     settings.set_string_property('gtk-font-name', 'ubuntu 9', '')
+    # Have Windows 7 consider this program to be a separate app, and not
+    # group it with other Python programs in the taskbar:
+    import ctypes
+    myappid = 'monashbec.labscript.lyse.1-0' # arbitrary string
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except:
+        pass
 
 def setup_logging():
     logger = logging.getLogger('LYSE')
@@ -745,6 +753,95 @@ class FileBox(object):
             self.liststore[i][success_column] = False
         with self.timing_condition:
             self.timing_condition.notify()
+            
+    def on_edit_columns_clicked(self, button):
+        visible = {}
+        for column in self.treeview.get_columns():
+            label = column.get_widget()
+            if isinstance(label, gtk.Label):
+                title = label.get_text()
+                visible[title] = column.get_visible()
+        dialog = EditColumns(self,visible)
+    
+    def set_visible_columns(self, visible):
+        for column in self.treeview.get_columns():
+            label = column.get_widget()
+            if isinstance(label, gtk.Label):
+                title = label.get_text()
+                column.set_visible(visible[title])
+             
+class EditColumns(object):
+
+    def __init__(self, filebox, columns):
+        self.filebox = filebox
+        
+        builder = gtk.Builder()
+        builder.add_from_file('edit_columns.glade')
+        builder.connect_signals(self)
+        
+        self.window = builder.get_object('toplevel')
+        self.treeview = builder.get_object('treeview')
+        self.liststore = builder.get_object('liststore')
+        self.all_visible_checkbutton = builder.get_object('all_visible_checkbutton')
+        self.filter_entry = builder.get_object('filter_entry')
+        
+        self.filter_store = self.liststore.filter_new()
+        self.treeview.set_model(self.filter_store)
+        self.filter_store.set_visible_func(self.check_filter)
+        names = columns.keys()
+        # Sort first by number of lines, then alphabetically:
+        names.sort(key=lambda s: [len(s.splitlines()),s])
+        for name in names:
+            self.liststore.append([name,columns[name]])
+        self.update_overall_checkbutton()
+        self.window.show()
+    
+    def check_filter(self, model, iter):
+        name = self.liststore.get(iter, 0)[0]
+        if isinstance(name, str):
+            if self.filter_entry.get_text().lower() in name.lower():
+                return True
+            
+    def on_filter_changed(self, entry):
+        self.filter_store.refilter()
+        
+    def on_cancel_clicked(self, button):
+        self.window.destroy()
+    
+    def on_ok_clicked(self,button):
+        columns = {}
+        for row in self.liststore:
+            name, visible = row
+            columns[name] = visible
+        self.filebox.set_visible_columns(columns)
+        self.window.destroy()
+                 
+    def on_visible_toggled(self,cellrenderer, index):
+        filtered_index = int(index)
+        real_index = self.filter_store.convert_path_to_child_path(filtered_index)
+        self.liststore[real_index][1] = not self.liststore[real_index][1]
+        self.update_overall_checkbutton()
+        
+    def on_all_visible_toggled(self,*args):
+        self.all_visible_checkbutton.set_inconsistent(False)
+        state = not self.all_visible_checkbutton.get_active()
+        self.all_visible_checkbutton.set_active(state)
+        for row in self.liststore:
+            row[1] = state
+        
+    def update_overall_checkbutton(self):
+        enabled = []
+        for row in self.liststore:
+            enabled.append(row[1])
+        if all(enabled):
+            self.all_visible_checkbutton.set_inconsistent(False)
+            self.all_visible_checkbutton.set_active(True)
+        elif any(enabled):
+            self.all_visible_checkbutton.set_inconsistent(True)
+            self.all_visible_checkbutton.set_active(False)
+        else:
+            self.all_visible_checkbutton.set_inconsistent(False)
+            self.all_visible_checkbutton.set_active(False)
             
 class OutputBox(object):
     def __init__(self,container, queue):
