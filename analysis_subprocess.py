@@ -175,8 +175,6 @@ class AnalysisWorker(object):
                 f.clear()
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath}
-        # Tell pylab to set the current figure to no. 1:
-        pylab.figure(1)
         # Connect the output redirection:
         self.stdout.connect()
         self.stderr.connect()
@@ -190,14 +188,13 @@ class AnalysisWorker(object):
         
         # Introspect the figures that were produced:
         i = 1
-        while True:
-            fig = pylab.figure(i)
+        for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
             if not fig.axes:
-                break
+                continue
             elif not fig in self.figures:
                 # If we don't already have this figure, make a window
                 # to put it in:
-                gobject.idle_add(self.new_figure,fig)
+                gobject.idle_add(self.new_figure,fig,identifier)
             elif not self.autoscaling[fig].get_active():
                 with gtk.gdk.lock:
                     # Restore the axis limits:
@@ -215,12 +212,12 @@ class AnalysisWorker(object):
             for canvas in self.canvases:
                 canvas.draw_idle()
     
-    def new_figure(self, fig):
+    def new_figure(self, fig, identifier):
         window = gtk.Window()
+        window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
         l, w = fig.get_size_inches()
         window.resize(int(l*100),int(w*100))
-        window.set_title(os.path.basename(self.filepath))
-        window.set_icon_from_file('icon.png')
+        window.set_icon_from_file('lyse.svg')
         c = FigureCanvas(fig)
         v = gtk.VBox()
         n = NavigationToolbar(c,window)

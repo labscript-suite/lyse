@@ -7,7 +7,8 @@ class FigureManager(object):
     def __init__(self):
         self.figs = {}
         self._figure = matplotlib.pyplot.figure
-    
+        self._close = matplotlib.pyplot.close
+        
     def get_first_empty_figure(self,*args,**kwargs):
         i = 1
         while True:
@@ -28,5 +29,33 @@ class FigureManager(object):
             self.figs[identifier] = fig
         return fig
 
-import matplotlib.pyplot        
-matplotlib.pyplot.figure = FigureManager()
+    def close(self,identifier=None):
+        if identifier is None:
+            thisfig = matplotlib.pyplot.gcf()
+            for key, fig in self.figs.items():
+                if fig is thisfig:
+                    del self.figs[key]
+                    self._close()
+        elif isinstance(identifier,matplotlib.figure.Figure):
+            thisfig = identifier
+            for key, fig in self.figs.items():
+                if fig is thisfig:
+                    del self.figs[fig]
+                    self._close(thisfig)
+        elif identifier == 'all':
+            self.figs = {}
+            self._close('all')
+        else:
+            fig = self.figs[identifier]
+            self._close(fig.number)
+            del self.figs[identifier]
+            
+
+
+
+import matplotlib.pyplot
+import matplotlib.figure
+ 
+figuremanager = FigureManager()
+matplotlib.pyplot.figure = figuremanager
+matplotlib.pyplot.close = figuremanager.close
