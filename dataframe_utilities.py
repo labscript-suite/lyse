@@ -19,7 +19,8 @@ def get_nested_dict_from_shot(filepath):
                         row[orientation][label][image] = dict(
                             group[image].attrs)
         row['filepath'] = filepath
-        row['labscript'] = h5_file['script'].attrs['name']
+        if 'script' in h5_file: 
+            row['labscript'] = h5_file['script'].attrs['name']
         try:
             row['run time'] = h5_file.attrs['run time']
         except KeyError:

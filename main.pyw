@@ -147,7 +147,6 @@ class RoutineBox(object):
             instruction, filepath = self.from_filebox.get()
             if self.type == 'multi':
                 filepath = self.filechooserbutton.get_filename()
-                print filepath
             print 'routinebox: got a file to process'
             # Clear the 'success' and 'error 'markers:
             with gtk.gdk.lock:
@@ -613,6 +612,7 @@ class FileBox(object):
                 if filepath in self.dataframe['filepath'].values:
                     # Ignore duplicates:
                     continue
+                print filepath
                 row = get_dataframe_from_shot(filepath)
                 self.dataframe = concat_with_padding(self.dataframe,row)
         with gtk.gdk.lock:

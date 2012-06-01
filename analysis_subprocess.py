@@ -213,7 +213,7 @@ class AnalysisWorker(object):
         with gtk.gdk.lock:
             for canvas in self.canvases:
                 canvas.draw_idle()
-    
+
     def new_figure(self, fig, identifier):
         window = gtk.Window()
         window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))

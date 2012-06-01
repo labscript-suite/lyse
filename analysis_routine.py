@@ -119,6 +119,7 @@ class AnalysisRoutine(object):
             signal, data = self.from_worker.get()
             print 'listener_loop: got signal from worker'
             if signal == 'quit':
+                to_do_analysis_function.put(['quit', None])
                 break
             elif signal == 'figure closed':
                 figures_visible, total_figures = data
@@ -145,17 +146,12 @@ class AnalysisRoutine(object):
         # listener_loop thread. This is because that thread has to be
         # listening for communication from the worker all the time,
         # whereas this function is only running some of the time.
-        try:
-            signal, data = self.from_listener.get()
-        except EOFError:
-            # Child has been killed, one way or another.
-            with gtk.gdk.lock:
-                self.routinebox.liststore[self.index][ERROR] = True
-                self.routinebox.liststore[self.index][WORKING] = False  
-            return False
+        signal, data = self.from_listener.get()
         print 'do_analysis: got response from worker'
         with gtk.gdk.lock:
             gobject.source_remove(self.pulse_timeout)
+        if signal == 'quit':
+            return True
         if signal == 'error':
             with gtk.gdk.lock:
                 self.routinebox.liststore[self.index][ERROR] = True
