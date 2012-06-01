@@ -52,7 +52,7 @@ class FigureManager(object):
             self._close(fig.number)
             del self.figs[identifier]
             
-    def show():
+    def show(self):
         if lyse.spinning_top:
             pass # supress show()
         else:
