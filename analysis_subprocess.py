@@ -1,3 +1,5 @@
+import lyse
+lyse.spinning_top = True
 import lyse.figure_manager
 
 import sys

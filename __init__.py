@@ -1,3 +1,5 @@
+spinning_top = False
+
 import figure_manager
 
 from dataframe_utilities import get_series_from_shot as _get_singleshot
@@ -22,7 +24,7 @@ def data(filepath=None, host='localhost'):
         address  = socket.gethostbyname(host)
         response = urllib2.urlopen('http://%s:%d'%(address,port), timeout=2).read()
         df = pickle.loads(response)
-        return df
+        return df.convert_objects()
  
 class Run(object):
     def __init__(self,h5_path,no_write=False):

@@ -1,3 +1,4 @@
+import lyse
 import sys
 if 'matplotlib.pyplot' in sys.modules:
     raise ImportError('lyse must be imported prior to pylab/pyplot in order to correctly override the figure() function.')
@@ -8,6 +9,7 @@ class FigureManager(object):
         self.figs = {}
         self._figure = matplotlib.pyplot.figure
         self._close = matplotlib.pyplot.close
+        self._show = matplotlib.pyplot.show
         
     def get_first_empty_figure(self,*args,**kwargs):
         i = 1
@@ -50,6 +52,11 @@ class FigureManager(object):
             self._close(fig.number)
             del self.figs[identifier]
             
+    def show()
+        if lyse.spinning_top:
+            pass # supress show()
+        else:
+            self._show()
 
 
 
@@ -59,3 +66,4 @@ import matplotlib.figure
 figuremanager = FigureManager()
 matplotlib.pyplot.figure = figuremanager
 matplotlib.pyplot.close = figuremanager.close
+matplotlib.pyplot.show = figuremanager.show
