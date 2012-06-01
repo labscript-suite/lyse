@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import cgi
 import logging, logging.handlers
 import os
@@ -629,7 +631,11 @@ class FileBox(object):
         print 'updating row', filepath
         row = get_dataframe_from_shot(filepath)
         index = numpy.where(self.dataframe['filepath'].values == row['filepath'].values)
-        index = index[0][0]
+        try:
+            index = index[0][0]
+        except IndexError:
+            # Shot was deleted from dataframe by user
+            return
         # Update the row in the dataframe:
         self.dataframe = replace_with_padding(self.dataframe, row, index)  
         # Check if new columns need to be created: 
