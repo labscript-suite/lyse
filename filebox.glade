@@ -267,11 +267,8 @@
                     <property name="clickable">True</property>
                     <property name="widget">enable_all</property>
                     <property name="reorderable">True</property>
-                    <signal name="clicked" handler="enable_all_clicked" swapped="no"/>
                     <child>
-                      <object class="GtkCellRendererToggle" id="enable">
-                        <signal name="toggled" handler="enable_toggled" swapped="no"/>
-                      </object>
+                      <object class="GtkCellRendererToggle" id="enable"/>
                       <attributes>
                         <attribute name="active">4</attribute>
                       </attributes>

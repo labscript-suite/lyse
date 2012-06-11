@@ -397,7 +397,6 @@
           <object class="GtkFileChooserButton" id="filechooserbutton">
             <property name="width_request">196</property>
             <property name="can_focus">False</property>
-            <property name="action">save</property>
             <property name="filter">output_filefilter</property>
             <property name="title" translatable="yes">Select file to save output</property>
           </object>

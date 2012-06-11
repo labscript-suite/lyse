@@ -27,6 +27,7 @@ from dataframe_utilities import (concat_with_padding,
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
+from subproc_utils.gtk_components import OutputBox
 try:
     import analysislib
     analysislib_prefix = os.path.dirname(analysislib.__file__)
@@ -61,7 +62,7 @@ def setup_logging():
     if sys.stdout.isatty():
         terminalhandler = logging.StreamHandler(sys.stdout)
         terminalhandler.setFormatter(formatter)
-        terminalhandler.setLevel(logging.INFO) # only display info or higher in the terminal
+        terminalhandler.setLevel(logging.DEBUG)
         logger.addHandler(terminalhandler)
     else:
         # Prevent bug on windows where writing to stdout without a command
@@ -82,6 +83,8 @@ class RoutineBox(object):
         
         self.type = 'multi' if multishot else 'single' 
         
+        self.logger = logging.getLogger('LYSE.RoutineBox.%s'%self.type)  
+        self.logger.info('starting')
         # The queues, through which the filebox will tell us what files
         # to analyse, and we will report progress back:
         self.to_filebox = to_filebox
@@ -147,7 +150,7 @@ class RoutineBox(object):
             instruction, filepath = self.from_filebox.get()
             if self.type == 'multi':
                 filepath = self.filechooserbutton.get_filename()
-            print 'routinebox: got a file to process'
+            self.logger.debug('got a file to process: %s'%filepath)
             # Clear the 'success' and 'error 'markers:
             with gtk.gdk.lock:
                 for row in self.liststore:
@@ -157,7 +160,7 @@ class RoutineBox(object):
             done = 0
             error = False
             while remaining:
-                print 'routinebox:', remaining, 'routines left to do'
+                self.logger.debug('%d routines left to do'%remaining)
                 routine = None
                 with gtk.gdk.lock:
                     for i, row in enumerate(self.liststore):
@@ -165,10 +168,13 @@ class RoutineBox(object):
                             routine = self.routines[i]
                             break
                 if routine is not None:
+                    self.logger.info('running analysis routine %s'%routine.shortname)
                     success = routine.do_analysis(self.type, filepath)
                     if success:
+                        self.logger.debug('success')
                         done += 1   
                     else:
+                        self.logger.debug('failure')
                         error = True
                         break
                 remaining = self.todo()
@@ -178,6 +184,7 @@ class RoutineBox(object):
                 self.to_filebox.put(['error', None])
             else:
                 self.to_filebox.put(['done',None])
+            self.logger.debug('completed analysis of %s'%filepath)
             
     def reorder(self, order):
         # Apply the reordering to the liststore:
@@ -242,6 +249,7 @@ class RoutineBox(object):
             model.remove(iter)
             selection = self.treeview.get_selection()
             model, selection = selection.get_selected_rows()
+            self.logger.debug('deleting routine %s'%self.routines[path[0]].shortname)
             self.routines[path[0]].destroy()
             del self.routines[path[0]]
         # Tell the routines their new indices:
@@ -272,6 +280,7 @@ class RoutineBox(object):
                 for file_ in files:
                     if file_ not in [routine.filepath for routine in
                                      self.routines]:
+                        self.logger.debug('adding routine %s'%os.path.basename(file_))
                         self.routines.append(AnalysisRoutine(file_, self))
                 self.current_folder = os.path.dirname(file_)
             self.refresh_overall_checkbuttons()
@@ -430,6 +439,8 @@ class FileBox(object):
         self.from_singleshot = from_singleshot
         self.from_multishot = from_multishot
         
+        self.logger = logging.getLogger('LYSE.FileBox')  
+        self.logger.info('starting')
         # The folder that the add-shots dialog will open to:
         self.current_folder = os.path.join(shared_drive_prefix,'Experiments')
         
@@ -495,6 +506,7 @@ class FileBox(object):
         self.adjustment.set_value(self.adjustment.upper - self.adjustment.page_size)
         
     def incoming_buffer_loop(self):
+        logger = logging.getLogger('LYSE.FileBox.incoming')  
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
@@ -507,18 +519,20 @@ class FileBox(object):
             while self.incoming_paused:
                 time.sleep(1)
             filepaths = self.incoming_queue.get()
+            logger.info('adding some files')
             self.add_files(filepaths, marked=True)
             
     def analysis_loop(self):
+        logger = logging.getLogger('LYSE.FileBox.analysis_loop')
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
         # imported. So we'll silence them in this thread too:
         h5py._errors.silence_errors()
-        
-        completed_column = self.storecolumns.index('success_visible')
-        progress_column = self.storecolumns.index('progress_value')
-        progress_visible_column = self.storecolumns.index('progress_visible')
+        with gtk.gdk.lock:
+            completed_column = self.storecolumns.index('success_visible')
+            progress_column = self.storecolumns.index('progress_value')
+            progress_visible_column = self.storecolumns.index('progress_visible')
         next_row = None
         self.multishot_required = False
         while True:
@@ -849,54 +863,6 @@ class EditColumns(object):
             self.all_visible_checkbutton.set_inconsistent(False)
             self.all_visible_checkbutton.set_active(False)
             
-class OutputBox(object):
-    def __init__(self,container, queue):
-    
-        self.output_view = gtk.TextView()
-        container.add(self.output_view)
-        self.output_adjustment = self.output_view.get_vadjustment()
-        self.output_buffer = self.output_view.get_buffer()
-        self.text_mark = self.output_buffer.create_mark(None, self.output_buffer.get_end_iter())
-        
-        self.output_view.modify_base(gtk.STATE_NORMAL, gtk.gdk.color_parse('black'))
-        self.output_view.modify_text(gtk.STATE_NORMAL, gtk.gdk.color_parse('white'))
-        self.output_view.modify_font(pango.FontDescription("monospace 11"))
-        self.output_view.set_indent(5)
-        self.output_view.set_wrap_mode(gtk.WRAP_WORD_CHAR)
-        self.output_view.show()
-                
-        self.queue = queue
-        self.mainloop = threading.Thread(target=self.mainloop)
-        self.mainloop.daemon = True
-        self.mainloop.start()
-        
-    def mainloop(self):
-        while True:
-            stream, text = self.queue.get()
-            if stream == 'stderr':
-                red = True
-            else:
-                red = False
-            with gtk.gdk.lock:
-                # Check if the scrollbar is at the bottom of the textview:
-                scrolling = self.output_adjustment.value == self.output_adjustment.upper - self.output_adjustment.page_size
-                # We need the initial cursor position so we know what range to make red:
-                offset = self.output_buffer.get_end_iter().get_offset()
-                # Insert the text at the end:
-                self.output_buffer.insert(self.output_buffer.get_end_iter(), text)
-                if red:
-                    start = self.output_buffer.get_iter_at_offset(offset)
-                    end = self.output_buffer.get_end_iter()
-                    # Make the text red:
-                    self.output_buffer.apply_tag(self.output_buffer.create_tag(foreground='red'),start,end)
-                    self.output_buffer.apply_tag(self.output_buffer.create_tag(weight=pango.WEIGHT_BOLD),start,end)
-
-                # Automatically keep the textbox scrolled to the bottom, but
-                # only if it was at the bottom to begin with. If the user has
-                # scrolled up we won't jump them back to the bottom:
-                if scrolling:
-                    self.output_view.scroll_to_mark(self.text_mark,0)
-
 class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):

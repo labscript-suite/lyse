@@ -13,6 +13,7 @@ import gobject
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 import pylab
+import h5py
 
 import excepthook
 import subproc_utils
@@ -37,31 +38,6 @@ if os.name == 'nt':
     except:
         pass
                 
-class OutputInterceptor(object):
-
-    def __init__(self, queue, streamname='stdout'):
-        self.queue = queue
-        self.streamname = streamname
-        self.real_stream = getattr(sys,streamname)
-        self.fileno = self.real_stream.fileno
-        self.readline = self.real_stream.readline
-        self.flush = self.real_stream.flush
-        
-    def connect(self):
-        setattr(sys,self.streamname,self)
-    
-    def disconnect(self):
-        setattr(sys,self.streamname,self.real_stream)
-            
-    def write(self, s):
-        self.queue.put([self.streamname, s])
-        self.real_stream.write(s)
-        
-    def close(self):
-        self.disconnect()
-        sys.stdout.close()
-        
-
 class ModuleWatcher(object):
      def __init__(self,stderr):
          # The whitelist is the list of names of currently loaded modules:
@@ -71,7 +47,6 @@ class ModuleWatcher(object):
          self.main.daemon = True
          self.stderr = stderr
          self.main.start()
-
          
      def mainloop(self):
          while True:
@@ -109,6 +84,7 @@ class ModuleWatcher(object):
                             if name in self.modified_times:
                                 del self.modified_times[name]
         
+        
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
         self.to_parent = to_parent
@@ -117,8 +93,8 @@ class AnalysisWorker(object):
         
         # Replacement stdout and stderr to redirect the output of the
         # users code to the textview in the main app:
-        self.stdout = OutputInterceptor(self.to_parent)
-        self.stderr = OutputInterceptor(self.to_parent,'stderr')
+        self.stdout = subproc_utils.OutputInterceptor(self.to_parent)
+        self.stderr = subproc_utils.OutputInterceptor(self.to_parent,'stderr')
         
         # Keeping track of figures and canvases:
         self.figures = []
@@ -138,6 +114,11 @@ class AnalysisWorker(object):
         self.mainloop_thread.start()
         
     def mainloop(self):
+        # HDF5 prints lots of errors by default, for things that aren't
+        # actually errors. These are silenced on a per thread basis,
+        # and automatically silenced in the main thread when h5py is
+        # imported. So we'll silence them in this thread too:
+        h5py._errors.silence_errors()
         print 'worker: mainloop starting'
         while True:
             print 'worker: waiting for next task'

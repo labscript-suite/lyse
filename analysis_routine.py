@@ -28,11 +28,12 @@ class AnalysisRoutine(object):
     def __init__(self,filepath, routinebox, restart=False):
         # The path to the python script that does the analysis:
         self.filepath = filepath
+        self.shortname = os.path.basename(self.filepath)
         self.routinebox = routinebox
         
         self.to_outputbox = self.routinebox.to_outputbox
         
-        self.pulse_timeout = 0
+        self.pulse_timeout = None
         
         objs = subproc_utils.subprocess_with_queues('analysis_subprocess.py')
         # Two queues for communicatng with the worker process for this
@@ -99,11 +100,12 @@ class AnalysisRoutine(object):
         # Kill the listener thread:
         self.from_worker.put(['quit',None])
         # Kill the worker process:
-        self.worker.terminate()
+        self.to_worker.put(['quit',None])
         # Stop the timeout attempting to update the spinner:
         if self.pulse_timeout is not None:
             gobject.source_remove(self.pulse_timeout)
-    
+            self.pulse_timeout = None
+            
     def restart(self):
         self.destroy()
         self.__init__(self.filepath, self.routinebox, restart=True)
@@ -163,7 +165,10 @@ class AnalysisRoutine(object):
         return True
     
     def pulse(self):
-        self.routinebox.liststore[self.index][PULSE] += 1
+        # Check that we haven't been gobject.source_remove'd since being
+        # placed in the gtk event queue:
+        if self.pulse_timeout:
+            self.routinebox.liststore[self.index][PULSE] += 1
         return True
         
 
