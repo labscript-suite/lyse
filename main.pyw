@@ -135,7 +135,11 @@ class RoutineBox(object):
         self.analysis = threading.Thread(target = self.analysis_loop)
         self.analysis.daemon = True
         self.analysis.start()
-        
+    
+    def destroy(self):
+        for routine in self.routines:
+            routine.destroy()
+            
     def todo(self):
         """How many analysis routines are not done?"""
         todo = 0
@@ -904,7 +908,7 @@ class AnalysisApp(object):
         filebox_container = builder.get_object('filebox_container')
         outputbox_container = builder.get_object('outputbox_container')
         
-        self.window.connect('destroy', gtk.main_quit)
+        self.window.connect('destroy', self.destroy)
         # All running analysis routines will have their output streams
         # redirected to the outputbox via this queue:
         to_outputbox = Queue.Queue()
@@ -937,7 +941,14 @@ class AnalysisApp(object):
         self.window.maximize()
         self.window.show()
         print 'number of threads is:', threading.active_count()
-
+    
+    def destroy(self,*args):
+        gtk.main_quit()
+        # The routine boxes have subprocesses that need to be quit:
+        self.singleshot_routinebox.destroy()
+        self.multishot_routinebox.destroy()
+        
+        
 if __name__ == '__main__':
     gtk.gdk.threads_init()
     app = AnalysisApp()

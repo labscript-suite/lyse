@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use("GTKAgg")
+
 import lyse
 lyse.spinning_top = True
 import lyse.figure_manager
@@ -126,7 +129,8 @@ class AnalysisWorker(object):
             with kill_lock:
                 print 'worker: got task', task
                 if task == 'quit':
-                    break
+                    with gtk.gdk.lock:
+                        gtk.main_quit()
                 elif task == 'reset figs':
                     self.reset_figs()
                 elif task == 'single' or task == 'multi':
