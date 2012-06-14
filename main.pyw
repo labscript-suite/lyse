@@ -184,6 +184,8 @@ class RoutineBox(object):
                 remaining = self.todo()
                 completion = 100*float(done)/(remaining + done)
                 self.to_filebox.put(['progress',completion])
+                # Allow filebox to update_row before continuing
+                assert self.from_filebox.get() == ['continue', None]
             if error:
                 self.to_filebox.put(['error', None])
             else:
@@ -575,6 +577,7 @@ class FileBox(object):
                                 if row[filepath_column] == path:
                                     row[progress_column] = completion
                         self.update_row(path)
+                        self.to_singleshot.put(['continue',None])
                     elif signal == 'done':
                         with gtk.gdk.lock:
                             for row in self.liststore:
@@ -598,6 +601,7 @@ class FileBox(object):
                     print 'filebox: got progress response'
                     if signal == 'progress':
                         completion = data
+                        self.to_multishot.put(['continue',None])
                     elif signal == 'done':
                         break
                     elif signal == 'error':
