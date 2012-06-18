@@ -659,7 +659,8 @@ class FileBox(object):
             # Shot was deleted from dataframe by user
             return
         # Update the row in the dataframe:
-        self.dataframe = replace_with_padding(self.dataframe, row, index)  
+        with gtk.gdk.lock:
+            self.dataframe = replace_with_padding(self.dataframe, row, index)  
         # Check if new columns need to be created: 
         with gtk.gdk.lock:
             self.update_liststore()
