@@ -181,7 +181,8 @@ class AnalysisWorker(object):
             elif not fig in self.figures:
                 # If we don't already have this figure, make a window
                 # to put it in:
-                gobject.idle_add(self.new_figure,fig,identifier)
+                with gtk.gdk.lock:
+                    gobject.idle_add(self.new_figure,fig,identifier)
             elif not self.autoscaling[fig].get_active():
                 with gtk.gdk.lock:
                     # Restore the axis limits:

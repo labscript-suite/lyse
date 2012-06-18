@@ -153,7 +153,8 @@ class RoutineBox(object):
         while True:
             instruction, filepath = self.from_filebox.get()
             if self.type == 'multi':
-                filepath = self.filechooserbutton.get_filename()
+                with gtk.gdk.lock:
+                    filepath = self.filechooserbutton.get_filename()
             self.logger.debug('got a file to process: %s'%filepath)
             # Clear the 'success' and 'error 'markers:
             with gtk.gdk.lock:
@@ -576,7 +577,8 @@ class FileBox(object):
                             for row in self.liststore:
                                 if row[filepath_column] == path:
                                     row[progress_column] = completion
-                        self.update_row(path)
+                        with gtk.gdk.lock:
+                            self.update_row(path)
                         self.to_singleshot.put(['continue',None])
                     elif signal == 'done':
                         with gtk.gdk.lock:
@@ -659,21 +661,19 @@ class FileBox(object):
             # Shot was deleted from dataframe by user
             return
         # Update the row in the dataframe:
-        with gtk.gdk.lock:
-            self.dataframe = replace_with_padding(self.dataframe, row, index)  
+        self.dataframe = replace_with_padding(self.dataframe, row, index)  
         # Check if new columns need to be created: 
-        with gtk.gdk.lock:
-            self.update_liststore()
-            # update the row in the liststore:
-            for rowindex, store_row in enumerate(self.liststore):
-                if store_row[self.column_labels[('filepath',)]] == filepath:
-                    for label, colindex in self.column_labels.items():
-                        item = self.dataframe[label].values[index]
-                        if isinstance(item, str):
-                            lines = item.splitlines()
-                            if len(lines) > 1:
-                                item = lines[0] + ' ...'
-                        store_row[colindex] = item
+        self.update_liststore()
+        # update the row in the liststore:
+        for rowindex, store_row in enumerate(self.liststore):
+            if store_row[self.column_labels[('filepath',)]] == filepath:
+                for label, colindex in self.column_labels.items():
+                    item = self.dataframe[label].values[index]
+                    if isinstance(item, str):
+                        lines = item.splitlines()
+                        if len(lines) > 1:
+                            item = lines[0] + ' ...'
+                    store_row[colindex] = item
             
     def update_liststore(self):
         print 'updating liststore!'
@@ -889,13 +889,15 @@ class RequestHandler(BaseHTTPRequestHandler):
                 app.filebox.incoming_queue.put([h5_filepath])
                 self.wfile.write('added successfully')
         else:
-            self.wfile.write(pickle.dumps(app.filebox.dataframe))
+            with gtk.gdk.lock:
+                self.wfile.write(pickle.dumps(app.filebox.dataframe))
         self.wfile.close()
     
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(pickle.dumps(app.filebox.dataframe))
+        with gtk.gdk.lock:
+            self.wfile.write(pickle.dumps(app.filebox.dataframe))
         self.wfile.close()
 
                
