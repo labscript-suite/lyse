@@ -161,7 +161,7 @@ class AnalysisWorker(object):
                     axis_limits[f,i] = a.get_xlim(), a.get_ylim()
                 f.clear()
         # The namespace the routine will run in:
-        sandbox = {'path':path,'__file__':self.filepath,'__name__','__main__'}
+        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
         # Connect the output redirection:
         self.stdout.connect()
         self.stderr.connect()
