@@ -151,7 +151,8 @@ class AnalysisRoutine(object):
         signal, data = self.from_listener.get()
         print 'do_analysis: got response from worker'
         with gtk.gdk.lock:
-            gobject.source_remove(self.pulse_timeout)
+            if self.pulse_timeout:
+                gobject.source_remove(self.pulse_timeout)
         if signal == 'quit':
             return True
         if signal == 'error':
