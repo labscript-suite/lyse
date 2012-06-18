@@ -69,7 +69,7 @@ def workaround_empty_string_bug(dictionary):
     # all empty strings with ordinary python ones, numpy will convert them
     # (when it needs to) to a datatype it can handle.
     for key, value in dictionary.items():
-        if value == '':
+        if isinstance(value,str) and value == '':
             dictionary[key] = ''
             
 def flat_dict_to_flat_series(dictionary):
