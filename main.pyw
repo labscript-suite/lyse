@@ -611,7 +611,15 @@ class FileBox(object):
                         break
                 if not error:
                     self.multishot_required = False
-                
+    
+    def on_row_activated(self, treeview, path, column):
+        index = path[0]
+        filepath = self.dataframe['filepath'][index]
+        if os.name == 'nt':
+            subprocess.Popen([r'C:\Program Files\TheHDFGroup\HDFView2.7\HDFView.ex', filepath])
+        else:
+            subprocess.Popen([r'hdfview', filepath])
+            
     def on_pause_button_toggled(self,button):
         self.analysis_loop_paused = button.get_active()
         self.paused_vbox.set_visible(self.analysis_loop_paused)
