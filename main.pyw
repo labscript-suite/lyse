@@ -34,8 +34,11 @@ try:
 except Exception:
     analysislib_prefix = None
     
-shared_drive_prefix = shared_drive.get_prefix('monashbec')
-
+try:
+    shared_drive_mounted = True
+    shared_drive_prefix = shared_drive.get_prefix('monashbec')
+except RuntimeError:
+    shared_drive_mounted = False
 
 if os.name == 'nt':
     # Make it not look so terrible (if icons and themes are installed):
@@ -449,7 +452,10 @@ class FileBox(object):
         self.logger = logging.getLogger('LYSE.FileBox')  
         self.logger.info('starting')
         # The folder that the add-shots dialog will open to:
-        self.current_folder = os.path.join(shared_drive_prefix,'Experiments')
+        if shared_drive_mounted:
+            self.current_folder = os.path.join(shared_drive_prefix,'Experiments')
+        else:
+            self.current_folder =  os.path.curdir
         
         # Make a gtk builder, get the widgets we need, connect signals:
         builder = gtk.Builder()
@@ -634,7 +640,8 @@ class FileBox(object):
         
     def add_files(self, filepaths, marked=False):
         for i, filepath in enumerate(filepaths):
-            filepath = filepath.replace('Z:',shared_drive_prefix)
+            if shared_drive_mounted:
+                filepath = filepath.replace('Z:',shared_drive_prefix)
             if not os.name == 'nt':
                 filepath = filepath.replace('\\','/')
             # Using the lock so as to prevent modifying the dataframe
