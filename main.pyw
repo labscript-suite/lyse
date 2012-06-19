@@ -616,7 +616,7 @@ class FileBox(object):
         index = path[0]
         filepath = self.dataframe['filepath'][index]
         if os.name == 'nt':
-            subprocess.Popen([r'C:\Program Files\TheHDFGroup\HDFView2.7\HDFView.ex', filepath])
+            subprocess.Popen([r'C:\Program Files\TheHDFGroup\HDFView2.7\HDFView.exe', filepath])
         else:
             subprocess.Popen([r'hdfview', filepath])
             
