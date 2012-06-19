@@ -24,8 +24,7 @@ def get_nested_dict_from_shot(filepath):
         try:
             row['run time'] = h5_file.attrs['run time']
         except KeyError:
-            # use compile time instead
-            row['run time'] = os.path.split(filepath)[1].replace('.py','').split('_')[1]
+            row['run time'] = float('nan')
         try:    
             row['run number'] = h5_file.attrs['run number']
         except KeyError:
