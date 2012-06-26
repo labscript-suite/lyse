@@ -169,7 +169,8 @@ class AnalysisRoutine(object):
         # Check that we haven't been gobject.source_remove'd since being
         # placed in the gtk event queue:
         if self.pulse_timeout:
-            self.routinebox.liststore[self.index][PULSE] += 1
+            with gtk.gdk.lock:
+                self.routinebox.liststore[self.index][PULSE] += 1
         return True
         
 

@@ -635,7 +635,8 @@ class FileBox(object):
             self.timing_condition.notify_all()    
             
     def scroll_to_bottom(self):
-        self.adjustment.set_value(self.adjustment.upper - self.adjustment.page_size)
+        with gtk.gdk.lock:
+            self.adjustment.set_value(self.adjustment.upper - self.adjustment.page_size)
         self.scrolled = True
         
     def add_files(self, filepaths, marked=False):
