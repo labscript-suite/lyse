@@ -201,24 +201,25 @@ class AnalysisWorker(object):
                 canvas.draw_idle()
 
     def new_figure(self, fig, identifier):
-        window = gtk.Window()
-        window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
-        l, w = fig.get_size_inches()
-        window.resize(int(l*100),int(w*100))
-        window.set_icon_from_file('lyse.svg')
-        c = FigureCanvas(fig)
-        v = gtk.VBox()
-        n = NavigationToolbar(c,window)
-        b = gtk.ToggleButton('Autoscale')
-        v.pack_start(b,False,False)
-        v.pack_start(c)
-        v.pack_start(n,False,False)
-        window.add(v)
-        window.show_all()
-        window.present()
-        self.canvases.append(c)
-        self.figures.append(fig)
-        self.autoscaling[fig] = b
+        with gtk.gdk.lock:
+            window = gtk.Window()
+            window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
+            l, w = fig.get_size_inches()
+            window.resize(int(l*100),int(w*100))
+            window.set_icon_from_file('lyse.svg')
+            c = FigureCanvas(fig)
+            v = gtk.VBox()
+            n = NavigationToolbar(c,window)
+            b = gtk.ToggleButton('Autoscale')
+            v.pack_start(b,False,False)
+            v.pack_start(c)
+            v.pack_start(n,False,False)
+            window.add(v)
+            window.show_all()
+            window.present()
+            self.canvases.append(c)
+            self.figures.append(fig)
+            self.autoscaling[fig] = b
         
     def reset_figs(self):
         pass
