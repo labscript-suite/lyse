@@ -150,6 +150,30 @@ class Run(object):
             results.append(self.get_image(orientation,label,image))
         return results
         
+    def get_globals(self,group=None):
+        globals_dict = {}
+        if not group:
+            with h5py.File(self.h5_path) as h5_file:
+                for key, val in h5_file['globals'].attrs.items():
+                    globals_dict[key] = val
+            return globals_dict
+        else:
+            try:
+                with h5py.File(self.h5_path) as h5_file:
+                    for key, val in h5_file['globals'][group].attrs.items():
+                        globals_dict[key] = val
+                return globals_dict                
+            except KeyError:
+                return globals_dict
+
+    def globals_groups(self):
+        with h5py.File(self.h5_path) as h5_file:
+            try:
+                return h5_file['globals'].keys()
+            except KeyError:
+                return []              
+    
+        
 class Sequence(Run):
     def __init__(self,h5_path,run_paths):
         if isinstance(run_paths, pandas.DataFrame):
