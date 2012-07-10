@@ -51,12 +51,12 @@ class Run(object):
                     if not self.group in h5_file['results']:
                          h5_file['results'].create_group(self.group)
         except KeyError:
-            sys.stderr.write('Warning: to write results, call '
-            'Run.set_group(groupname), specifying the name of the group '
-            'you would like to save results to. This normally comes from '
-            'the filename of your script, but since you\'re in interactive '
-            'mode, there is no scipt name. Opening in read only mode for '
-            'the moment.\n')
+            # sys.stderr.write('Warning: to write results, call '
+            # 'Run.set_group(groupname), specifying the name of the group '
+            # 'you would like to save results to. This normally comes from '
+            # 'the filename of your script, but since you\'re in interactive '
+            # 'mode, there is no scipt name. Opening in read only mode for '
+            # 'the moment.\n')
             self.no_write = True
             
     def set_group(self, groupname):

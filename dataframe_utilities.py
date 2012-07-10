@@ -1,7 +1,7 @@
 import h5py
 import pandas
 import os
-from numpy import intersect1d
+from numpy import *
 
 def get_nested_dict_from_shot(filepath):
     with h5py.File(filepath,'r') as h5_file:
@@ -140,7 +140,7 @@ def dict_diff(dict1, dict2):
     """Return the difference between two dictionaries as a dictionary of key: [val1, val2] pairs.
     Keys unique to either dictionary are included as key: [val1, '-'] or key: ['-', val2]."""
     diff_keys = []
-    common_keys = np.intersect1d(dict1.keys(), dict2.keys())
+    common_keys = intersect1d(dict1.keys(), dict2.keys())
     for key in common_keys:
         if iterable(dict1[key]):
             if any(dict1[key] != dict2[key]):
