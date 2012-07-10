@@ -3,6 +3,7 @@ spinning_top = False
 import figure_manager
 
 from dataframe_utilities import get_series_from_shot as _get_singleshot
+from dataframe_utilities import dict_diff
 import os
 import urllib
 import urllib2
@@ -25,6 +26,9 @@ def data(filepath=None, host='localhost'):
         response = urllib2.urlopen('http://%s:%d'%(address,port), timeout=2).read()
         df = pickle.loads(response)
         return df.convert_objects()
+        
+def globals_diff(run1, run2, group=None):
+    return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
 class Run(object):
     def __init__(self,h5_path,no_write=False):
@@ -171,7 +175,10 @@ class Run(object):
             try:
                 return h5_file['globals'].keys()
             except KeyError:
-                return []              
+                return []   
+                
+    def globals_diff(self, other_run, group=None):
+        return globals_diff(self, other_run, group)            
     
         
 class Sequence(Run):
