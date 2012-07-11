@@ -157,6 +157,14 @@ class Run(object):
         for image in images:
             results.append(self.get_image(orientation,label,image))
         return results
+    
+    def get_image_attributes(self,orientation):
+        with h5py.File(self.h5_path) as h5_file:
+            if not 'images' in h5_file:
+                raise Exception('File does not contain any images')
+            if not orientation in h5_file['images']:
+                raise Exception('File does not contain any images with orientation \'%s\''%orientation)
+            return dict(h5_file['images'][orientation].attrs)
         
     def get_globals(self,group=None):
         if not group:

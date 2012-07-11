@@ -23,9 +23,9 @@ def get_nested_dict_from_shot(filepath):
                         row[orientation][label][image] = dict(
                             group[image].attrs)
         row['filepath'] = filepath
+        row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])        
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
-            row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])
         try:
             row['run time'] = asdatetime(h5_file.attrs['run time'])
         except KeyError:
