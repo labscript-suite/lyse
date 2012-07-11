@@ -25,7 +25,11 @@ def data(filepath=None, host='localhost'):
         address  = socket.gethostbyname(host)
         response = urllib2.urlopen('http://%s:%d'%(address,port), timeout=2).read()
         df = pickle.loads(response)
-        return df.convert_objects()
+        df.convert_objects()
+        # df = df.set_index('run time', inplace=True, drop=False)
+        df.set_index(['sequence','run time'], inplace=True, drop=False)
+        df.sort_index(inplace=True)
+        return df
         
 def globals_diff(run1, run2, group=None):
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
@@ -155,20 +159,15 @@ class Run(object):
         return results
         
     def get_globals(self,group=None):
-        globals_dict = {}
         if not group:
             with h5py.File(self.h5_path) as h5_file:
-                for key, val in h5_file['globals'].attrs.items():
-                    globals_dict[key] = val
-            return globals_dict
+                return dict(h5_file['globals'].attrs)
         else:
             try:
                 with h5py.File(self.h5_path) as h5_file:
-                    for key, val in h5_file['globals'][group].attrs.items():
-                        globals_dict[key] = val
-                return globals_dict                
+                    return dict(h5_file['globals'][group].attrs)
             except KeyError:
-                return globals_dict
+                return {}
 
     def globals_groups(self):
         with h5py.File(self.h5_path) as h5_file:

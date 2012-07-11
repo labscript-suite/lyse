@@ -2,6 +2,9 @@ import h5py
 import pandas
 import os
 from numpy import *
+import dateutil
+
+asdatetime = dateutil.parser.parse
 
 def get_nested_dict_from_shot(filepath):
     with h5py.File(filepath,'r') as h5_file:
@@ -22,8 +25,9 @@ def get_nested_dict_from_shot(filepath):
         row['filepath'] = filepath
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
+            row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])
         try:
-            row['run time'] = h5_file.attrs['run time']
+            row['run time'] = asdatetime(h5_file.attrs['run time'])
         except KeyError:
             row['run time'] = float('nan')
         try:    
