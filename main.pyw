@@ -32,14 +32,14 @@ try:
     import analysislib
     analysislib_prefix = os.path.dirname(analysislib.__file__)
 except Exception:
-    analysislib_prefix = None
+    analysislib_prefix = os.path.curdir
     
 try:
     shared_drive_mounted = True
     shared_drive_prefix = shared_drive.get_prefix('monashbec')
 except RuntimeError:
     shared_drive_mounted = False
-
+    
 if os.name == 'nt':
     # Make it not look so terrible (if icons and themes are installed):
     settings = gtk.settings_get_default()
@@ -56,8 +56,9 @@ if os.name == 'nt':
         pass
 
 def setup_logging():
+    log_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),'lyse.log')
     logger = logging.getLogger('LYSE')
-    handler = logging.handlers.RotatingFileHandler(r'C:\\pythonlib\lyse\lyse.log', maxBytes=1024*1024*50)
+    handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=1024*1024*50)
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
     handler.setFormatter(formatter)
     handler.setLevel(logging.DEBUG)

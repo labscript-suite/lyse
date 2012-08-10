@@ -14,7 +14,8 @@ import sys
 
 import h5py
 import pandas
-from pylab import array
+from pylab import array, ndarray
+import types
 
 def data(filepath=None, host='localhost'):
     if filepath is not None:
@@ -176,6 +177,51 @@ class Run(object):
                     return dict(h5_file['globals'][group].attrs)
             except KeyError:
                 return {}
+
+    def get_globals_raw(self,group=None):
+        globals_dict = {}
+        def append_globals(name, obj):
+            if not 'units' in name:
+                temp_dict = dict(obj.attrs)
+                for key, val in temp_dict.items():
+                    globals_dict[key] = val
+        with h5py.File(self.h5_path) as h5_file:
+            h5_file['globals'].visititems(append_globals)
+        return globals_dict
+        
+    def iterable_globals(self,group=None):
+        raw_globals = self.get_globals_raw(group)
+        print raw_globals.items()
+        iterable_globals = {}
+        for global_name, expression in raw_globals.items():
+            print expression
+            # try:
+                # sandbox = {}
+                # exec('from pylab import *',sandbox,sandbox)
+                # exec('from runmanager.functions import *',sandbox,sandbox)
+                # value = eval(expression,sandbox)
+            # except Exception as e:
+                # raise Exception('Error parsing global \'%s\': '%global_name + str(e))
+            # if isinstance(value,types.GeneratorType):
+               # print global_name + ' is iterable.'
+               # iterable_globals[global_name] = [tuple(value)]
+            # elif isinstance(value, ndarray) or  isinstance(value, list):
+               # print global_name + ' is iterable.'            
+               # iterable_globals[global_name] = value
+            # else:
+                # print global_name + ' is not iterable.'
+            return raw_globals
+                   
+    def get_units(self,group=None):
+        units_dict = {}
+        def append_units(name, obj):
+            if 'units' in name:
+                temp_dict = dict(obj.attrs)
+                for key, val in temp_dict.items():
+                    units_dict[key] = val
+        with h5py.File(self.h5_path) as h5_file:
+            h5_file['globals'].visititems(append_units)
+        return units_dict
 
     def globals_groups(self):
         with h5py.File(self.h5_path) as h5_file:
