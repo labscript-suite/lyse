@@ -17,15 +17,14 @@ import pandas
 from pylab import array, ndarray
 import types
 
+from subproc_utils import zmq_get
+
 def data(filepath=None, host='localhost'):
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
         port = 42519
-        # Workaround to force python not to use IPv6 for the request:
-        address  = socket.gethostbyname(host)
-        response = urllib2.urlopen('http://%s:%d'%(address,port), timeout=2).read()
-        df = pickle.loads(response)
+        df = zmq_get(port, host, 'get dataframe', timeout=2)
         df.convert_objects()
         # df = df.set_index('run time', inplace=True, drop=False)
         df.set_index(['sequence','run time'], inplace=True, drop=False)

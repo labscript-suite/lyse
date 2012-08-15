@@ -10,7 +10,6 @@ import threading
 import time
 import traceback
 import subprocess
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 import gtk
 import gobject
@@ -27,7 +26,9 @@ from dataframe_utilities import (concat_with_padding,
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
+from subproc_utils import ZMQServer
 from subproc_utils.gtk_components import OutputBox
+
 try:
     import analysislib
     analysislib_prefix = os.path.dirname(analysislib.__file__)
@@ -490,7 +491,7 @@ class FileBox(object):
         # Whether the last scroll to the bottom of the treeview has been processed:
         self.scrolled = True
         
-        # A queue for storing incoming files from the HTTP server so
+        # A queue for storing incoming files from the ZMQ server so
         # the server can keep receiving files even if analysis is slow
         # or paused:
         self.incoming_queue = Queue.Queue()
@@ -888,36 +889,24 @@ class EditColumns(object):
         else:
             self.all_visible_checkbutton.set_inconsistent(False)
             self.all_visible_checkbutton.set_active(False)
+   
             
-class RequestHandler(BaseHTTPRequestHandler):
+class WebServer(ZMQServer):
 
-    def do_POST(self):
-        self.send_response(200)
-        self.end_headers()
-        ctype, pdict = cgi.parse_header(
-            self.headers.getheader('content-type'))
-        length = int(self.headers.getheader('content-length'))
-        postvars = cgi.parse_qs(self.rfile.read(length), keep_blank_values=1)
-        if postvars:
-            h5_filepath = postvars['filepath'][0]
-            if h5_filepath == 'hello':
-                self.wfile.write('hello')
-            else:
+    def handler(self, request_data):
+        if request_data == 'hello':
+            return 'hello'
+        elif request_data == 'get dataframe':
+            return app.filebox.dataframe
+        elif isinstance(request_data, dict):
+            if 'filepath' in request_data:
+                h5_filepath = request_data['filepath']
                 app.filebox.incoming_queue.put([h5_filepath])
-                self.wfile.write('added successfully')
-        else:
-            with gtk.gdk.lock:
-                self.wfile.write(pickle.dumps(app.filebox.dataframe))
-        self.wfile.close()
-    
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        with gtk.gdk.lock:
-            self.wfile.write(pickle.dumps(app.filebox.dataframe))
-        self.wfile.close()
-
-               
+                return 'added successfully'
+        return ("error: operation not supported. Recognised requests are:\n "
+                "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
+        
+        
 class AnalysisApp(object):
     port = 42519
 
@@ -956,10 +945,8 @@ class AnalysisApp(object):
         self.filebox = FileBox(filebox_container, self, to_singleshot, from_singleshot, to_multishot, from_multishot)
         self.outputbox = OutputBox(outputbox_container, to_outputbox)
         
-        # Start daemon thread for the HTTP server:
-        self.server = threading.Thread(target=HTTPServer(('', self.port), RequestHandler).serve_forever)
-        self.server.daemon = True
-        self.server.start()
+        # Start the web server:
+        self.server = WebServer(self.port)
         
         self.window.resize(1600, 900)
         self.window.maximize()
