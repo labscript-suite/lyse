@@ -25,8 +25,7 @@ def data(filepath=None, host='localhost'):
     else:
         port = 42519
         df = zmq_get(port, host, 'get dataframe', timeout=2)
-        df.convert_objects()
-        # df = df.set_index('run time', inplace=True, drop=False)
+        df = df.convert_objects()
         df.set_index(['sequence','run time'], inplace=True, drop=False)
         df.sort_index(inplace=True)
         return df
