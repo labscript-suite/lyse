@@ -597,7 +597,8 @@ class FileBox(object):
                                     break
                         break
                     elif signal == 'error':
-                        self.pause_togglebutton.set_active(True)
+                        with gtk.gdk.lock:
+                            self.pause_togglebutton.set_active(True)
                         break
                 # Evey time single-shot analysis is completed, even if
                 # there were no single-shot routines, we trigger a new
