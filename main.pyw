@@ -616,7 +616,8 @@ class FileBox(object):
                     elif signal == 'done':
                         break
                     elif signal == 'error':
-                        self.pause_togglebutton.set_active(False)
+                        with gtk.gdk.lock:
+                            self.pause_togglebutton.set_active(False)
                         break
                 if not error:
                     self.multishot_required = False
