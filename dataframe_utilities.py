@@ -35,6 +35,11 @@ def get_nested_dict_from_shot(filepath):
         except KeyError:
             # ignore:
             pass
+        try:
+            row['individual id'] = h5_file.attrs['individual id']
+            row['generation'] = h5_file.attrs['generation']
+        except KeyError:
+            pass
         return row
             
 def flatten_dict(dictionary, keys=tuple()):

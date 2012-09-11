@@ -551,25 +551,23 @@ class FileBox(object):
         next_row = None
         self.multishot_required = False
         while True:
-            while self.analysis_loop_paused:
-                with self.timing_condition:
+            with self.timing_condition:
+                while self.analysis_loop_paused:
                     self.timing_condition.wait()
-            if next_row is None:
-                print 'no next file for analysis loop'            
-                with self.timing_condition:
+                next_row = None     
+                with gtk.gdk.lock:
+                    for row in self.liststore:
+                        if not row[completed_column]:
+                            next_row = row
+                            break
+                    if next_row is not None:
+                        # Ok, now we have a file which has not been processed yet.
+                        filepath_column = self.column_labels[('filepath',)]
+                        path = row[filepath_column]
+                if next_row is None:
+                    print 'no next file for analysis loop'            
                     self.timing_condition.wait()
-            
-            next_row = None     
-            with gtk.gdk.lock:
-                for row in self.liststore:
-                    if not row[completed_column]:
-                        next_row = row
-                        break
-                if next_row is not None:
-                    # Ok, now we have a file which has not been processed yet.
-                    filepath_column = self.column_labels[('filepath',)]
-                    path = row[filepath_column]
-            if next_row is not None:
+            if next_row is not None:    
                 # Now that we've relinquished the gtk lock, when it comes
                 # time to write data back to the list store, we'll have to
                 # look up by filename. This is because the liststore could
@@ -656,7 +654,7 @@ class FileBox(object):
                 if filepath in self.dataframe['filepath'].values:
                     # Ignore duplicates:
                     continue
-                print filepath
+                logger.info('added %s'%filepath)
                 row = get_dataframe_from_shot(filepath)
                 self.dataframe = concat_with_padding(self.dataframe,row)
         with gtk.gdk.lock:
@@ -896,6 +894,7 @@ class EditColumns(object):
 class WebServer(ZMQServer):
 
     def handler(self, request_data):
+        logger.info('WebServer request: %s'%str(request_data))
         if request_data == 'hello':
             return 'hello'
         elif request_data == 'get dataframe':
