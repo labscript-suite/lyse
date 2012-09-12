@@ -962,6 +962,12 @@ class AnalysisApp(object):
         
         
 if __name__ == '__main__':
+
+    ##########
+    import tracelog
+    tracelog.log('lyse_lines.log',['__main__','analysis_routine', 'dataframe_utilities'])
+    ##########
+    
     gtk.gdk.threads_init()
     app = AnalysisApp()
     with gtk.gdk.lock:
