@@ -26,7 +26,11 @@ def data(filepath=None, host='localhost'):
         port = 42519
         df = zmq_get(port, host, 'get dataframe', timeout=2)
         df = df.convert_objects()
-        df.set_index(['sequence','run time'], inplace=True, drop=False)
+        try:
+            df.set_index(['sequence','run time'], inplace=True, drop=False)
+        except KeyError:
+            # Empty dataframe?
+            pass
         df.sort_index(inplace=True)
         return df
         
