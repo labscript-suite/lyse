@@ -120,6 +120,8 @@ class AnalysisWorker(object):
         self.stdout.connect()
         self.stderr.connect()
         try:
+            # reset the current figure to figure 0:
+            lyse.figure_manager.figuremanager()
             # Actually run the user's analysis!
             execfile(self.filepath,sandbox,sandbox)
         finally:
