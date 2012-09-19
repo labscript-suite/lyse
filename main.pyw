@@ -551,23 +551,25 @@ class FileBox(object):
         next_row = None
         self.multishot_required = False
         while True:
-            with self.timing_condition:
-                while self.analysis_loop_paused:
+            while self.analysis_loop_paused:
+                with self.timing_condition:
                     self.timing_condition.wait()
-                next_row = None     
-                with gtk.gdk.lock:
-                    for row in self.liststore:
-                        if not row[completed_column]:
-                            next_row = row
-                            break
-                    if next_row is not None:
-                        # Ok, now we have a file which has not been processed yet.
-                        filepath_column = self.column_labels[('filepath',)]
-                        path = row[filepath_column]
-                if next_row is None:
-                    print 'no next file for analysis loop'            
+            if next_row is None:
+                print 'no next file for analysis loop'            
+                with self.timing_condition:
                     self.timing_condition.wait()
-            if next_row is not None:    
+            
+            next_row = None     
+            with gtk.gdk.lock:
+                for row in self.liststore:
+                    if not row[completed_column]:
+                        next_row = row
+                        break
+                if next_row is not None:
+                    # Ok, now we have a file which has not been processed yet.
+                    filepath_column = self.column_labels[('filepath',)]
+                    path = row[filepath_column]
+            if next_row is not None:
                 # Now that we've relinquished the gtk lock, when it comes
                 # time to write data back to the list store, we'll have to
                 # look up by filename. This is because the liststore could
