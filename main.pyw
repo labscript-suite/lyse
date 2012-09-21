@@ -19,7 +19,7 @@ import numpy
 import pandas
 import excepthook
 import shared_drive
-from dataframe_utilities import (concat_with_padding, 
+from lyse.dataframe_utilities import (concat_with_padding, 
                                  get_dataframe_from_shot, 
                                  replace_with_padding)
                                  
