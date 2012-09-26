@@ -166,6 +166,13 @@ class AnalysisRoutine(object):
         return True
     
     def pulse(self):
+        # Note: This function increments the pulse column in the
+        # liststore, which is currently not being used for anything. It
+        # has been disabled due to a memory leak in gtk spinners. If
+        # this bug gets fixed, this code will be re-enabled. But for
+        # the moment we'll just pointlessly increment an integer that
+        # isn't being used.
+
         # Check that we haven't been gobject.source_remove'd since being
         # placed in the gtk event queue:
         if self.pulse_timeout:

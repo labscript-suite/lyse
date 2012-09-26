@@ -227,10 +227,11 @@
                     <property name="title" translatable="yes"> info</property>
                     <property name="widget">image9</property>
                     <child>
-                      <object class="GtkCellRendererSpinner" id="working"/>
+                      <object class="GtkCellRendererPixbuf" id="working">
+                        <property name="stock_id">gtk-execute</property>
+                      </object>
                       <attributes>
-                        <attribute name="active">4</attribute>
-                        <attribute name="pulse">7</attribute>
+                        <attribute name="visible">4</attribute>
                       </attributes>
                     </child>
                     <child>
