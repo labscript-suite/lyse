@@ -185,6 +185,12 @@ if __name__ == '__main__':
     gtk.threads_init()
     to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
+    
+    ##########
+    import tracelog
+    tracelog.log('tracelog_%s.log'%os.path.basename(filepath),['__main__','subproc_utils','lyse','filewatcher'])
+    ##########
+    
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     with gtk.gdk.lock:
         gtk.main()
