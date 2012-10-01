@@ -953,7 +953,7 @@ class AnalysisApp(object):
         # The routine boxes have subprocesses that need to be quit:
         self.singleshot_routinebox.destroy()
         self.multishot_routinebox.destroy()
-        
+        self.server.shutdown()
         
 if __name__ == '__main__':
 
