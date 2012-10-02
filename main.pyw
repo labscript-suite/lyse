@@ -575,6 +575,7 @@ class FileBox(object):
                     if signal == 'progress':
                         completion = data
                         with gtk.gdk.lock:
+                            filepath_column = self.column_labels[('filepath',)]
                             for row in self.liststore:
                                 if row[filepath_column] == path:
                                     row[progress_column] = completion
@@ -583,6 +584,7 @@ class FileBox(object):
                         self.to_singleshot.put(['continue',None])
                     elif signal == 'done':
                         with gtk.gdk.lock:
+                            filepath_column = self.column_labels[('filepath',)]
                             for row in self.liststore:
                                 if row[filepath_column] == path:
                                     row[progress_visible_column] = False
