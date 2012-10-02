@@ -120,27 +120,26 @@ class AnalysisWorker(object):
         self.stdout.connect()
         self.stderr.connect()
         try:
-            # reset the current figure to figure 0:
-            lyse.figure_manager.figuremanager()
-            # Actually run the user's analysis!
-            execfile(self.filepath,sandbox,sandbox)
+            with gtk.gdk.lock:
+                # Actually run the user's analysis!
+                execfile(self.filepath,sandbox,sandbox)
+                # reset the current figure to figure 0:
+                lyse.figure_manager.figuremanager()
         finally:
             # Disconnect output redirection:
             self.stdout.disconnect()
             self.stderr.disconnect()
         
         # Introspect the figures that were produced:
-        i = 1
-        for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
-            if not fig.axes:
-                continue
-            elif not fig in self.figures:
-                # If we don't already have this figure, make a window
-                # to put it in:
-                with gtk.gdk.lock:
+        with gtk.gdk.lock:
+            for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+                if not fig.axes:
+                    continue
+                elif not fig in self.figures:
+                    # If we don't already have this figure, make a window
+                    # to put it in:
                     gobject.idle_add(self.new_figure,fig,identifier)
-            elif not self.autoscaling[fig].get_active():
-                with gtk.gdk.lock:
+                elif not self.autoscaling[fig].get_active():
                     # Restore the axis limits:
                     for j, a in enumerate(fig.axes):
                         try:
@@ -149,7 +148,6 @@ class AnalysisWorker(object):
                             a.set_ylim(ylim)
                         except KeyError:
                             continue
-            i += 1
         
         # Redraw all figures:
         with gtk.gdk.lock:
