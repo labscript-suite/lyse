@@ -18,6 +18,9 @@ class FigureManager(object):
             if not fig.axes:
                 return i, fig
             i += 1
+            
+    def set_first_figure_current(self):
+        self._figure(1)
                 
     def __call__(self,identifier=None, *args, **kwargs):
         if identifier is None:

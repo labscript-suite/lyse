@@ -51,6 +51,7 @@ class AnalysisWorker(object):
         # Keeping track of figures and canvases:
         self.figures = []
         self.canvases = []
+        self.windows = {}
         
         # Whether or not to autoscale each figure with new data:
         self.autoscaling = {}
@@ -105,8 +106,8 @@ class AnalysisWorker(object):
         with gtk.gdk.lock:
             # Actually run the user's analysis!
             execfile(self.filepath,sandbox,sandbox)
-            # reset the current figure to figure 0:
-            lyse.figure_manager.figuremanager()
+            # reset the current figure to figure 1:
+            lyse.figure_manager.figuremanager.set_first_figure_current()
         
         # Introspect the figures that were produced:
         with gtk.gdk.lock:
@@ -117,25 +118,31 @@ class AnalysisWorker(object):
                     # If we don't already have this figure, make a window
                     # to put it in:
                     gobject.idle_add(self.new_figure,fig,identifier)
-                elif not self.autoscaling[fig].get_active():
-                    # Restore the axis limits:
-                    for j, a in enumerate(fig.axes):
-                        try:
-                            xlim, ylim = axis_limits[fig,j]
-                            a.set_xlim(xlim)
-                            a.set_ylim(ylim)
-                        except KeyError:
-                            continue
+                else:
+                    self.update_window_title(self.windows[fig], identifier)
+                    if not self.autoscaling[fig].get_active():
+                        # Restore the axis limits:
+                        for j, a in enumerate(fig.axes):
+                            try:
+                                xlim, ylim = axis_limits[fig,j]
+                                a.set_xlim(xlim)
+                                a.set_ylim(ylim)
+                            except KeyError:
+                                continue
+                
         
         # Redraw all figures:
         with gtk.gdk.lock:
             for canvas in self.canvases:
                 canvas.draw_idle()
 
+    def update_window_title(self, window, identifier):
+        window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
+        
     def new_figure(self, fig, identifier):
         with gtk.gdk.lock:
             window = gtk.Window()
-            window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
+            self.update_window_title(window, identifier)
             l, w = fig.get_size_inches()
             window.resize(int(l*100),int(w*100))
             window.set_icon_from_file('lyse.svg')
@@ -152,6 +159,7 @@ class AnalysisWorker(object):
             self.canvases.append(c)
             self.figures.append(fig)
             self.autoscaling[fig] = b
+            self.windows[fig] = window
         
     def reset_figs(self):
         pass
