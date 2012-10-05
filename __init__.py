@@ -19,12 +19,12 @@ import types
 
 from subproc_utils import zmq_get
 
-def data(filepath=None, host='localhost'):
+def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
         port = 42519
-        df = zmq_get(port, host, 'get dataframe', timeout=2)
+        df = zmq_get(port, host, 'get dataframe', timeout)
         df = df.convert_objects()
         try:
             df.set_index(['sequence','run time'], inplace=True, drop=False)
