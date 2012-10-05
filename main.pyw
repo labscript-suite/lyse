@@ -14,7 +14,7 @@ import subprocess
 import gtk
 import gobject
 import pango
-import h5py
+import h5_lock, h5py
 import numpy
 import pandas
 import excepthook

@@ -1,4 +1,4 @@
-import h5py
+import h5_lock, h5py
 import pandas
 import os
 from numpy import *

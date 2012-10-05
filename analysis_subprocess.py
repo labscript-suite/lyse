@@ -1,3 +1,4 @@
+import excepthook
 import matplotlib
 matplotlib.use("GTKAgg")
 
@@ -18,7 +19,6 @@ from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as Navig
 import pylab
 import h5py
 
-import excepthook
 import subproc_utils
 from filewatcher.modulewatcher import ModuleWatcher
 
