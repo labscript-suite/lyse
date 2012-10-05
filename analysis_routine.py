@@ -31,11 +31,11 @@ class AnalysisRoutine(object):
         self.shortname = os.path.basename(self.filepath)
         self.routinebox = routinebox
         
-        self.to_outputbox = self.routinebox.to_outputbox
+        port_to_outputbox = self.routinebox.port_to_outputbox
         
         self.pulse_timeout = None
         
-        objs = subproc_utils.subprocess_with_queues('analysis_subprocess.py')
+        objs = subproc_utils.subprocess_with_queues('analysis_subprocess.py', port_to_outputbox)
         # Two queues for communicatng with the worker process for this
         # routine, The worker process itself (a subprocess.Popen object),
         # and a multiprocessing.Manager for sharing the queues between
@@ -130,10 +130,9 @@ class AnalysisRoutine(object):
                 # This signal is meant for the do_analysis function. Pass
                 # it on:
                 to_do_analysis_function.put([signal, data])
-            elif signal in ['stdout', 'stderr']:
-                # Forward output to the outputbox:
-                self.to_outputbox.put([signal, data])
-        
+            else:
+                raise RuntimeError((signal, data))
+                        
     def do_analysis(self,task,data):
         with gtk.gdk.lock:
             self.routinebox.liststore[self.index][WORKING] = True

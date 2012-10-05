@@ -48,11 +48,6 @@ class AnalysisWorker(object):
         self.from_parent = from_parent
         self.filepath = filepath
         
-        # Replacement stdout and stderr to redirect the output of the
-        # users code to the textview in the main app:
-        self.stdout = subproc_utils.OutputInterceptor(self.to_parent)
-        self.stderr = subproc_utils.OutputInterceptor(self.to_parent,'stderr')
-        
         # Keeping track of figures and canvases:
         self.figures = []
         self.canvases = []
@@ -62,7 +57,7 @@ class AnalysisWorker(object):
         
         # An object with a method to unload user modules if any have
         # changed on disk:
-        self.modulewatcher = ModuleWatcher(self.stderr)
+        self.modulewatcher = ModuleWatcher()
         
         # Start the thread that listens for instructions from the
         # parent process:
@@ -76,12 +71,9 @@ class AnalysisWorker(object):
         # and automatically silenced in the main thread when h5py is
         # imported. So we'll silence them in this thread too:
         h5py._errors.silence_errors()
-        print 'worker: mainloop starting'
         while True:
-            print 'worker: waiting for next task'
             task, data = self.from_parent.get()
             with kill_lock:
-                print 'worker: got task', task
                 if task == 'quit':
                     with gtk.gdk.lock:
                         gtk.main_quit()
@@ -89,26 +81,20 @@ class AnalysisWorker(object):
                     self.reset_figs()
                 elif task == 'single' or task == 'multi':
                     try:
-                        print 'worker: calling do_analysis'
                         self.do_analysis(task,data)
-                        print 'worker: finished analysis'
                         self.to_parent.put(['done',None])
                     except:
-                        print 'worker: there was an exception'
                         traceback_lines = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
                         del traceback_lines[1:3]
                         message = ''.join(traceback_lines)
-                        self.to_parent.put(['stderr',message])
+                        sys.stderr.write(message)
                         self.to_parent.put(['error', message])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
-        print 'worker: broke out of loop!'
         
     def do_analysis(self,task,path):
-        print 'worker: in do_analysis'
         axis_limits = {}
         with gtk.gdk.lock:
-            print 'worker: acquired gtk lock'
             for f in self.figures:
                 for i, a in enumerate(f.axes):
                     # Save the limits of the axes to restore them afterward:
@@ -116,19 +102,11 @@ class AnalysisWorker(object):
                 f.clear()
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
-        # Connect the output redirection:
-        self.stdout.connect()
-        self.stderr.connect()
-        try:
-            with gtk.gdk.lock:
-                # Actually run the user's analysis!
-                execfile(self.filepath,sandbox,sandbox)
-                # reset the current figure to figure 0:
-                lyse.figure_manager.figuremanager()
-        finally:
-            # Disconnect output redirection:
-            self.stdout.disconnect()
-            self.stderr.disconnect()
+        with gtk.gdk.lock:
+            # Actually run the user's analysis!
+            execfile(self.filepath,sandbox,sandbox)
+            # reset the current figure to figure 0:
+            lyse.figure_manager.figuremanager()
         
         # Introspect the figures that were produced:
         with gtk.gdk.lock:
@@ -183,15 +161,15 @@ if __name__ == '__main__':
     gtk.threads_init()
     
     ##########
-    import tracelog
-    tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','filewatcher'])
+    # import tracelog
+    # tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','filewatcher'])
     ##########
     
     to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
     
     ####
-    tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
+    # tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
     ####
     
     worker = AnalysisWorker(filepath, to_parent, from_parent)

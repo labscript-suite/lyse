@@ -78,7 +78,7 @@ logger.info('\n\n===============starting===============\n')
         
 class RoutineBox(object):
 
-    def __init__(self, container, app, from_filebox, to_filebox, to_outputbox, multishot=False):
+    def __init__(self, container, app, from_filebox, to_filebox, port_to_outputbox, multishot=False):
     
         self.app = app
         
@@ -91,9 +91,9 @@ class RoutineBox(object):
         self.to_filebox = to_filebox
         self.from_filebox = from_filebox
         
-        # The queue through which the analysis routines will deliver their
-        # stdout and stderr to the outputbox:
-        self.to_outputbox = to_outputbox
+        # The port through which the analysis routines will deliver their
+        # stdout and stderr to the outputbox over zmq:
+        self.port_to_outputbox = port_to_outputbox
         
         # This list will contain AnalysisRoutine objects. Its order
         # will be kept consistent with the order of the routines in
@@ -919,9 +919,6 @@ class AnalysisApp(object):
         outputbox_container = builder.get_object('outputbox_container')
         
         self.window.connect('destroy', self.destroy)
-        # All running analysis routines will have their output streams
-        # redirected to the outputbox via this queue:
-        to_outputbox = Queue.Queue()
         
         # The singleshot routinebox will be connected to the filebox
         # by queues:
@@ -936,11 +933,10 @@ class AnalysisApp(object):
         # them out of each other as attributes, but it's more explicit
         # to instantiate them here, and hopefully easier for someone to
         # see how these things are connected.
-        
-        self.singleshot_routinebox = RoutineBox( singleshot_container, self, to_singleshot, from_singleshot, to_outputbox)
-        self.multishot_routinebox = RoutineBox(multishot_container, self, to_multishot, from_multishot, to_outputbox, multishot=True)
+        self.outputbox = OutputBox(outputbox_container)
+        self.singleshot_routinebox = RoutineBox( singleshot_container, self, to_singleshot, from_singleshot, self.outputbox.port)
+        self.multishot_routinebox = RoutineBox(multishot_container, self, to_multishot, from_multishot, self.outputbox.port, multishot=True)
         self.filebox = FileBox(filebox_container, self, to_singleshot, from_singleshot, to_multishot, from_multishot)
-        self.outputbox = OutputBox(outputbox_container, to_outputbox)
         
         # Start the web server:
         self.server = WebServer(self.port)
