@@ -119,7 +119,7 @@ class AnalysisWorker(object):
                     # to put it in:
                     gobject.idle_add(self.new_figure,fig,identifier)
                 else:
-                    self.update_window_title(self.windows[fig], identifier)
+                    gobject.idle_add(self.update_window_title, self.windows[fig], identifier)
                     if not self.autoscaling[fig].get_active():
                         # Restore the axis limits:
                         for j, a in enumerate(fig.axes):
@@ -135,7 +135,11 @@ class AnalysisWorker(object):
         with gtk.gdk.lock:
             for canvas in self.canvases:
                 canvas.draw_idle()
-
+                
+    def update_window_title_idle(self, window, identifier):
+        with gtk.gdk.lock:
+            update_window_title(self,window,identifier)
+        
     def update_window_title(self, window, identifier):
         window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
         
