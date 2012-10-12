@@ -8,6 +8,7 @@ import lyse.figure_manager
 
 import sys
 import os
+import gc
 import threading
 import traceback
 import time
@@ -103,12 +104,12 @@ class AnalysisWorker(object):
                 f.clear()
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
-        with gtk.gdk.lock:
-            # Actually run the user's analysis!
-            execfile(self.filepath,sandbox,sandbox)
-            # reset the current figure to figure 1:
-            lyse.figure_manager.figuremanager.set_first_figure_current()
-        
+        # Actually run the user's analysis!
+        execfile(self.filepath,sandbox,sandbox)
+        # reset the current figure to figure 1:
+        lyse.figure_manager.figuremanager.set_first_figure_current()
+        # Clean up:
+        gc.collect()
         # Introspect the figures that were produced:
         with gtk.gdk.lock:
             for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
