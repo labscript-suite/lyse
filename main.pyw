@@ -14,11 +14,12 @@ import subprocess
 import gtk
 import gobject
 import pango
+import socket
 import h5_lock, h5py
 import numpy
 import pandas
 import excepthook
-import shared_drive
+from LabConfig import LabConfig, config_prefix
 from lyse.dataframe_utilities import (concat_with_padding, 
                                  get_dataframe_from_shot, 
                                  replace_with_padding)
@@ -32,14 +33,15 @@ from subproc_utils.gtk_components import OutputBox
 # Set working directory to runmanager folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(lyse_dir)
-
-try:
-    import analysislib
-    analysislib_prefix = os.path.dirname(analysislib.__file__)
-except Exception:
-    analysislib_prefix = os.path.curdir
-    
-shared_drive_prefix = shared_drive.prefix
+ 
+# get LabConfig
+config_path = os.path.join(config_prefix,'%s.ini'%socket.gethostname())
+required_config_params = {"DEFAULT":["experiment_name"],
+                          "programs":["text_editor", "text_editor_arguments"],
+                          "paths":["shared_drive", "experiment_shot_storage",
+                                   "analysislib"]
+                         }                       
+exp_config = LabConfig(config_path, required_config_params)
     
 if os.name == 'nt':
     # Make it not look so terrible (if icons and themes are installed):
@@ -105,7 +107,8 @@ class RoutineBox(object):
         self.routines = []
 
         # The folder path that the add-routine file browser will open to:
-        self.current_folder = analysislib_prefix
+        self.exp_config = exp_config
+        self.current_folder = self.exp_config.get('paths', 'analysislib')
         
         # Make a gtk builder, get the widgets we need, connect signals:
         builder = gtk.Builder()
@@ -419,11 +422,26 @@ class RoutineBox(object):
         index = path[0]
         routine = self.routines[int(index)]
         filepath = routine.filepath
-        if os.name == 'nt':
-            subprocess.Popen([r'C:\Program Files\Notepad++\notepad++', filepath])
-        elif 'linux' in sys.platform:
-            subprocess.Popen(['gedit',filepath])
-                
+    
+        # get path to text editor
+        editor_path = self.exp_config.get('programs', 'text_editor')
+        editor_args = self.exp_config.get('programs', 'text_editor_arguments')
+
+        if editor_path:  
+            if '{file}' in editor_args:
+                editor_args = editor_args.replace('{file}', filepath)
+            else:
+                editor_args = filepath + " " + editor_args
+            
+            try:
+                subprocess.Popen([editor_path, editor_args])
+            except Exception:
+                raise Exception("Unable to launch text editor. Check the "\
+                                "path is valid in the experiment config file "\
+                                "(%s)" % (self.exp_config.config_path))
+        else:
+            raise Exception("No editor path was specified in the lab config "\
+
 class FileBox(object):
     storecolumns = ['progress_visible',
                'progress_value',
@@ -453,8 +471,10 @@ class FileBox(object):
         
         self.logger = logging.getLogger('LYSE.FileBox')  
         self.logger.info('starting')
+
         # The folder that the add-shots dialog will open to:
-        self.current_folder = os.path.join(shared_drive_prefix,'Experiments')
+        self.exp_config = exp_config
+        self.current_folder = self.exp_config.get('paths', 'experiment_shot_storage')
         
         # Make a gtk builder, get the widgets we need, connect signals:
         builder = gtk.Builder()
@@ -644,7 +664,7 @@ class FileBox(object):
         
     def add_files(self, filepaths, marked=False):
         for i, filepath in enumerate(filepaths):
-            filepath = filepath.replace('Z:',shared_drive_prefix)
+            filepath = filepath.replace('Z:', self.exp_config.get('paths', 'shared_drive'))
             if not os.name == 'nt':
                 filepath = filepath.replace('\\','/')
             # Using the lock so as to prevent modifying the dataframe
