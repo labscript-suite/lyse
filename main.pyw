@@ -39,7 +39,8 @@ config_path = os.path.join(config_prefix,'%s.ini'%socket.gethostname())
 required_config_params = {"DEFAULT":["experiment_name"],
                           "programs":["text_editor", "text_editor_arguments"],
                           "paths":["shared_drive", "experiment_shot_storage",
-                                   "analysislib"]
+                                   "analysislib"],
+                          "ports":["lyse"]
                          }                       
 exp_config = LabConfig(config_path, required_config_params)
     
@@ -441,6 +442,7 @@ class RoutineBox(object):
                                 "(%s)" % (self.exp_config.config_path))
         else:
             raise Exception("No editor path was specified in the lab config "\
+                            "file.")
 
 class FileBox(object):
     storecolumns = ['progress_visible',
@@ -929,7 +931,7 @@ class WebServer(ZMQServer):
         
         
 class AnalysisApp(object):
-    port = 42519
+    port = int(exp_config.get('ports', 'lyse'))
 
     def __init__(self):
         # Make a gtk builder, get the widgets we need, connect signals:
