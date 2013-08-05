@@ -161,7 +161,7 @@ class Run(object):
             results.append(self.get_image(orientation,label,image))
         return results
     
-    def get_image_attributes(self,orientation):
+    def get_image_attributes(self, orientation):
         with h5py.File(self.h5_path) as h5_file:
             if not 'images' in h5_file:
                 raise Exception('File does not contain any images')
@@ -180,18 +180,19 @@ class Run(object):
             except KeyError:
                 return {}
 
-    def get_globals_raw(self,group=None):
+    def get_globals_raw(self, group=None):
         globals_dict = {}
-        def append_globals(name, obj):
-            if not 'units' in name:
-                temp_dict = dict(obj.attrs)
-                for key, val in temp_dict.items():
-                    globals_dict[key] = val
         with h5py.File(self.h5_path) as h5_file:
-            h5_file['globals'].visititems(append_globals)
+            if group == None:
+                for obj in h5_file['globals'].values():
+                    temp_dict = dict(obj.attrs)
+                    for key, val in temp_dict.items():
+                        globals_dict[key] = val
+            else:
+                globals_dict = dict(h5_file['globals'][group].attrs)
         return globals_dict
         
-    def iterable_globals(self,group=None):
+    def iterable_globals(self, group=None):
         raw_globals = self.get_globals_raw(group)
         print raw_globals.items()
         iterable_globals = {}
@@ -214,7 +215,7 @@ class Run(object):
                 # print global_name + ' is not iterable.'
             return raw_globals
                    
-    def get_units(self,group=None):
+    def get_units(self, group=None):
         units_dict = {}
         def append_units(name, obj):
             if 'units' in name:
