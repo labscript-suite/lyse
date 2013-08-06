@@ -95,7 +95,7 @@ class Run(object):
                 raise Exception('The result array \'%s\' doesn not exist'%name)
             return array(h5_file['results'][group][name])
             
-    def save_result(self,name,value):
+    def save_result(self, name, value, group=None, overwrite=True):
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -103,45 +103,77 @@ class Run(object):
                             'in single-shot analysis routines, in which a '
                             'single Run object is used')
         with h5py.File(self.h5_path,'a') as h5_file:
-            h5_file['results'][self.group].attrs[name] = value
+            if not group:
+                # Save to analysis results group by default
+                group = 'results/' + self.group
+            elif not group in h5_file:
+                # Create the group if it doesn't exist
+                h5_file.create_group(group) 
+            if name in h5_file[group].attrs.keys() and not overwrite:
+                raise Exception('Attribute %s exists in group %s. ' \
+                                'Use overwrite=True to overwrite.' % (name, group))                   
+            h5_file[group].attrs.modify(name, value)
         
-    def save_result_array(self,name,data):
+    def save_result_array(self, name, data, group=None, overwrite=True, keep_attrs=False):
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
                             'Sequence object. Per-run analysis should be done '
                             'in single-shot analysis routines, in which a '
                             'single Run object is used')
-        with h5py.File(self.h5_path,'a') as h5_file:
-            if name in h5_file['results'][self.group]:
-                # Overwrite if dataset already exists:
-                del h5_file['results'][self.group][name]
-            h5_file['results'][self.group].create_dataset(name,data=data)
+        with h5py.File(self.h5_path, 'a') as h5_file:
+            attrs = {}
+            if not group:
+                # Save dataset to results group by default
+                group = 'results/' + self.group
+            elif not group in h5_file:
+                # Create the group if it doesn't exist
+                h5_file.create_group(group) 
+            if name in h5_file[group]:
+                if overwrite:
+                    # Overwrite if dataset already exists
+                    if keep_attrs:
+                        attrs = dict(h5_file[group][name].attrs)
+                    del h5_file[group][name]
+                else:
+                    raise Exception('Dataset %s exists. Use overwrite=True to overwrite.' % 
+                                     group + '/' + name)
+            h5_file[group].create_dataset(name, data=data)
+            for key, val in attrs.items():
+                h5_file[group][name].attrs[key] = val
 
-    def get_traces(self,*names):
+    def get_traces(self, *names):
         traces = []
         for name in names:
             traces.extend(self.get_trace(name))
         return traces
              
-    def get_result_arrays(self,group,*names):
+    def get_result_arrays(self, group, *names):
         results = []
         for name in names:
-            results.append(self.get_result_array(group,name))
+            results.append(self.get_result_array(group, name))
         return results
         
-    def save_results(self,*args):
+    def save_results(self, *args):
         names = args[::2]
         values = args[1::2]
-        for name, value in zip(names,values):
+        for name, value in zip(names, values):
             print 'saving %s ='%name, value
-            self.save_result(name,value)
-        
+            self.save_result(name, value)
+            
+    def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
+        for name, value in results_dict.items():
+            if not uncertainties:
+                self.save_result(name, value, **kwargs)
+            else:
+                self.save_result(name, value[0], **kwargs)
+                self.save_result('u_' + name, value[1], **kwargs)
+
     def save_result_arrays(self, *args):
         names = args[::2]
         values = args[1::2]
-        for name, value in zip(names,values):
-            self.save_result_array(name,value)
+        for name, value in zip(names, values):
+            self.save_result_array(name, value)
     
     def get_image(self,orientation,label,image):
         with h5py.File(self.h5_path) as h5_file:
