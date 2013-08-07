@@ -40,7 +40,7 @@ zlock.set_client_process_name('lyse')
 # get LabConfig
 config_path = os.path.join(config_prefix,'%s.ini'%socket.gethostname())
 required_config_params = {"DEFAULT":["experiment_name"],
-                          "programs":["text_editor", "text_editor_arguments"],
+                          "programs":["text_editor", "text_editor_arguments", "hdf5_viewer", "hdf5_viewer_arguments"],
                           "paths":["shared_drive", "experiment_shot_storage",
                                    "analysislib"],
                           "ports":["lyse"]
@@ -649,10 +649,10 @@ class FileBox(object):
     def on_row_activated(self, treeview, path, column):
         index = path[0]
         filepath = self.dataframe['filepath'][index]
-        if os.name == 'nt':
-            subprocess.Popen([r'C:\Program Files\TheHDFGroup\HDFView2.7\HDFView.exe', filepath])
-        else:
-            subprocess.Popen([r'hdfview', filepath])
+        viewer_path = self.exp_config.get('programs', 'hdf5_viewer')
+        viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
+        subprocess.Popen([viewer_path] + viewer_args.replace('{file}',filepath).split() if viewer_args else [filepath])
+
             
     def on_pause_button_toggled(self,button):
         self.analysis_loop_paused = button.get_active()
