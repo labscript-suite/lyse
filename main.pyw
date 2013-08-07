@@ -29,7 +29,7 @@ from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
 
 from subproc_utils import ZMQServer
 from subproc_utils.gtk_components import OutputBox
-
+import shared_drive
 
 # Set working directory to runmanager folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
@@ -669,9 +669,6 @@ class FileBox(object):
         
     def add_files(self, filepaths, marked=False):
         for i, filepath in enumerate(filepaths):
-            filepath = filepath.replace('Z:', self.exp_config.get('paths', 'shared_drive'))
-            if not os.name == 'nt':
-                filepath = filepath.replace('\\','/')
             # Using the lock so as to prevent modifying the dataframe
             # whilst update_liststore is mid-loop over it:
             with gtk.gdk.lock:
@@ -926,7 +923,7 @@ class WebServer(ZMQServer):
             return app.filebox.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
-                h5_filepath = request_data['filepath']
+                h5_filepath = shared_drive.path_to_local(request_data['filepath'])
                 app.filebox.incoming_queue.put([h5_filepath])
                 return 'added successfully'
         return ("error: operation not supported. Recognised requests are:\n "

@@ -4,6 +4,8 @@ import os
 from numpy import *
 import dateutil
 
+import shared_drive
+
 asdatetime = dateutil.parser.parse
 
 
@@ -51,6 +53,7 @@ def get_nested_dict_from_shot(filepath):
                         row[orientation][label][image] = dict(
                             group[image].attrs)
         row['filepath'] = filepath
+        row['agnostic_path'] = shared_drive.path_to_local(filepath)
         row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])        
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
