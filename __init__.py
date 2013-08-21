@@ -160,6 +160,13 @@ class Run(object):
         for image in images:
             results.append(self.get_image(orientation,label,image))
         return results
+        
+    def get_all_image_labels(self):
+        images_list = {}
+        with h5py.File(self.h5_path) as h5_file:
+            for orientation in h5_file['/images'].keys():
+                images_list[orientation] = h5_file['/images'][orientation].keys()                
+        return images_list                
     
     def get_image_attributes(self,orientation):
         with h5py.File(self.h5_path) as h5_file:
