@@ -13,7 +13,8 @@ import shared_drive
 #     return localtz().localize(dateutil.parser.parse(timestr))
 
 def asdatetime(timestr):
-    tz = localtz().zone
+    # tz = localtz().zone
+    tz = 'Australia/Melbourne'
     # tz = None
     return pandas.Timestamp(timestr, tz=tz)
 
