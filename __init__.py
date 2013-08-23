@@ -231,28 +231,40 @@ class Run(object):
                 globals_dict = dict(h5_file['globals'][group].attrs)
         return globals_dict
         
-    def iterable_globals(self, group=None):
-        raw_globals = self.get_globals_raw(group)
-        print raw_globals.items()
-        iterable_globals = {}
-        for global_name, expression in raw_globals.items():
-            print expression
-            # try:
-                # sandbox = {}
-                # exec('from pylab import *',sandbox,sandbox)
-                # exec('from runmanager.functions import *',sandbox,sandbox)
-                # value = eval(expression,sandbox)
-            # except Exception as e:
-                # raise Exception('Error parsing global \'%s\': '%global_name + str(e))
-            # if isinstance(value,types.GeneratorType):
-               # print global_name + ' is iterable.'
-               # iterable_globals[global_name] = [tuple(value)]
-            # elif isinstance(value, ndarray) or  isinstance(value, list):
-               # print global_name + ' is iterable.'            
-               # iterable_globals[global_name] = value
-            # else:
-                # print global_name + ' is not iterable.'
-            return raw_globals
+    # def iterable_globals(self, group=None):
+        # raw_globals = self.get_globals_raw(group)
+        # print raw_globals.items()
+        # iterable_globals = {}
+        # for global_name, expression in raw_globals.items():
+            # print expression
+            # # try:
+                # # sandbox = {}
+                # # exec('from pylab import *',sandbox,sandbox)
+                # # exec('from runmanager.functions import *',sandbox,sandbox)
+                # # value = eval(expression,sandbox)
+            # # except Exception as e:
+                # # raise Exception('Error parsing global \'%s\': '%global_name + str(e))
+            # # if isinstance(value,types.GeneratorType):
+               # # print global_name + ' is iterable.'
+               # # iterable_globals[global_name] = [tuple(value)]
+            # # elif isinstance(value, ndarray) or  isinstance(value, list):
+               # # print global_name + ' is iterable.'            
+               # # iterable_globals[global_name] = value
+            # # else:
+                # # print global_name + ' is not iterable.'
+            # return raw_globals
+            
+    def get_globals_expansion(self):
+        expansion_dict = {}
+        def append_expansion(name, obj):
+            if 'expansion' in name:
+                temp_dict = dict(obj.attrs)
+                for key, val in temp_dict.items():
+                    if val:
+                        expansion_dict[key] = val
+        with h5py.File(self.h5_path) as h5_file:
+            h5_file['globals'].visititems(append_expansion)
+        return expansion_dict
                    
     def get_units(self, group=None):
         units_dict = {}
