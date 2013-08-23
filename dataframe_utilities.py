@@ -3,11 +3,19 @@ import pandas
 import os
 from numpy import *
 import dateutil
+from timezones import localtz
 
 import shared_drive
 
-asdatetime = dateutil.parser.parse
+# asdatetime = dateutil.parser.parse
 
+# def asdatetime(timestr):
+#     return localtz().localize(dateutil.parser.parse(timestr))
+
+def asdatetime(timestr):
+    tz = localtz().zone
+    # tz = None
+    return pandas.Timestamp(timestr, tz=tz)
 
 class Fields(object):
     """A workaraound for the fact that numpy.void objects cannot be

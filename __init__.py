@@ -25,7 +25,7 @@ def data(filepath=None, host='localhost', timeout=5):
     else:
         port = 42519
         df = zmq_get(port, host, 'get dataframe', timeout)
-        df = df.convert_objects()
+        df = df.convert_objects(convert_numeric=True, convert_dates=False)
         try:
             df.set_index(['sequence','run time'], inplace=True, drop=False)
         except KeyError:
