@@ -8,7 +8,6 @@ import lyse.figure_manager
 
 import sys
 import os
-import gc
 import threading
 import traceback
 import time
@@ -108,8 +107,6 @@ class AnalysisWorker(object):
         execfile(self.filepath,sandbox,sandbox)
         # reset the current figure to figure 1:
         lyse.figure_manager.figuremanager.set_first_figure_current()
-        # Clean up:
-        gc.collect()
         # Introspect the figures that were produced:
         with gtk.gdk.lock:
             for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
