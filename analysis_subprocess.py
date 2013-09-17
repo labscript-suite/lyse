@@ -103,8 +103,10 @@ class AnalysisWorker(object):
                 f.clear()
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
-        # Actually run the user's analysis!
-        execfile(self.filepath,sandbox,sandbox)
+        # Do not let the modulewatcher unload any modules whilst we're working:
+        with self.modulewatcher.unloader_lock:
+            # Actually run the user's analysis!
+            execfile(self.filepath,sandbox,sandbox)
         # reset the current figure to figure 1:
         lyse.figure_manager.figuremanager.set_first_figure_current()
         # Introspect the figures that were produced:
