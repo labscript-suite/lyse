@@ -104,7 +104,7 @@ class AnalysisWorker(object):
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
         # Do not let the modulewatcher unload any modules whilst we're working:
-        with self.modulewatcher.unloader_lock:
+        with self.modulewatcher.lock:
             # Actually run the user's analysis!
             execfile(self.filepath,sandbox,sandbox)
         # reset the current figure to figure 1:
