@@ -133,7 +133,7 @@ def workaround_numpy_void_bug(dictionary):
 
 def do_workarounds(dictionary):
     workaround_empty_string_bug(dictionary)
-    workaround_numpy_void_bug(dictionary)
+    #workaround_numpy_void_bug(dictionary)
     
 def flat_dict_to_flat_series(dictionary):
     max_tuple_length = 2 # Must have at least two levels to make a MultiIndex
