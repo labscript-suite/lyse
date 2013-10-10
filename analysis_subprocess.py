@@ -123,12 +123,16 @@ class AnalysisWorker(object):
                     if not self.autoscaling[fig].get_active():
                         # Restore the axis limits:
                         for j, a in enumerate(fig.axes):
+                            a.autoscale(enable=False)
                             try:
                                 xlim, ylim = axis_limits[fig,j]
                                 a.set_xlim(xlim)
                                 a.set_ylim(ylim)
                             except KeyError:
                                 continue
+                    else:
+                        for j, a in enumerate(fig.axes):
+                            a.autoscale(enable=True)
                 
         
         # Redraw all figures:
