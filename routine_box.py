@@ -25,6 +25,7 @@ class RoutineTreeView(QTreeView):
         
         self._drag_start_position = None
         self._type = 'None'
+        self._drag_move_indicator_item = None
         
         self.collapsed.connect(self.expand)
     
@@ -66,29 +67,63 @@ class RoutineTreeView(QTreeView):
             else:            
                 event.ignore()
 
+    def removeDropIndicator(self):
+        # Remove indicator from last dragMoveEvent if it exists:
+        if self._drag_move_indicator_item:
+            if self._drag_move_indicator_item.parent():
+                self._drag_move_indicator_item.parent().removeRow(self._drag_move_indicator_item.row())
+            else:                        
+                indicator_index = self.model().indexFromItem(self._drag_move_indicator_item)
+                self.model().takeRow(indicator_index.row())
+            self._drag_move_indicator_item = None
+     
+    def dragLeaveEvent(self, event):
+        try:
+            event.accept()
+            # Remove indicator from last dragMoveEvent if it exists:
+            self.removeDropIndicator()
+        except Exception:
+            raise
+            pass
+     
     def dragMoveEvent(self, event):
         try:
             type = event.mimeData().data("lyse.RoutineBox")
             if type == self._type:
-                dropIndex = self.indexAt(event.pos())
-                if dropIndex.isValid():
-                    if dropIndex not in self.selectedIndexes():
-                        # Checks to do:
-                        #    make sure the drop target is not one of the selected items
-                        #    Make sure the drop target is not a child of a selected row
-                        index = dropIndex
-                        while index.row() != -1:
-                            if index in self.selectedIndexes():
-                                event.ignore()
-                                return False
-                            index = index.parent()
-                            
-                        event.setDropAction(Qt.MoveAction)
-                        event.accept()
-                #print 'lyse internal'
+                event.setDropAction(Qt.MoveAction)
+                event.accept()
+                
+                # Remove indicator from last dragMoveEvent if it exists:
+                self.removeDropIndicator()
+                    
+                
+                dropItem, append_or_insert = self.getDropDetails(event)
+                
+                # Do checks:
+                #    make sure the drop target is not one of the selected items
+                #    Make sure the drop target is not a child of a selected row
+                index = self.model().indexFromItem(dropItem)
+                while index.row() != -1:
+                    if index in self.selectedIndexes():
+                        #event.ignore()
+                        return False
+                    index = index.parent()
+                
+                itemToAddTo, insert_position = self.getInsertLocation(self.model().indexFromItem(dropItem), append_or_insert)
+                
+                items = [QStandardItem(''),QStandardItem(''), QStandardItem('Selected items will be dropped here')]
+                items[0].setCheckable(True)
+                items[0].setCheckState(Qt.Unchecked)
+                if append_or_insert in ['insert_below', 'insert_above']:
+                    itemToAddTo.insertRow(insert_position,items)
+                else:
+                    itemToAddTo.appendRow(items)
+                self._drag_move_indicator_item = items[0]
+                
             else:
                 event.ignore()
         except Exception:
+            raise
             if event.mimeData().hasUrls():
                 event.setDropAction(Qt.CopyAction)
                 event.accept()
@@ -115,8 +150,8 @@ class RoutineTreeView(QTreeView):
         # This is because we add all the items in a row as children of the
         # first item in a row.
         dropIndex = self.model().index(dropIndex.row(),0,dropIndex.parent())
-        
-        return dropIndex, append_or_insert
+        dropItem = self.model().itemFromIndex(dropIndex)
+        return dropItem, append_or_insert
     
     def getInsertLocation(self, dropIndex, append_or_insert):        
         if append_or_insert == 'append':
@@ -141,13 +176,17 @@ class RoutineTreeView(QTreeView):
         try:
             type = event.mimeData().data("lyse.RoutineBox")
             if type == self._type:
+                # Remove indicator from last dragMoveEvent if it exists:
+                dropItem, append_or_insert = self.getDropDetails(event)
                 
-                dropIndex, append_or_insert = self.getDropDetails(event)
+                self.removeDropIndicator()
                 
+                # Get dropIndex and whether we are inserting or appending as a child
+                dropItem, append_or_insert = self.getDropDetails(event)
                 # Do checks:
                 #    make sure the drop target is not one of the selected items
                 #    Make sure the drop target is not a child of a selected row
-                index = dropIndex
+                index = self.model().indexFromItem(dropItem)#dropIndex
                 while index.row() != -1:
                     if index in self.selectedIndexes():
                         event.ignore()
@@ -179,7 +218,6 @@ class RoutineTreeView(QTreeView):
                         if len(rows_to_take) != item.rowCount():
                             # Do this in reverse so as not to mess up the indexes
                             for child_row in reversed(rows_to_take):
-                                # TODO: preserve child expansion selection
                                 child_items = item.takeRow(child_row)
                                 
                                 # find closest parent that is not selected:
@@ -200,7 +238,6 @@ class RoutineTreeView(QTreeView):
                                     parent_item = self.model()
                                 # now that we have a parent, add the items to it
                                 parent_item.insertRow(current_item.row()+1,child_items)
-                                #TODO: restore child expansion selection
                         
                     # Update the selected indexes (previous indexes will be invalid now!)                        
                     selected_items.remove(item)
@@ -246,10 +283,6 @@ class RoutineTreeView(QTreeView):
                     if index.column() == 0:
                         selected_item_list.append(self.model().itemFromIndex(index))
                 
-                # Decide where we are inserting to, or if we are appending
-                # and what item we are adding it to                
-                itemToAddTo, insert_position = self.getInsertLocation(dropIndex, append_or_insert)
-                
                 # For each selected item, move it to the new place
                 for selected_item in selected_item_list:
                     parentItem = selected_item.parent()
@@ -258,7 +291,13 @@ class RoutineTreeView(QTreeView):
                         items = parentItem.takeRow(index.row())
                     else:
                         items = self.model().takeRow(index.row())
-                        
+                            
+                    # Decide where we are inserting to, or if we are appending
+                    # and what item we are adding it to 
+                    # Note: Must be done AFTER the call to takeRow() so that the insert_position is correct                    
+                    dropIndex = self.model().indexFromItem(dropItem)
+                    itemToAddTo, insert_position = self.getInsertLocation(dropIndex, append_or_insert)
+                    
                     if append_or_insert in ['insert_below', 'insert_above']:
                         itemToAddTo.insertRow(insert_position,items)
                     else:
