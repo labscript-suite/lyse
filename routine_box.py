@@ -25,6 +25,8 @@ class RoutineTreeView(QTreeView):
         
         self._drag_start_position = None
         self._type = 'None'
+        
+        self.collapsed.connect(self.expand)
     
     def setup_dragging(self,type):
         self._type = type
@@ -40,10 +42,7 @@ class RoutineTreeView(QTreeView):
             return QTreeView.mouseMoveEvent(self,event)
         if (event.pos()-self._drag_start_position).manhattanLength() < QApplication.startDragDistance():
             return QTreeView.mouseMoveEvent(self,event)
-            
-        # save the selected indexes
-        self._index_list = self.selectedIndexes()
-            
+                        
         # we should begin the drag!
         drag = QDrag(self)
         mimeData = QMimeData()
@@ -51,17 +50,13 @@ class RoutineTreeView(QTreeView):
         drag.setMimeData(mimeData)
         
         dropAction = drag.exec_(Qt.MoveAction)
-        #if dropAction == Qt.MoveAction:
-            # we should find out where
         
     def dragEnterEvent(self, event):
-        print 'drag enter'
         try:
             type = event.mimeData().data("lyse.RoutineBox")
             if type == self._type:
                 event.accept()
                 event.acceptProposedAction()
-                print 'lyse internal'
             else:
                 event.ignore()
         except Exception:
@@ -72,24 +67,23 @@ class RoutineTreeView(QTreeView):
                 event.ignore()
 
     def dragMoveEvent(self, event):
-        #print 'dragMove'
         try:
             type = event.mimeData().data("lyse.RoutineBox")
             if type == self._type:
-                event.setDropAction(Qt.MoveAction)
                 dropIndex = self.indexAt(event.pos())
                 if dropIndex.isValid():
-                    if dropIndex not in self._index_list:
+                    if dropIndex not in self.selectedIndexes():
                         # Checks to do:
                         #    make sure the drop target is not one of the selected items
                         #    Make sure the drop target is not a child of a selected row
                         index = dropIndex
                         while index.row() != -1:
-                            if index in self._index_list:
+                            if index in self.selectedIndexes():
                                 event.ignore()
                                 return False
                             index = index.parent()
                             
+                        event.setDropAction(Qt.MoveAction)
                         event.accept()
                 #print 'lyse internal'
             else:
@@ -101,109 +95,187 @@ class RoutineTreeView(QTreeView):
             else:            
                 event.ignore()
 
+    def getDropDetails(self,event):
+        dropIndex = self.indexAt(event.pos())
+        if not dropIndex.isValid():
+            # then make the index valid!
+            # return the index of the last row
+            dropIndex = self.model().index(self.model().rowCount()-1,0)
+            append_or_insert = 'insert_below'
+        else:
+            append_or_insert = 'append'
+            
+            # Check whether we really wanted to place it between two rows, or make it a child of a row
+            if dropIndex != self.indexAt(QPoint(event.pos().x(), event.pos().y()+5)):
+                append_or_insert = 'insert_below'
+            if dropIndex != self.indexAt(QPoint(event.pos().x(), event.pos().y()-5)):
+                append_or_insert = 'insert_above'
+        
+        # covert to index of first column (same row)
+        # This is because we add all the items in a row as children of the
+        # first item in a row.
+        dropIndex = self.model().index(dropIndex.row(),0,dropIndex.parent())
+        
+        return dropIndex, append_or_insert
+    
+    def getInsertLocation(self, dropIndex, append_or_insert):        
+        if append_or_insert == 'append':
+            itemToAddTo = self.model().itemFromIndex(dropIndex)
+            return itemToAddTo, None
+        else:
+            if append_or_insert == 'insert_below':
+                insert_position = dropIndex.row()+1
+            else:
+                insert_position = dropIndex.row()
+            itemToAddTo = self.model().itemFromIndex(dropIndex.parent())
+            if itemToAddTo is None:
+                itemToAddTo = self.model()
+            if insert_position < 0:
+                insert_position = 0
+            if insert_position >= itemToAddTo.rowCount():
+                append_or_insert = 'append'
+        
+            return itemToAddTo, insert_position
+            
     def dropEvent(self, event):
-        #print 'dropEvent'
         try:
             type = event.mimeData().data("lyse.RoutineBox")
             if type == self._type:
-                #print 'lyse internal'
-                dropIndex = self.indexAt(event.pos())
-                if dropIndex.isValid():
-                    append_or_insert = 'append'
+                
+                dropIndex, append_or_insert = self.getDropDetails(event)
+                
+                # Do checks:
+                #    make sure the drop target is not one of the selected items
+                #    Make sure the drop target is not a child of a selected row
+                index = dropIndex
+                while index.row() != -1:
+                    if index in self.selectedIndexes():
+                        event.ignore()
+                        return False
+                    index = index.parent()
+                
+                # if we get this far, then accept the event!
+                event.accept()
+                
+                
+                #     * Any children of an item that is selected, that are not themselves selected,
+                #       should be moved to a new parent
+                #                
+                selected_indexes = self.selectedIndexes()
+                selected_items = [self.model().itemFromIndex(index) for index in selected_indexes]
+                while selected_items:
+                #for index in selected_indexes:
+                    item = selected_items[0]
+                    if item.hasChildren():
+                        rows_to_take = []
+                        for child_row in range(item.rowCount()):
+                            child_item = item.child(child_row,0)
+                            child_index = self.model().indexFromItem(child_item)
+                            if child_index not in selected_indexes:
+                                rows_to_take.append(child_row)
+                        
+                        # Only move children to a new parent if part of the children are selected
+                        # and part are not.
+                        if len(rows_to_take) != item.rowCount():
+                            # Do this in reverse so as not to mess up the indexes
+                            for child_row in reversed(rows_to_take):
+                                # TODO: preserve child expansion selection
+                                child_items = item.takeRow(child_row)
+                                
+                                # find closest parent that is not selected:
+                                current_item = item
+                                parent_item = current_item.parent()
+                                if parent_item:
+                                    parent_index = self.model().indexFromItem(parent_item)
+                                    while parent_index in selected_indexes:
+                                        current_item = parent_item
+                                        parent_item = current_item.parent()
+                                            # TODO: if item has no parent, add to model!
+                                        if parent_item:
+                                            parent_index = self.model().indexFromItem(parent_item)
+                                        else:
+                                            parent_item = self.model()
+                                            break                            
+                                else:
+                                    parent_item = self.model()
+                                # now that we have a parent, add the items to it
+                                parent_item.insertRow(current_item.row()+1,child_items)
+                                #TODO: restore child expansion selection
+                        
+                    # Update the selected indexes (previous indexes will be invalid now!)                        
+                    selected_items.remove(item)
+
+                #
+                #     * Now that the above step is complete, any items wil children selected should 
+                #       have those children unselected temporarily (save what was selected though!)
+                # 
+                selected_indexes = self.selectedIndexes()                
+                items_to_restore_selection_of = []
+                for index in selected_indexes:
+                    item = self.model().itemFromIndex(index)
+                    # does this item has a parent that is selected? If yes, unselect it
+                    parent_item = item.parent()
+                    if parent_item:
+                        parent_index = self.model().indexFromItem(parent_item)
+                        if parent_index in selected_indexes:
+                            # unselect this item temporarily
+                            self.selectionModel().select(index,QItemSelectionModel.Deselect)
+                            items_to_restore_selection_of.append(item)
                     
-                    # Check whether we really wanted to place it between two rows, or make it a child of a row
-                    if dropIndex != self.indexAt(QPoint(event.pos().x(), event.pos().y()+5)):
-                        append_or_insert = 'insert_below'
-                    if dropIndex != self.indexAt(QPoint(event.pos().x(), event.pos().y()-5)):
-                        append_or_insert = 'insert_above'
-                    
-                    # covert to index of first column
-                    dropIndex = self.model().index(dropIndex.row(),0,dropIndex.parent())
-                    
-                    # Checks to do:
-                    #    make sure the drop target is not one of the selected items
-                    #    Make sure the drop target is not a child of a selected row
-                    index = dropIndex
-                    while index.row() != -1:
-                        if index in self._index_list:
-                            event.ignore()
-                            return False
-                        index = index.parent()
-                        print index
-                    
-                    # if we get this far, then accept the event!
-                    event.accept()
-                    # algorithm:
-                    # * If a row has children which are not selected, move them "up a level"
-                    #   until they have a parent which is not selected
-                    # * Build up row hierarchy of selected rows in tuple form
-                    # * Remove any children from the "items to move" which have parents that 
-                    #   are also moving
-                    # * Take one of the rows to move and remove it
-                    # * if this row was at the same or higher level than the drop target,
-                    #   and had a row number that was closer to 0 than the drop target,
-                    #   then we need to update the index of the drop target
-                    # * add it as a child of the drop target
-                    # * work out it's new index and add it to the selection model
-                    
-                    # print self._index_list
-                    
-                    # for index in self._index_list:
-                        # if index.column() == 0:
-                            # item = self.model.itemFromIndex(index)
-                            # if item.hasChildren():
-                                # for i in item.rowCount():
-                                    
-                    
-                    # convert selected indices to a list of items
-                    # we'll look up the index from the items when we need to!
-                    # This is because index's will change when the model does
-                    # and so any ModelIndex we use will become invalid after the first model change
-                    # It is much better to use items as the reference point because they are not deleted
-                    selected_item_list = []
-                    for index in sorted(self._index_list):
-                        if index.column() == 0:
-                            selected_item_list.append(self.model().itemFromIndex(index))
-                    print selected_item_list
-                    
-                    # Decide where we are inserting to, or if we are appending
-                    # and what item we are adding it to
-                    if append_or_insert == 'append':
-                        itemToAddTo = self.model().itemFromIndex(dropIndex)
+                    def unselect_children(item,items_to_restore_selection_of):                    
+                        # Does this item have any children? If yes, unselect them (they should all be selected by now)
+                        if item.hasChildren():
+                            for child_row in range(item.rowCount()):
+                                child_item = item.child(child_row,0)
+                                child_index = self.model().indexFromItem(child_item)
+                                if child_index in self.selectedIndexes():
+                                    items_to_restore_selection_of.append(child_item)
+                                    self.selectionModel().select(child_index,QItemSelectionModel.Deselect)
+                                unselect_children(child_item,items_to_restore_selection_of)
+                        return
+                    unselect_children(item,items_to_restore_selection_of)
+                
+                # convert selected indices to a list of items
+                # we'll look up the index from the items when we need to!
+                # This is because index's will change when the model does
+                # and so any ModelIndex we use will become invalid after the first model change
+                # It is much better to use items as the reference point because they are not deleted
+                selected_indexes = self.selectedIndexes()
+                selected_item_list = []
+                for index in sorted(selected_indexes):
+                    if index.column() == 0:
+                        selected_item_list.append(self.model().itemFromIndex(index))
+                
+                # Decide where we are inserting to, or if we are appending
+                # and what item we are adding it to                
+                itemToAddTo, insert_position = self.getInsertLocation(dropIndex, append_or_insert)
+                
+                # For each selected item, move it to the new place
+                for selected_item in selected_item_list:
+                    parentItem = selected_item.parent()
+                    index = self.model().indexFromItem(selected_item)
+                    if parentItem:
+                        items = parentItem.takeRow(index.row())
                     else:
-                        if append_or_insert == 'insert_below':
-                            insert_position = dropIndex.row()+1
-                        else:
-                            insert_position = dropIndex.row()
-                        itemToAddTo = self.model().itemFromIndex(dropIndex.parent())
-                        if itemToAddTo is None:
-                            itemToAddTo = self.model()
-                        if insert_position < 0:
-                            insert_position = 0
-                        if insert_position >= itemToAddTo.rowCount():
-                            append_or_insert = 'append'
+                        items = self.model().takeRow(index.row())
                         
-                    # For each selected item, move it to the new place
-                    for selected_item in selected_item_list:
-                        parentItem = selected_item.parent()
-                        index = self.model().indexFromItem(selected_item)
-                        if parentItem:
-                            items = parentItem.takeRow(index.row())
-                        else:
-                            items = self.model().takeRow(index.row())
-                            
-                        if append_or_insert in ['insert_below', 'insert_above']:
-                            itemToAddTo.insertRow(insert_position,items)
-                        else:
-                            itemToAddTo.appendRow(items)
-                        
-                        for item in items:
-                            self.selectionModel().select(self.model().indexFromItem(item),QItemSelectionModel.Select)
+                    if append_or_insert in ['insert_below', 'insert_above']:
+                        itemToAddTo.insertRow(insert_position,items)
+                    else:
+                        itemToAddTo.appendRow(items)
                     
-                    # Make the item we added to, expanded (if it isn't directly the model)
-                    if itemToAddTo is not self.model():
-                        self.expand(self.model().indexFromItem(itemToAddTo))
-                    return True
+                    for item in items:
+                        self.selectionModel().select(self.model().indexFromItem(item),QItemSelectionModel.Select)                    
+                
+                #
+                #     * restore selection state after move is complete
+                #
+                for item in items_to_restore_selection_of:
+                    # get the model index for this item
+                    self.selectionModel().select(self.model().indexFromItem(item),QItemSelectionModel.Select)
+                
+                    
+                return True
             else:
                 event.ignore()
         except Exception:
@@ -232,7 +304,12 @@ class RoutineTreeView(QTreeView):
                     self._logger.info('Invalid file dropped. Path was %s'%path)
         else:
             event.ignore()
-            
+    
+
+    def rowsInserted(self, index, start, end):
+        self.expandAll()
+        return QTreeView.rowsInserted(self,index,start,end)
+    
 class RoutineBox(object):    
     def __init__(self, lyse, layout, type):
         self.lyse = lyse
