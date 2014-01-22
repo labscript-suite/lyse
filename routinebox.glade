@@ -395,17 +395,31 @@
           </packing>
         </child>
         <child>
-          <object class="GtkFileChooserButton" id="filechooserbutton">
-            <property name="width_request">196</property>
+          <object class="GtkLabel" id="label1">
+            <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="filter">output_filefilter</property>
-            <property name="title" translatable="yes">Select file to save output</property>
+            <property name="label" translatable="yes">Output h5 file:</property>
           </object>
           <packing>
             <property name="expand">True</property>
             <property name="fill">True</property>
-            <property name="padding">19</property>
             <property name="position">3</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkEntry" id="file_chooser_entry">
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="invisible_char">•</property>
+            <property name="primary_icon_activatable">False</property>
+            <property name="secondary_icon_activatable">False</property>
+            <property name="primary_icon_sensitive">True</property>
+            <property name="secondary_icon_sensitive">True</property>
+          </object>
+          <packing>
+            <property name="expand">True</property>
+            <property name="fill">True</property>
+            <property name="position">4</property>
           </packing>
         </child>
       </object>

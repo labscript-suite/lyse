@@ -123,8 +123,7 @@ class RoutineBox(object):
         self.enable_all = builder.get_object('enable_all')
         self.plot_all = builder.get_object('plot_all')
         self.multiplot_all = builder.get_object('multiplot_all')
-        self.filechooserbutton =  builder.get_object('filechooserbutton')
-        self.filefilter = builder.get_object('output_filefilter')
+        self.filechooserentry =  builder.get_object('file_chooser_entry')
         toplevel = builder.get_object('toplevel')
         label = builder.get_object('label')
 
@@ -136,9 +135,7 @@ class RoutineBox(object):
 
         if multishot:
             label.set_markup('<b>Multi shot routines</b>')
-            self.filechooserbutton.show()
-            self.filefilter.add_pattern('*.h5')
-            self.filefilter.set_name('HDF5 files')
+            self.filechooserentry.show()
         container.add(toplevel)
         toplevel.show()
         
@@ -166,7 +163,7 @@ class RoutineBox(object):
             instruction, filepath = self.from_filebox.get()
             if self.type == 'multi':
                 with gtk.gdk.lock:
-                    filepath = self.filechooserbutton.get_filename()
+                    filepath = self.filechooserentry.get_text()
             self.logger.debug('got a file to process: %s'%filepath)
             # Clear the 'success' and 'error 'markers:
             with gtk.gdk.lock:
