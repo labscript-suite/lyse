@@ -12,7 +12,7 @@ import pickle as pickle
 import inspect
 import sys
 
-import h5_lock, h5py
+import labscript_utils.h5_lock, h5py
 import pandas
 from pylab import array, ndarray
 import types

@@ -1,4 +1,4 @@
-import excepthook
+import labscript_utils.excepthook
 import matplotlib
 matplotlib.use("GTKAgg")
 
@@ -17,10 +17,10 @@ import gobject
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 import pylab
-import zlock, h5_lock, h5py
+import zlock, labscript_utils.h5_lock, h5py
 
 import subproc_utils
-from filewatcher.modulewatcher import ModuleWatcher
+from labscript_utils.modulewatcher import ModuleWatcher
 
 if not sys.stdout.isatty():
     # Prevent bug on windows where writing to stdout without a command
@@ -177,8 +177,8 @@ if __name__ == '__main__':
     gtk.threads_init()
     
     ##########
-    # import tracelog
-    # tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','filewatcher'])
+    # import labscript_utils.tracelog
+    # labscript_utils.tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','labscript_utils.filewatcher'])
     ##########
     
     to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
     zlock.set_client_process_name('lyse-'+os.path.basename(filepath))
     
     ####
-    # tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
+    # labscript_utils.tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
     ####
     
     worker = AnalysisWorker(filepath, to_parent, from_parent)

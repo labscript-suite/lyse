@@ -15,11 +15,11 @@ import gtk
 import gobject
 import pango
 import socket
-import zlock, h5_lock, h5py
+import zlock, labscript_utils.h5_lock, h5py
 import numpy
 import pandas
-import excepthook
-from LabConfig import LabConfig, config_prefix
+import labscript_utils.excepthook
+from labscript_utils.labconfig import LabConfig, config_prefix
 from lyse.dataframe_utilities import (concat_with_padding, 
                                  get_dataframe_from_shot, 
                                  replace_with_padding)
@@ -29,7 +29,7 @@ from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
 
 from subproc_utils import ZMQServer
 from subproc_utils.gtk_components import OutputBox
-import shared_drive
+import labscript_utils.shared_drive
 
 # Set working directory to runmanager folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
@@ -83,7 +83,7 @@ def setup_logging():
     return logger
     
 logger = setup_logging()
-excepthook.set_logger(logger)
+labscript_utils.excepthook.set_logger(logger)
 logger.info('\n\n===============starting===============\n')
         
 class RoutineBox(object):
@@ -920,7 +920,7 @@ class WebServer(ZMQServer):
             return app.filebox.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
-                h5_filepath = shared_drive.path_to_local(request_data['filepath'])
+                h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
                 app.filebox.incoming_queue.put([h5_filepath])
                 return 'added successfully'
         return ("error: operation not supported. Recognised requests are:\n "
@@ -979,8 +979,8 @@ class AnalysisApp(object):
 if __name__ == '__main__':
 
     ##########
-    # import tracelog
-    # tracelog.log('lyse_lines.log',['__main__','analysis_routine', 'dataframe_utilities'])
+    # import labscript_utils.tracelog
+    # labscript_utils.tracelog.log('lyse_lines.log',['__main__','analysis_routine', 'dataframe_utilities'])
     ##########
     
     gtk.gdk.threads_init()

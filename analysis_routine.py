@@ -6,7 +6,7 @@ import time
 import traceback
 import gtk
 import gobject
-import excepthook
+import labscript_utils.excepthook
 
 # constants for which columns of the liststore correspond to what:
 FILE = 0
