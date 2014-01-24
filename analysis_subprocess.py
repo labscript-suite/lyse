@@ -30,9 +30,9 @@ import gobject
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 import pylab
-import zlock, labscript_utils.h5_lock, h5py
+import zprocess.locking, labscript_utils.h5_lock, h5py
 
-import subproc_utils
+import zprocess
 from labscript_utils.modulewatcher import ModuleWatcher
 
 if not sys.stdout.isatty():
@@ -191,14 +191,14 @@ if __name__ == '__main__':
     
     ##########
     # import labscript_utils.tracelog
-    # labscript_utils.tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','labscript_utils.filewatcher'])
+    # labscript_utils.tracelog.log('tracelog_analysis_subprocess',['__main__','zprocess','lyse','labscript_utils.filewatcher'])
     ##########
     
-    to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
+    to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
     
-    # Set a meaningful client id for zlock:
-    zlock.set_client_process_name('lyse-'+os.path.basename(filepath))
+    # Set a meaningful client id for zprocess.locking:
+    zprocess.locking.set_client_process_name('lyse-'+os.path.basename(filepath))
     
     ####
     # labscript_utils.tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))

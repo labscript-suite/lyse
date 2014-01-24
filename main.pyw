@@ -28,7 +28,7 @@ import gtk
 import gobject
 import pango
 import socket
-import zlock, labscript_utils.h5_lock, h5py
+import zprocess.locking, labscript_utils.h5_lock, h5py
 import numpy
 import pandas
 import labscript_utils.excepthook
@@ -40,16 +40,16 @@ from lyse.dataframe_utilities import (concat_with_padding,
 from analysis_routine import (AnalysisRoutine, ENABLE, SHOW_PLOTS, ERROR,
                               MULTIPLE_PLOTS, INCONSISTENT, SUCCESS)
 
-from subproc_utils import ZMQServer
-from subproc_utils.gtk_components import OutputBox
+from zprocess import ZMQServer
+from labscript_utils.gtk_outputbox import OutputBox
 import labscript_utils.shared_drive
 
 # Set working directory to runmanager folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(lyse_dir)
 
-# Set a meaningful name for zlock's client id:
-zlock.set_client_process_name('lyse') 
+# Set a meaningful name for zprocess.locking's client id:
+zprocess.locking.set_client_process_name('lyse') 
 # get LabConfig
 config_path = os.path.join(config_prefix,'%s.ini'%socket.gethostname())
 required_config_params = {"DEFAULT":["experiment_name"],

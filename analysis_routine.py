@@ -13,7 +13,7 @@
 
 import Queue
 import threading
-import subproc_utils
+import zprocess
 import os
 import time
 import traceback
@@ -48,7 +48,7 @@ class AnalysisRoutine(object):
         
         self.pulse_timeout = None
         
-        objs = subproc_utils.subprocess_with_queues('analysis_subprocess.py', port_to_outputbox)
+        objs = zprocess.subprocess_with_queues('analysis_subprocess.py', port_to_outputbox)
         # Two queues for communicatng with the worker process for this
         # routine, The worker process itself (a subprocess.Popen object),
         # and a multiprocessing.Manager for sharing the queues between

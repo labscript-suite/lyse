@@ -30,7 +30,7 @@ import pandas
 from pylab import array, ndarray
 import types
 
-from subproc_utils import zmq_get
+from zprocess import zmq_get
 
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
