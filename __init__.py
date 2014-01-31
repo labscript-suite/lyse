@@ -32,6 +32,8 @@ import types
 
 from subproc_utils import zmq_get
 
+__version__ = '1.0.0'
+
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
         return _get_singleshot(filepath)
