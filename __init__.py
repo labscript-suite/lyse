@@ -32,7 +32,7 @@ import types
 
 from subproc_utils import zmq_get
 
-__version__ = '1.0.0'
+__version__ = '2.0.0-dev'
 
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
