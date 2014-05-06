@@ -98,7 +98,7 @@ class AnalysisWorker(object):
                         self.do_analysis(task,data)
                         self.to_parent.put(['done',None])
                     except:
-                        traceback_lines = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
+                        traceback_lines = traceback.format_exception(*sys.exc_info())
                         del traceback_lines[1:3]
                         message = ''.join(traceback_lines)
                         sys.stderr.write(message)
