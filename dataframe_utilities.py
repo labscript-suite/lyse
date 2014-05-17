@@ -67,13 +67,16 @@ def get_nested_dict_from_shot(filepath):
                 row[groupname] = dict(resultsgroup.attrs)
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
-                row[orientation] = dict(h5_file['images'][orientation].attrs)
-                for label in h5_file['images'][orientation]:
-                    row[orientation][label] = {}
-                    group = h5_file['images'][orientation][label]
-                    for image in group:
-                        row[orientation][label][image] = dict(
-                            group[image].attrs)
+                if isinstance(h5_file['images'][orientation], h5py.Group):
+                    row[orientation] = dict(h5_file['images'][orientation].attrs)
+                    for label in h5_file['images'][orientation]:
+                        row[orientation][label] = {}
+                        group = h5_file['images'][orientation][label]
+                        for image in group:
+                            row[orientation][label][image] = {}
+                            for key, val in group[image].attrs.items():
+                                if not isinstance(val, h5py.Reference):
+                                    row[orientation][label][image][key] = val
         row['filepath'] = filepath
         row['agnostic_path'] = labscript_utils.shared_drive.path_to_local(filepath)
         row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])        
