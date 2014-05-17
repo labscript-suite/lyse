@@ -809,7 +809,7 @@ class FileBox(object):
         print selection
         # Delete by index from the dataframe:
         self.dataframe = self.dataframe.drop([path[0] for path in selection])
-        self.dataframe.index[:] = range(len(self.dataframe))
+        self.dataframe.index = pandas.Index(range(len(self.dataframe)))
         # Have to delete one at a time from the liststore, since the
         # indices change after each deletion:
         while selection:
