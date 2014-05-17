@@ -61,6 +61,9 @@ class AnalysisWorker(object):
         self.from_parent = from_parent
         self.filepath = filepath
         
+        # Add user script directory to the pythonpath:
+        sys.path.insert(0, os.path.dirname(self.filepath))
+        
         # Keeping track of figures and canvases:
         self.figures = []
         self.canvases = []
@@ -115,7 +118,7 @@ class AnalysisWorker(object):
                     axis_limits[f,i] = a.get_xlim(), a.get_ylim()
                 f.clear()
         # The namespace the routine will run in:
-        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
+        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__', '__file__': self.filepath}
         # Do not let the modulewatcher unload any modules whilst we're working:
         with self.modulewatcher.lock:
             # Actually run the user's analysis!
