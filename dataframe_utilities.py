@@ -20,6 +20,8 @@ from timezones import localtz
 
 import labscript_utils.shared_drive
 
+import runmanager
+
 # asdatetime = dateutil.parser.parse
 
 # def asdatetime(timestr):
@@ -31,36 +33,9 @@ def asdatetime(timestr):
     # tz = None
     return pandas.Timestamp(timestr, tz=tz)
 
-class Fields(object):
-    """A workaraound for the fact that numpy.void objects cannot be
-    correctly unpickled (a bug in numpy) and therefore cannot be sent
-    to other processes over the network. This class implements the same
-    functionality mostly. Basically the thing you get back looks like a
-    tuple but can be indexed with either names of the fields or integers,
-    much like a single row of a numpy structured array. Whenever this
-    module encounters a numpy.void type when reading attributes from a
-    HDF5 file, it converts it to one of these."""
-
-    def __init__(self, data):
-        self.data_by_name = {}
-        self.data_by_index = tuple(data)
-        self.dtype = data.dtype
-        for name in data.dtype.names:
-            self.data_by_name[name] = data[name]
-            
-    def __getitem__(self, key):
-        if isinstance(key,int):
-            return self.data_by_index[key]
-        else:
-            return self.data_by_name[key]
-            
-    def __repr__(self):
-        return str(self.data_by_index)
-        
-
 def get_nested_dict_from_shot(filepath):
+    row = runmanager.get_shot_globals(filepath)
     with h5py.File(filepath,'r') as h5_file:
-        row = dict(h5_file['globals'].attrs)
         if 'results' in h5_file:
             for groupname in h5_file['results']:
                 resultsgroup = h5_file['results'][groupname]
@@ -125,32 +100,6 @@ def flat_dict_to_hierarchical_dataframe(dictionary):
     index = pandas.MultiIndex.from_tuples(sorted(result.keys()))
     return pandas.DataFrame([result],columns=index)  
 
-def workaround_empty_string_bug(dictionary):
-    # It doesn't look like this function does anything, but it does. It
-    # converts numpy empty strings to python empty strings. This is
-    # to workaround the fact that h5py returns empty stings as a numpy
-    # datatype which numpy itself actually can'y handle. Numpy never uses
-    # length zero strings, only length one or greater. So by replacing
-    # all empty strings with ordinary python ones, numpy will convert them
-    # (when it needs to) to a datatype it can handle.
-    for key, value in dictionary.items():
-        if isinstance(value,str) and value == '':
-            dictionary[key] = ''
-            
-def workaround_numpy_void_bug(dictionary):
-    # numpy.void objects undergo data corruption when pickled and
-    # unpickled.  h5py returns numpy.void objects for attributes
-    # which are its 'compound' datatype.  We'll convert any we find to our
-    # home-cooked Fields class (defined above), which provides mostly
-    # the same functionality. This will be removed if and when numpy fix their bug.
-    for key, value in dictionary.items():
-        if isinstance(value, void):
-            dictionary[key] = Fields(value)
-
-def do_workarounds(dictionary):
-    workaround_empty_string_bug(dictionary)
-    #workaround_numpy_void_bug(dictionary)
-    
 def flat_dict_to_flat_series(dictionary):
     max_tuple_length = 2 # Must have at least two levels to make a MultiIndex
     result = {}
