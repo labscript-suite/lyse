@@ -116,14 +116,12 @@ def flat_dict_to_flat_series(dictionary):
 def get_dataframe_from_shot(filepath):
     nested_dict = get_nested_dict_from_shot(filepath)
     flat_dict =  flatten_dict(nested_dict)
-    do_workarounds(flat_dict)
     df = flat_dict_to_hierarchical_dataframe(flat_dict)
     return df
     
 def get_series_from_shot(filepath):
     nested_dict = get_nested_dict_from_shot(filepath)
     flat_dict =  flatten_dict(nested_dict)
-    do_workarounds(flat_dict)
     s = flat_dict_to_flat_series(flat_dict)
     return s
     
