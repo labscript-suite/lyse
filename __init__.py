@@ -13,8 +13,6 @@
 
 spinning_top = False
 
-import figure_manager
-
 from dataframe_utilities import get_series_from_shot as _get_singleshot
 from dataframe_utilities import dict_diff
 import os
@@ -27,12 +25,12 @@ import sys
 
 import labscript_utils.h5_lock, h5py
 import pandas
-from pylab import array, ndarray
+from numpy import array, ndarray
 import types
 
 from zprocess import zmq_get
 
-__version__ = '1.0.2-dev'
+__version__ = '2.0-dev'
 
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
