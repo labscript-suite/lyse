@@ -11,7 +11,7 @@
 #                                                                   #
 #####################################################################
 
-import excepthook
+import labscript_utils.excepthook
 import matplotlib
 matplotlib.use("GTKAgg")
 
@@ -30,10 +30,10 @@ import gobject
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 import pylab
-import zlock, h5_lock, h5py
+import zprocess.locking, labscript_utils.h5_lock, h5py
 
-import subproc_utils
-from filewatcher.modulewatcher import ModuleWatcher
+import zprocess
+from labscript_utils.modulewatcher import ModuleWatcher
 
 if not sys.stdout.isatty():
     # Prevent bug on windows where writing to stdout without a command
@@ -60,6 +60,9 @@ class AnalysisWorker(object):
         self.to_parent = to_parent
         self.from_parent = from_parent
         self.filepath = filepath
+        
+        # Add user script directory to the pythonpath:
+        sys.path.insert(0, os.path.dirname(self.filepath))
         
         # Keeping track of figures and canvases:
         self.figures = []
@@ -98,7 +101,7 @@ class AnalysisWorker(object):
                         self.do_analysis(task,data)
                         self.to_parent.put(['done',None])
                     except:
-                        traceback_lines = traceback.format_exception(sys.exc_type, sys.exc_value, sys.exc_traceback)
+                        traceback_lines = traceback.format_exception(*sys.exc_info())
                         del traceback_lines[1:3]
                         message = ''.join(traceback_lines)
                         sys.stderr.write(message)
@@ -115,7 +118,7 @@ class AnalysisWorker(object):
                     axis_limits[f,i] = a.get_xlim(), a.get_ylim()
                 f.clear()
         # The namespace the routine will run in:
-        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__'}
+        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__', '__file__': self.filepath}
         # Do not let the modulewatcher unload any modules whilst we're working:
         with self.modulewatcher.lock:
             # Actually run the user's analysis!
@@ -190,18 +193,18 @@ if __name__ == '__main__':
     gtk.threads_init()
     
     ##########
-    # import tracelog
-    # tracelog.log('tracelog_analysis_subprocess',['__main__','subproc_utils','lyse','filewatcher'])
+    # import labscript_utils.tracelog
+    # labscript_utils.tracelog.log('tracelog_analysis_subprocess',['__main__','zprocess','lyse','labscript_utils.filewatcher'])
     ##########
     
-    to_parent, from_parent, kill_lock = subproc_utils.setup_connection_with_parent(lock = True)
+    to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
     
-    # Set a meaningful client id for zlock:
-    zlock.set_client_process_name('lyse-'+os.path.basename(filepath))
+    # Set a meaningful client id for zprocess.locking:
+    zprocess.locking.set_client_process_name('lyse-'+os.path.basename(filepath))
     
     ####
-    # tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
+    # labscript_utils.tracelog.set_file('tracelog_%s.log'%os.path.basename(filepath))
     ####
     
     worker = AnalysisWorker(filepath, to_parent, from_parent)
