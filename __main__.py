@@ -29,6 +29,34 @@ except ImportError:
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL) # Quit on ctrl-c
 
+def set_windows_app_user_model(appid='Monashbec.Labscript.Lyse', icon_path='runmanager.ico'):
+    import win32gui
+    import win32process
+    from win32com.propsys import propsys, pscon
+    
+    def get_process_windows():
+        pid = os.getpid()
+        def callback (window, windows):
+            if win32gui.IsWindowVisible(window) and win32gui.IsWindowEnabled(window):
+                _, found_pid = win32process.GetWindowThreadProcessId (window)
+                if found_pid == pid:
+                    windows.append (window)
+            return True
+    
+        windows = []
+        win32gui.EnumWindows(callback, windows)
+        return windows
+  
+    windows = get_process_windows()
+    for window in windows:
+        store = propsys.SHGetPropertyStoreForWindow(window, propsys.IID_IPropertyStore)
+        id = store.GetValue(pscon.PKEY_AppUserModel_ID)
+        store.SetValue(pscon.PKEY_AppUserModel_ID, propsys.PROPVARIANTType(appid))
+        id = store.GetValue(pscon.PKEY_AppUserModel_ID)
+        print(id.ToString())
+
+set_windows_app_user_model()
+
 def check_version(module_name, at_least, less_than, version=None):
 
     class VersionException(Exception):
@@ -56,7 +84,7 @@ from labscript_utils.setup_logging import setup_logging
 import labscript_utils.shared_drive as shared_drive
 import lyse
 
-from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager, qstring_to_unicode
+from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 import qtutils.icons
 
@@ -79,7 +107,12 @@ def question_dialog(message):
   
   
 class Lyse(object):
-    pass
+    def __init__(self):
+        loader = UiLoader()
+        # loader.registerCustomWidget(TreeView)
+        self.ui = loader.load('main.ui')
+        self.output_box = OutputBox(self.ui.verticalLayout_output_box)
+        self.ui.show()
     
     
 if __name__ == "__main__":
