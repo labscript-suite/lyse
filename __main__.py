@@ -29,34 +29,18 @@ except ImportError:
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL) # Quit on ctrl-c
 
-def set_windows_app_user_model(appid='Monashbec.Labscript.Lyse', icon_path='runmanager.ico'):
-    import win32gui
-    import win32process
-    from win32com.propsys import propsys, pscon
-    
-    def get_process_windows():
-        pid = os.getpid()
-        def callback (window, windows):
-            if win32gui.IsWindowVisible(window) and win32gui.IsWindowEnabled(window):
-                _, found_pid = win32process.GetWindowThreadProcessId (window)
-                if found_pid == pid:
-                    windows.append (window)
-            return True
-    
-        windows = []
-        win32gui.EnumWindows(callback, windows)
-        return windows
-  
-    windows = get_process_windows()
-    for window in windows:
-        store = propsys.SHGetPropertyStoreForWindow(window, propsys.IID_IPropertyStore)
-        id = store.GetValue(pscon.PKEY_AppUserModel_ID)
-        store.SetValue(pscon.PKEY_AppUserModel_ID, propsys.PROPVARIANTType(appid))
-        id = store.GetValue(pscon.PKEY_AppUserModel_ID)
-        print(id.ToString())
 
-set_windows_app_user_model()
+def set_win_appusermodel(window_id):
+    from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
+    icon_path = os.path.abspath('lyse.ico')
+    executable = sys.executable.lower()
+    if not executable.endswith('w.exe'):
+        executable = executable.replace('.exe', 'w.exe')
+    relaunch_command = executable + ' ' + os.path.abspath(__file__.replace('.pyc', '.py'))
+    relaunch_display_name = app_descriptions['lyse']
+    set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
 
+    
 def check_version(module_name, at_least, less_than, version=None):
 
     class VersionException(Exception):
@@ -72,9 +56,11 @@ def check_version(module_name, at_least, less_than, version=None):
     if not at_least_tuple <= version_tuple < less_than_tuple:
         raise VersionException('{module_name} {version} found. {at_least} <= {module_name} < {less_than} required.'.format(**locals()))
 
+        
 check_version('labscript_utils', '1.1', '2')
-check_version('qtutils', '1.1', '2')
+check_version('qtutils', '1.5.1', '2')
 check_version('zprocess', '1.1.2', '2')
+
 
 import zprocess.locking
 from zmq import ZMQError
@@ -95,10 +81,12 @@ os.chdir(lyse_dir)
 # Set a meaningful name for zprocess.locking's client id:
 zprocess.locking.set_client_process_name('lyse')
 
+
 @inmain_decorator()
 def error_dialog(message):
     QtGui.QMessageBox.warning(app.ui, 'lyse', message)
 
+    
 @inmain_decorator()
 def question_dialog(message):
     reply = QtGui.QMessageBox.question(app.ui, 'lyse', message,
@@ -106,12 +94,25 @@ def question_dialog(message):
     return (reply == QtGui.QMessageBox.Yes)
   
   
+class LyseMainWindow(QtWidgets.QMainWindow):
+    # A signal for when the window manager has created a new window for this widget:
+    newWindow = Signal(int)
+
+    def event(self, event):
+        result = QtWidgets.QMainWindow.event(self, event)
+        if event.type() == QtCore.QEvent.WinIdChange:
+            self.newWindow.emit(self.effectiveWinId())
+        return result
+        
+        
 class Lyse(object):
     def __init__(self):
         loader = UiLoader()
         # loader.registerCustomWidget(TreeView)
-        self.ui = loader.load('main.ui')
+        self.ui = loader.load('main.ui', LyseMainWindow())
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
+        if os.name == 'nt':
+            self.ui.newWindow.connect(set_win_appusermodel)
         self.ui.show()
     
     
