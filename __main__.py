@@ -29,6 +29,9 @@ except ImportError:
 import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL) # Quit on ctrl-c
 
+# Set working directory to runmanager folder, resolving symlinks
+lyse_dir = os.path.dirname(os.path.realpath(__file__))
+os.chdir(lyse_dir)
 
 def set_win_appusermodel(window_id):
     from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
