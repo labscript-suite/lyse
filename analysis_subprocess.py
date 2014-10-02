@@ -120,41 +120,45 @@ class AnalysisWorker(object):
         # The namespace the routine will run in:
         sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__', '__file__': self.filepath}
         # Do not let the modulewatcher unload any modules whilst we're working:
-        with self.modulewatcher.lock:
-            # Actually run the user's analysis!
-            execfile(self.filepath,sandbox,sandbox)
-        # reset the current figure to figure 1:
-        lyse.figure_manager.figuremanager.set_first_figure_current()
-        # Introspect the figures that were produced:
-        with gtk.gdk.lock:
-            for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
-                if not fig.axes:
-                    continue
-                elif not fig in self.figures:
-                    # If we don't already have this figure, make a window
-                    # to put it in:
-                    gobject.idle_add(self.new_figure,fig,identifier)
-                else:
-                    gobject.idle_add(self.update_window_title_idle, self.windows[fig], identifier)
-                    if not self.autoscaling[fig].get_active():
-                        # Restore the axis limits:
-                        for j, a in enumerate(fig.axes):
-                            a.autoscale(enable=False)
-                            try:
-                                xlim, ylim = axis_limits[fig,j]
-                                a.set_xlim(xlim)
-                                a.set_ylim(ylim)
-                            except KeyError:
-                                continue
+        try:
+            with self.modulewatcher.lock:
+                # Actually run the user's analysis!
+                execfile(self.filepath,sandbox,sandbox)
+        except:
+            raise
+        finally:
+            # reset the current figure to figure 1:
+            lyse.figure_manager.figuremanager.set_first_figure_current()
+            # Introspect the figures that were produced:
+            with gtk.gdk.lock:
+                for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+                    if not fig.axes:
+                        continue
+                    elif not fig in self.figures:
+                        # If we don't already have this figure, make a window
+                        # to put it in:
+                        gobject.idle_add(self.new_figure,fig,identifier)
                     else:
-                        for j, a in enumerate(fig.axes):
-                            a.autoscale(enable=True)
-                
-        
-        # Redraw all figures:
-        with gtk.gdk.lock:
-            for canvas in self.canvases:
-                canvas.draw()
+                        gobject.idle_add(self.update_window_title_idle, self.windows[fig], identifier)
+                        if not self.autoscaling[fig].get_active():
+                            # Restore the axis limits:
+                            for j, a in enumerate(fig.axes):
+                                a.autoscale(enable=False)
+                                try:
+                                    xlim, ylim = axis_limits[fig,j]
+                                    a.set_xlim(xlim)
+                                    a.set_ylim(ylim)
+                                except KeyError:
+                                    continue
+                        else:
+                            for j, a in enumerate(fig.axes):
+                                a.autoscale(enable=True)
+                    
+            
+            # Redraw all figures:
+            with gtk.gdk.lock:
+                for canvas in self.canvases:
+                    canvas.draw()
                 
     def update_window_title_idle(self, window, identifier):
         with gtk.gdk.lock:
