@@ -97,15 +97,21 @@ class LyseMainWindow(QtWidgets.QMainWindow):
             self.newWindow.emit(self.effectiveWinId())
         return result
         
+class FileBox(object):
+    def __init__(self, container):
+        loader = UiLoader()
+        # loader.registerCustomWidget(TreeView) ?
+        self.ui = loader.load('filebox.ui')
+        container.addWidget(self.ui)
         
 class Lyse(object):
     def __init__(self):
         loader = UiLoader()
-        # loader.registerCustomWidget(TreeView)
         self.ui = loader.load('main.ui', LyseMainWindow())
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
+        self.filebox = FileBox(self.ui.verticalLayout_filebox)
         self.ui.show()
     
     
