@@ -278,6 +278,10 @@ if __name__ == "__main__":
     # TEST
     app.submit_dummy_shots()
     
-    signal.signal(signal.SIGINT, signal.SIG_DFL) # Quit on ctrl-c
-    
-    sys.exit(qapplication.exec_())
+    # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
+    timer = QtCore.QTimer()
+    timer.start(500)  # You may change this if you wish.
+    timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
+    # Upon seeing a ctrl-c interrupt, quit the event loop
+    signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
+    qapplication.exec_()
