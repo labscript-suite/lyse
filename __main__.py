@@ -16,6 +16,7 @@ import labscript_utils.excepthook
 
 # 3rd party imports:
 
+import labscript_utils.h5_lock, h5py
 import pandas
 import sip
 
@@ -99,6 +100,24 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
                
                
+class DataFrameModel(QtGui.QStandardItemModel):
+
+    def __init__(self):
+        QtGui.QStandardItemModel.__init__(self)
+        # This dataframe will contain all the scalar data
+        # from the run files that are currently open:
+        index = pandas.MultiIndex.from_tuples([('filepath', '')])
+        self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
+        # We cache the pickled dataframe so we don't have to pickle it again
+        # if it hasn't changed since the last pickling:
+        self.pickled_dataframe = None
+        
+    def data(self, index, role):
+        return QtGui.QStandardItemModel.data(self, index, role)
+   
+    def setData(self, index, value, role)
+    
+    
 class LyseMainWindow(QtGui.QMainWindow):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -171,16 +190,13 @@ class FileBox(object):
         # or paused:
         self.incoming_queue = Queue.Queue()
         
-        # This dataframe will contain all the scalar data
-        # from the run files that are currently open:
-        index = pandas.MultiIndex.from_tuples([('filepath', '')])
-        self.dataframe = pandas.DataFrame({'filepath':[]},columns=index)
+        self.shots_model = DataFrameModel()
         
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
-        #self.incoming = threading.Thread(target = self.incoming_buffer_loop)
-        #self.incoming.daemon = True
-        #self.incoming.start()
+        self.incoming = threading.Thread(target = self.incoming_buffer_loop)
+        self.incoming.daemon = True
+        self.incoming.start()
         
         #self.analysis = threading.Thread(target = self.analysis_loop)
         #self.analysis.daemon = True
@@ -200,7 +216,44 @@ class FileBox(object):
                 # visible[title] = column.get_visible()
         self.dialog = EditColumns(self)
         
-
+    def incoming_buffer_loop(self):
+        logger = logging.getLogger('LYSE.FileBox.incoming')  
+        # HDF5 prints lots of errors by default, for things that aren't
+        # actually errors. These are silenced on a per thread basis,
+        # and automatically silenced in the main thread when h5py is
+        # imported. So we'll silence them in this thread too:
+        h5py._errors.silence_errors()
+        
+        while True:
+            filepaths = self.incoming_queue.get()
+            logger.info('adding some files')
+            self.add_files(filepaths, marked=True)
+            
+    @inmain_decorator()
+    def add_files(self, filepaths):
+        for i, filepath in enumerate(filepaths):
+            # Using the lock so as to prevent modifying the dataframe
+            # whilst update_liststore is mid-loop over it:
+            with gtk.gdk.lock:
+                print 'adding file', i
+                if filepath in self.dataframe['filepath'].values:
+                    # Ignore duplicates:
+                    continue
+                logger.info('added %s'%filepath)
+                row = get_dataframe_from_shot(filepath)
+                self.dataframe = concat_with_padding(self.dataframe,row)
+        with gtk.gdk.lock:
+            self.update_liststore()
+        if self.scrolled:
+            with gtk.gdk.lock:
+                # Are we scrolled to the bottom of the TreeView?
+                if self.adjustment.value == self.adjustment.upper - self.adjustment.page_size:
+                    self.scrolled = False                 
+                    gobject.idle_add(self.scroll_to_bottom)
+        # Let waiting threads know to check for new files:
+        with self.timing_condition:
+            self.timing_condition.notify_all()
+        
 class Lyse(object):
     def __init__(self):
         loader = UiLoader()
