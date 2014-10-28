@@ -1,4 +1,4 @@
-from __future__ import division, unicode_literals, print_function, absolute_import
+from __future__ import division, unicode_literals, print_function, absolute_import # Ease the transition to Python 3
 
 # stdlib imports
 
@@ -45,9 +45,14 @@ from zmq import ZMQError
 
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
+from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 import labscript_utils.shared_drive as shared_drive
 import lyse
 
+from lyse.dataframe_utilities import (concat_with_padding, 
+                                 get_dataframe_from_shot, 
+                                 replace_with_padding)
+                                 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 import qtutils.icons
@@ -100,24 +105,6 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
                
                
-class DataFrameModel(QtGui.QStandardItemModel):
-
-    def __init__(self):
-        QtGui.QStandardItemModel.__init__(self)
-        # This dataframe will contain all the scalar data
-        # from the run files that are currently open:
-        index = pandas.MultiIndex.from_tuples([('filepath', '')])
-        self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
-        # We cache the pickled dataframe so we don't have to pickle it again
-        # if it hasn't changed since the last pickling:
-        self.pickled_dataframe = None
-        
-    def data(self, index, role):
-        return QtGui.QStandardItemModel.data(self, index, role)
-   
-    def setData(self, index, value, role)
-    
-    
 class LyseMainWindow(QtGui.QMainWindow):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -153,7 +140,46 @@ class EditColumns(object):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
             
+
+class DataFrameModel(object):
+
+    def __init__(self, treeview):
+        self._treeview = treeview
+        self._model = QtGui.QStandardItemModel()
+        # self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)# HorizontalHeaderViewWithWidgets(self._model)
+        self._header = HorizontalHeaderViewWithWidgets(self._model)
+        self._treeview.setHeader(self._header)
+        self._treeview.setModel(self._model)
+        # This dataframe will contain all the scalar data
+        # from the run files that are currently open:
+        index = pandas.MultiIndex.from_tuples([('filepath', '')])
+        self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
+        self._model.setHorizontalHeaderItem(0, QtGui.QStandardItem('filepath'))
+        
+    def get_column_names(self):
+        return ['\n'.join(item for item in column_name if item) for column_name in self.dataframe.columns]
             
+    def add_file(self, filepath):
+        if filepath in self.dataframe['filepath'].values:
+            # Ignore duplicates:
+            return
+        column_names_before_insertion = self.get_column_names()
+        row = get_dataframe_from_shot(filepath)
+        self.dataframe = concat_with_padding(self.dataframe, row)
+        
+        # Check and create necessary new columns:
+        column_names_after_insertion = self.get_column_names()
+        new_column_names = set(column_names_after_insertion) - set(column_names_before_insertion)
+        new_columns_start = self._model.columnCount()
+        self._model.insertColumns(new_columns_start, len(new_column_names))
+        for i, column_name in enumerate(new_column_names):
+            # Set the header label of the new column:
+            column = new_columns_start + i
+            item = QtGui.QStandardItem(column_name)
+            item.setToolTip(column_name)
+            self._model.setHorizontalHeaderItem(column, item)
+            self._treeview.setColumnWidth(column, self._header.sectionSizeFromContents(column).width())
+    
 class FileBox(object):
     def __init__(self, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
     
@@ -190,8 +216,8 @@ class FileBox(object):
         # or paused:
         self.incoming_queue = Queue.Queue()
         
-        self.shots_model = DataFrameModel()
-        
+        self.shots_model = DataFrameModel(self.ui.treeView)
+            
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
         self.incoming = threading.Thread(target = self.incoming_buffer_loop)
@@ -227,32 +253,24 @@ class FileBox(object):
         while True:
             filepaths = self.incoming_queue.get()
             logger.info('adding some files')
-            self.add_files(filepaths, marked=True)
+            self.add_files(filepaths)
             
     @inmain_decorator()
     def add_files(self, filepaths):
         for i, filepath in enumerate(filepaths):
-            # Using the lock so as to prevent modifying the dataframe
-            # whilst update_liststore is mid-loop over it:
-            with gtk.gdk.lock:
-                print 'adding file', i
-                if filepath in self.dataframe['filepath'].values:
-                    # Ignore duplicates:
-                    continue
-                logger.info('added %s'%filepath)
-                row = get_dataframe_from_shot(filepath)
-                self.dataframe = concat_with_padding(self.dataframe,row)
-        with gtk.gdk.lock:
-            self.update_liststore()
-        if self.scrolled:
-            with gtk.gdk.lock:
-                # Are we scrolled to the bottom of the TreeView?
-                if self.adjustment.value == self.adjustment.upper - self.adjustment.page_size:
-                    self.scrolled = False                 
-                    gobject.idle_add(self.scroll_to_bottom)
-        # Let waiting threads know to check for new files:
-        with self.timing_condition:
-            self.timing_condition.notify_all()
+            self.logger.info('adding %s'%filepath)
+            self.shots_model.add_file(filepath)
+        # with gtk.gdk.lock:
+            # self.update_liststore()
+        # if self.scrolled:
+            # with gtk.gdk.lock:
+                # # Are we scrolled to the bottom of the TreeView?
+                # if self.adjustment.value == self.adjustment.upper - self.adjustment.page_size:
+                    # self.scrolled = False                 
+                    # gobject.idle_add(self.scroll_to_bottom)
+        # # Let waiting threads know to check for new files:
+        # with self.timing_condition:
+            # self.timing_condition.notify_all()
         
 class Lyse(object):
     def __init__(self):
