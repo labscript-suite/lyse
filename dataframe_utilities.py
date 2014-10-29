@@ -15,22 +15,13 @@ import labscript_utils.h5_lock, h5py
 import pandas
 import os
 from numpy import *
-import dateutil
-from timezones import localtz
-
+import tzlocal
 import labscript_utils.shared_drive
 
 import runmanager
 
-# asdatetime = dateutil.parser.parse
-
-# def asdatetime(timestr):
-#     return localtz().localize(dateutil.parser.parse(timestr))
-
 def asdatetime(timestr):
-    # tz = localtz().zone
-    tz = 'Australia/Melbourne'
-    # tz = None
+    tz = tzlocal.get_localzone().zone
     return pandas.Timestamp(timestr, tz=tz)
 
 def get_nested_dict_from_shot(filepath):

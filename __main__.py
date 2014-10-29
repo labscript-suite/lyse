@@ -16,6 +16,7 @@ import labscript_utils.excepthook
 
 # 3rd party imports:
 
+import numpy as np
 import labscript_utils.h5_lock, h5py
 import pandas
 import sip
@@ -57,6 +58,9 @@ from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, 
 from qtutils.outputbox import OutputBox
 import qtutils.icons
 
+# debug import, can be removed in production
+import bprofile
+
 # Set working directory to lyse folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(lyse_dir)
@@ -87,7 +91,48 @@ def question_dialog(message):
                                        QtGui.QMessageBox.Yes|QtGui.QMessageBox.No)
     return (reply == QtGui.QMessageBox.Yes)
   
-  
+
+def scientific_notation(x, sigfigs = 4):
+    """Returns a unicode string of the float f in scientific notation"""
+    if not isinstance(x, float):
+        raise TypeError('x must be floating point number')
+    if np.isnan(x) or np.isinf(x):
+        return str(x)
+    times = u'\u00d7'
+    thinspace = u'\u2009'
+    sups = {u'-': u'\u207b',
+            u'0': u'\u2070',
+            u'1': u'\xb9',
+            u'2': u'\xb2',
+            u'3': u'\xb3',
+            u'4': u'\u2074',
+            u'5': u'\u2075',
+            u'6': u'\u2076',
+            u'7': u'\u2077',
+            u'8': u'\u2078',
+            u'9': u'\u2079'}
+    
+    if x != 0:
+        try:
+            exponent = int(np.floor(np.log10(np.abs(x))))
+            # Only multiples of 10^3
+            exponent = int(np.floor(exponent/3)*3)
+        except Exception:
+            import IPython
+            IPython.embed()
+    else:
+        exponent = 0
+    significand = x/10**exponent
+    pre_decimal, post_decimal = divmod(significand, 1)
+    digits = sigfigs - len(str(int(pre_decimal)))
+    significand = round(significand, digits)
+    result =  str(significand)
+    if exponent:
+        superscript = ''.join(sups.get(char, char) for char in str(exponent))
+        result += thinspace + times + thinspace + '10' + superscript
+    return result
+    
+    
 class WebServer(ZMQServer):
 
     def handler(self, request_data):
@@ -95,7 +140,7 @@ class WebServer(ZMQServer):
         if request_data == 'hello':
             return 'hello'
         elif request_data == 'get dataframe':
-            return app.filebox.dataframe
+            return app.filebox.shots_model.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
@@ -141,45 +186,108 @@ class EditColumns(object):
             self.ui.newWindow.connect(set_win_appusermodel)
             
 
+class Model(QtGui.QStandardItemModel):
+    def flags(self, index):
+        """Return flags as normal except that the ItemIsEditable
+        flag is always False"""
+        result =  QtGui.QStandardItemModel.flags(self, index)
+        return result & ~QtCore.Qt.ItemIsEditable
+        
+    
 class DataFrameModel(object):
 
     def __init__(self, treeview):
         self._treeview = treeview
-        self._model = QtGui.QStandardItemModel()
-        # self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)# HorizontalHeaderViewWithWidgets(self._model)
+        self._model = Model()
         self._header = HorizontalHeaderViewWithWidgets(self._model)
+        # self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)
         self._treeview.setHeader(self._header)
         self._treeview.setModel(self._model)
         # This dataframe will contain all the scalar data
-        # from the run files that are currently open:
+        # from the shot files that are currently open:
         index = pandas.MultiIndex.from_tuples([('filepath', '')])
         self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
-        self._model.setHorizontalHeaderItem(0, QtGui.QStandardItem('filepath'))
+        header_item = QtGui.QStandardItem('filepath')
+        header_item.setToolTip('filepath')
+        self._model.setHorizontalHeaderItem(0, header_item)
+        self._treeview.setColumnWidth(0, self._header.sectionSizeFromContents(0).width())
         
-    def get_column_names(self):
+        # Column indices to names and vice versa for fast lookup:
+        self.column_indices = {'filepath': 0}
+        self.column_names = {0: 'filepath'}
+        
+    def get_model_row_by_filepath(self, filepath):
+        possible_items = self._model.findItems(filepath, column=0)
+        if len(possible_items) > 1:
+            raise LookupError('Multiple items found')
+        elif not possible_items:
+            raise LookupError('No item found')
+        item = possible_items[0]
+        index = item.index()
+        return index.row()
+        
+    def get_df_column_names(self):
         return ['\n'.join(item for item in column_name if item) for column_name in self.dataframe.columns]
             
+    def update_row(self, filepath, dataframe_already_updated=False):
+        """"Updates a row in the dataframe and Qt model
+        to the data in the HDF5 file for that shot"""
+        # Update the row in the dataframe first:
+        index = np.where(self.dataframe['filepath'].values == filepath)
+        index = index[0][0]
+        if not dataframe_already_updated:
+            new_row_data = get_dataframe_from_shot(filepath)
+            self.dataframe = replace_with_padding(self.dataframe, new_row_data, index)  
+        # Check and create necessary new columns in the Qt model:
+        new_column_names = set(self.get_df_column_names()) - set(self.column_names.keys())
+        new_columns_start = self._model.columnCount()
+        self._model.insertColumns(new_columns_start, len(new_column_names))
+        for i, column_name in enumerate(sorted(new_column_names)):
+            # Set the header label of the new column:
+            column_number = new_columns_start + i
+            self.column_names[column_number] = column_name
+            self.column_indices[column_name] = column_number
+            header_item = QtGui.QStandardItem(column_name)
+            header_item.setToolTip(column_name)
+            self._model.setHorizontalHeaderItem(column_number, header_item)
+            # self._treeview.setColumnWidth(column_number, self._header.sectionSizeFromContents(column_number).width())
+            self._treeview.setColumnWidth(column_number, 100)
+            
+        # Update the data in the Qt model:
+        model_row_number = self.get_model_row_by_filepath(filepath)
+        for column_number, column_name in self.column_names.items():
+            item = self._model.item(model_row_number, column_number)
+            if item is None:
+                # This is the first time we've written a value to this part of the model:
+                item = QtGui.QStandardItem()
+                self._model.setItem(model_row_number, column_number, item)
+            value = self.dataframe[column_name].values[index][0]
+            if isinstance(value, float):
+                value_str = scientific_notation(value)
+            else:
+                value_str = str(value)
+            lines = value_str.splitlines()
+            if len(lines) > 1:
+                short_value_str = lines[0] + ' ...'
+            else:
+                short_value_str = value_str
+            item.setText(short_value_str)
+            item.setToolTip(repr(value))
+        
+        
+    @bprofile.BProfile('add_file.png')
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
             return
-        column_names_before_insertion = self.get_column_names()
-        row = get_dataframe_from_shot(filepath)
-        self.dataframe = concat_with_padding(self.dataframe, row)
+        # Add the new row to the model:
+        self._model.appendRow([QtGui.QStandardItem(filepath)])
+        # Add the new row to the dataframe.
+        new_row_data = get_dataframe_from_shot(filepath)
+        self.dataframe = concat_with_padding(self.dataframe, new_row_data)
+        self.update_row(filepath, dataframe_already_updated=True)
         
-        # Check and create necessary new columns:
-        column_names_after_insertion = self.get_column_names()
-        new_column_names = set(column_names_after_insertion) - set(column_names_before_insertion)
-        new_columns_start = self._model.columnCount()
-        self._model.insertColumns(new_columns_start, len(new_column_names))
-        for i, column_name in enumerate(new_column_names):
-            # Set the header label of the new column:
-            column = new_columns_start + i
-            item = QtGui.QStandardItem(column_name)
-            item.setToolTip(column_name)
-            self._model.setHorizontalHeaderItem(column, item)
-            self._treeview.setColumnWidth(column, self._header.sectionSizeFromContents(column).width())
-    
+        
 class FileBox(object):
     def __init__(self, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
     
@@ -351,8 +459,13 @@ if __name__ == "__main__":
     
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
-    timer.start(500)  # You may change this if you wish.
+    timer.start(500)
     timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
+    # Do not run qapplication.exec_() whilst waiting for keyboard input if
+    # we hop into interactive mode.
+    QtCore.pyqtRemoveInputHook()
+    
     qapplication.exec_()
+    server.shutdown()
