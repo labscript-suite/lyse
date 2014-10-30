@@ -40,7 +40,8 @@ def data(filepath=None, host='localhost', timeout=5):
         df = zmq_get(port, host, 'get dataframe', timeout)
         df = df.convert_objects(convert_numeric=True, convert_dates=False)
         try:
-            df.set_index(['sequence','run time'], inplace=True, drop=False)
+            padding = ('',)*(df.columns.nlevels - 1)
+            df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
         except KeyError:
             # Empty dataframe?
             pass
