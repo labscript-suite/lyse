@@ -207,10 +207,6 @@ class EditColumns(object):
         
         self.populate_model(column_names, columns_visible)
         
-        # Make the treeview expand horizontally to not require a scrollbar:
-        width = self.ui.treeView.sizeHint().width()
-        height = self.ui.treeView.height()
-        self.ui.treeView.resize(QtCore.QSize(width, height))
         self.ui.show()
         
     def connect_signals(self):
@@ -308,12 +304,18 @@ class EditColumns(object):
         
             
 class ItemDelegate(QtGui.QStyledItemDelegate):
-    """An item delegate with a fixed height"""
+    """An item delegate with a fixed height and a progress bar in one column"""
     EXTRA_ROW_HEIGHT = 7
 
-    def __init__(self, view, *args, **kwargs):
+    def __init__(self, view, model, col_status, role_status_percent):
         self.view = view
-        QtGui.QStyledItemDelegate.__init__(self, *args, **kwargs)
+        self.model = model
+        self.COL_STATUS = col_status
+        self.ROLE_STATUS_PERCENT = role_status_percent
+        
+        # We hold onto a single progress bar, setting its parameters and using it to paint to every
+        # self.progress_bar = QtGui.QProgressBar()parameters
+        QtGui.QStyledItemDelegate.__init__(self)
         
     def sizeHint(self, *args):
         fontmetrics = QtGui.QFontMetrics(self.view.font())
@@ -322,6 +324,20 @@ class ItemDelegate(QtGui.QStyledItemDelegate):
         size = QtGui.QStyledItemDelegate.sizeHint(self, *args)
         return QtCore.QSize(size.width(), row_height)
 
+    def paint(self, painter, option, index):
+        if index.column() == self.COL_STATUS:
+            status_percent = self.model.data(index, self.ROLE_STATUS_PERCENT)
+            if status_percent == 100:
+                return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+            else:
+                ############ work in progress keep working from here #############
+                progress_bar_option = QtGui.QStyleOptionProgressBarV2()
+                # initStyleOption(&opt);
+                painter.drawControl(QtGui.QStyle.CE_ProgressBar, option)
+                #################################################################
+        else:
+            return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
+        
         
 class UneditableModel(QtGui.QStandardItemModel):
     def flags(self, index):
@@ -333,6 +349,12 @@ class UneditableModel(QtGui.QStandardItemModel):
     
 class DataFrameModel(object):
 
+    COL_ACTIVE = 0
+    COL_STATUS = 1
+    COL_FILEPATH = 2
+    
+    ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
+    
     def __init__(self, view):
         self._view = view
         self._model = UneditableModel()
@@ -349,7 +371,7 @@ class DataFrameModel(object):
         self._view.setModel(self._model)
         self._view.setHorizontalHeader(self._header)
         self._view.setVerticalHeader(self._vertheader)
-        self._delegate = ItemDelegate(self._view)
+        self._delegate = ItemDelegate(self._view, self._model, self.COL_STATUS, self.ROLE_STATUS_PERCENT)
         self._view.setItemDelegate(self._delegate)
         self._view.setSelectionBehavior(QtGui.QTableView.SelectRows)
         
@@ -360,25 +382,25 @@ class DataFrameModel(object):
         
         active_item = QtGui.QStandardItem('active')
         active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
-        self._model.setHorizontalHeaderItem(0, active_item)
+        self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         
         status_item = QtGui.QStandardItem()
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
         status_item.setToolTip('status/progress of single-shot analysis')
-        self._model.setHorizontalHeaderItem(1, status_item)
+        self._model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         
         filepath_item = QtGui.QStandardItem('filepath')
         filepath_item.setToolTip('filepath')
-        self._model.setHorizontalHeaderItem(2, filepath_item)
+        self._model.setHorizontalHeaderItem(self.COL_FILEPATH, filepath_item)
         
-        self._view.resizeColumnToContents(0)
-        self._view.setColumnWidth(1, 70)
-        self._view.setColumnWidth(2, 100)
+        self._view.resizeColumnToContents(self.COL_ACTIVE)
+        self._view.setColumnWidth(self.COL_STATUS, 70)
+        self._view.setColumnWidth(self.COL_FILEPATH, 100)
         
         # Column indices to names and vice versa for fast lookup:
-        self.column_indices = {'__active' : 0, '__status': 1, 'filepath': 2}
-        self.column_names = {0: '__active', 1: '__status', 2: 'filepath'}
-        self.columns_visible = {0: True, 1: True, 2: True}
+        self.column_indices = {'__active' : self.COL_ACTIVE, '__status': self.COL_STATUS, 'filepath': self.COL_FILEPATH}
+        self.column_names = {self.COL_ACTIVE: '__active', self.COL_STATUS: '__status', self.COL_FILEPATH: 'filepath'}
+        self.columns_visible = {self.COL_ACTIVE: True, self.COL_STATUS: True, self.COL_FILEPATH: True}
         
     def get_model_row_by_filepath(self, filepath):
         possible_items = self._model.findItems(filepath, column=self.column_indices['filepath'])
@@ -431,7 +453,8 @@ class DataFrameModel(object):
             item = self._model.item(model_row_number, column_number)
             if item is None:
                 # This is the first time we've written a value to this part of the model:
-                item = QtGui.QStandardItem()
+                item = QtGui.QStandardItem('NaN')
+                item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
                 self._model.setItem(model_row_number, column_number, item)
             value = self.dataframe[column_name].values[index][0]
             if isinstance(value, float):
@@ -457,6 +480,8 @@ class DataFrameModel(object):
         active_item = QtGui.QStandardItem()
         active_item.setCheckable(True)
         status_item = QtGui.QStandardItem()
+        status_item.setData(0, self.ROLE_STATUS_PERCENT)
+        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [active_item, status_item, name_item] 
         
@@ -629,6 +654,8 @@ class Lyse(object):
     ##### TESTING ONLY REMOVE IN PRODUCTION
     def submit_dummy_shots(self):
         path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_11.h5'
+        print(zprocess.zmq_get(self.port, data={'filepath': path}))
+        path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_10.h5'
         print(zprocess.zmq_get(self.port, data={'filepath': path}))
 
 
