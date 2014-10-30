@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>390</width>
-    <height>367</height>
+    <width>479</width>
+    <height>472</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -33,7 +33,11 @@
     </layout>
    </item>
    <item>
-    <widget class="QTreeView" name="treeView_columns"/>
+    <widget class="QTreeView" name="treeView">
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+    </widget>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">

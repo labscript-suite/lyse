@@ -164,7 +164,10 @@ class LyseMainWindow(QtGui.QMainWindow):
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
-
+    
+    def __init__(self):
+        QtGui.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
+        
     def event(self, event):
         result = QtGui.QDialog.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
@@ -173,18 +176,136 @@ class EditColumnsDialog(QtGui.QDialog):
 
         
 class EditColumns(object):
-
-    def __init__(self, filebox, columns=None):
+    ROLE_SORT_DATA = QtCore.Qt.UserRole + 1
+    COL_VISIBLE = 0
+    COL_NAME = 1
+    
+    def __init__(self, filebox, column_names, columns_visible):
+        self.filebox = filebox
+        self.columns_visible = columns_visible.copy()
+        
         loader = UiLoader()
         self.ui = loader.load('edit_columns.ui', EditColumnsDialog())
+        
+        self.model = UneditableModel()
+        self.header = HorizontalHeaderViewWithWidgets(self.model)
+        self.model.setHorizontalHeaderLabels(['visible', 'Name'])
+        self.select_all_checkbox = QtGui.QCheckBox()
+        self.select_all_checkbox.setTristate(False)
+        self.header.setWidget(self.COL_VISIBLE, self.select_all_checkbox)
+        self.ui.treeView.setHeader(self.header)
+        self.proxy_model = QtGui.QSortFilterProxyModel()
+        self.proxy_model.setSourceModel(self.model)
+        self.proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
+        self.proxy_model.setFilterKeyColumn(self.COL_NAME)
+        self.ui.treeView.setSortingEnabled(True)
+        self.proxy_model.setSortRole(self.ROLE_SORT_DATA)
+        self.ui.treeView.setModel(self.proxy_model)
         self.ui.setWindowModality(QtCore.Qt.ApplicationModal)
+        
         self.connect_signals()
+        
+        self.populate_model(column_names, columns_visible)
+        
+        # Make the treeview expand horizontally to not require a scrollbar:
+        width = self.ui.treeView.sizeHint().width()
+        height = self.ui.treeView.height()
+        self.ui.treeView.resize(QtCore.QSize(width, height))
         self.ui.show()
         
     def connect_signals(self):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
+        self.ui.lineEdit_filter.textEdited.connect(self.on_filter_text_edited)
+        self.ui.pushButton_make_it_so.clicked.connect(self.make_it_so)
+        self.ui.pushButton_cancel.clicked.connect(self.cancel)
+        self.model.itemChanged.connect(self.on_model_item_changed)
+        # A context manager with which we can temporarily disconnect the above connection.
+        self.model_item_changed_disconnected = DisconnectContextManager(self.model.itemChanged, self.on_model_item_changed)
+        self.select_all_checkbox.stateChanged.connect(self.on_select_all_state_changed)
+        self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
+            self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
             
+    def populate_model(self, column_names, columns_visible):
+        # Which indices in self.columns_visible the row numbers correspond to
+        self.column_indices = {}
+        for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
+            if name.startswith('__'):
+                # one of our special columns, ignore:
+                continue
+            visible = columns_visible[column_index]
+            visible_item = QtGui.QStandardItem()
+            visible_item.setCheckable(True)
+            if visible:
+                visible_item.setCheckState(QtCore.Qt.Checked)
+                visible_item.setData(QtCore.Qt.Checked, self.ROLE_SORT_DATA)
+            else:
+                visible_item.setCheckState(QtCore.Qt.Unchecked)
+                visible_item.setData(QtCore.Qt.Unchecked, self.ROLE_SORT_DATA)
+                
+            name_item = QtGui.QStandardItem(name)
+            name_item.setData(name, self.ROLE_SORT_DATA)
+            self.model.appendRow([visible_item, name_item])
+            self.column_indices[self.model.rowCount() - 1] = column_index
+            
+        self.ui.treeView.resizeColumnToContents(self.COL_VISIBLE)
+        self.ui.treeView.resizeColumnToContents(self.COL_NAME)
+        self.update_select_all_checkstate()
+        self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
+        
+    def on_filter_text_edited(self, text):
+        self.proxy_model.setFilterWildcard(text)
+        
+    def on_select_all_state_changed(self, state):
+        for row in range(self.model.rowCount()):
+            visible_item = self.model.item(row, self.COL_VISIBLE)
+            self.update_visible_state(visible_item, state)
+        self.do_sort()
+        self.select_all_checkbox.setTristate(False)
+       
+    def update_visible_state(self, item, state):
+        assert item.column() == self.COL_VISIBLE, "unexpected column"
+        row = item.row()
+        with self.model_item_changed_disconnected:
+            item.setCheckState(state)
+            item.setData(state, self.ROLE_SORT_DATA)
+            if state == QtCore.Qt.Checked:
+                self.columns_visible[self.column_indices[row]] = True
+            else:
+                self.columns_visible[self.column_indices[row]] = False
+                
+    def update_select_all_checkstate(self):
+        with self.select_all_checkbox_state_changed_disconnected:
+            all_states = []
+            for row in range(self.model.rowCount()):
+                visible_item = self.model.item(row, self.COL_VISIBLE)
+                all_states.append(visible_item.checkState())
+            if all(state == QtCore.Qt.Checked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
+            elif all(state == QtCore.Qt.Unchecked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
+                
+    def on_model_item_changed(self, item):
+        state = item.checkState()
+        self.update_visible_state(item, state)
+        self.update_select_all_checkstate()
+        self.do_sort()
+        
+    def do_sort(self):
+        header = self.ui.treeView.header()
+        sort_column = header.sortIndicatorSection()
+        sort_order = header.sortIndicatorOrder()
+        self.ui.treeView.sortByColumn(sort_column, sort_order)
+        
+    def cancel(self):
+        self.ui.close()
+        
+    def make_it_so(self):
+        self.filebox.set_columns_visible(self.columns_visible)
+        self.ui.close()
+        
             
 class ItemDelegate(QtGui.QStyledItemDelegate):
     """An item delegate with a fixed height"""
@@ -202,7 +323,7 @@ class ItemDelegate(QtGui.QStyledItemDelegate):
         return QtCore.QSize(size.width(), row_height)
 
         
-class Model(QtGui.QStandardItemModel):
+class UneditableModel(QtGui.QStandardItemModel):
     def flags(self, index):
         """Return flags as normal except that the ItemIsEditable
         flag is always False"""
@@ -214,7 +335,7 @@ class DataFrameModel(object):
 
     def __init__(self, view):
         self._view = view
-        self._model = Model()
+        self._model = UneditableModel()
         #self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
         
@@ -251,15 +372,15 @@ class DataFrameModel(object):
         self._model.setHorizontalHeaderItem(2, filepath_item)
         
         self._view.resizeColumnToContents(0)
-        self._view.setColumnWidth(1, 100)
+        self._view.setColumnWidth(1, 70)
         self._view.setColumnWidth(2, 100)
         
         # Column indices to names and vice versa for fast lookup:
         self.column_indices = {'__active' : 0, '__status': 1, 'filepath': 2}
         self.column_names = {0: '__active', 1: '__status', 2: 'filepath'}
+        self.columns_visible = {0: True, 1: True, 2: True}
         
     def get_model_row_by_filepath(self, filepath):
-        print(self.column_indices['filepath'])
         possible_items = self._model.findItems(filepath, column=self.column_indices['filepath'])
         if len(possible_items) > 1:
             raise LookupError('Multiple items found')
@@ -271,7 +392,12 @@ class DataFrameModel(object):
         
     def get_df_column_names(self):
         return ['\n'.join(item for item in column_name if item) for column_name in self.dataframe.columns]
-            
+       
+    def set_columns_visible(self, columns_visible):
+        self.columns_visible = columns_visible
+        for column_index, visible in columns_visible.items():
+            self._view.setColumnHidden(column_index, not visible)
+        
     def update_row(self, filepath, dataframe_already_updated=False):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot"""
@@ -291,12 +417,10 @@ class DataFrameModel(object):
             column_number = new_columns_start + i
             self.column_names[column_number] = column_name
             self.column_indices[column_name] = column_number
+            self.columns_visible[column_number] = True
             header_item = QtGui.QStandardItem(column_name)
             header_item.setToolTip(column_name)
             self._model.setHorizontalHeaderItem(column_number, header_item)
-            # self._view.setColumnWidth(column_number, self._header.sectionSizeFromContents(column_number).width())
-            # self._view.setColumnWidth(column_number, 100)
-            #self._view.resizeColumnToContents(column_number)
             
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
@@ -330,14 +454,10 @@ class DataFrameModel(object):
             self._view.resizeColumnToContents(column_number)
         
     def new_row(self, filepath):
-        
         active_item = QtGui.QStandardItem()
         active_item.setCheckable(True)
-        
         status_item = QtGui.QStandardItem()
-        
         name_item = QtGui.QStandardItem(filepath)
-        
         return [active_item, status_item, name_item] 
         
     
@@ -414,8 +534,11 @@ class FileBox(object):
             # if isinstance(label, gtk.Label):
                 # title = label.get_text()
                 # visible[title] = column.get_visible()
-        self.dialog = EditColumns(self)
+        self.dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
         
+    def set_columns_visible(self, columns_visible):
+        self.shots_model.set_columns_visible(columns_visible)
+    
     def incoming_buffer_loop(self):
         logger = logging.getLogger('LYSE.FileBox.incoming')  
         # HDF5 prints lots of errors by default, for things that aren't
