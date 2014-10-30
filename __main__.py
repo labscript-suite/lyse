@@ -185,7 +185,23 @@ class EditColumns(object):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
             
+            
+class ItemDelegate(QtGui.QStyledItemDelegate):
+    """An item delegate with a fixed height"""
+    EXTRA_ROW_HEIGHT = 7
 
+    def __init__(self, view, *args, **kwargs):
+        self.view = view
+        QtGui.QStyledItemDelegate.__init__(self, *args, **kwargs)
+        
+    def sizeHint(self, *args):
+        fontmetrics = QtGui.QFontMetrics(self.view.font())
+        text_height = fontmetrics.height()
+        row_height = text_height + self.EXTRA_ROW_HEIGHT
+        size = QtGui.QStyledItemDelegate.sizeHint(self, *args)
+        return QtCore.QSize(size.width(), row_height)
+
+        
 class Model(QtGui.QStandardItemModel):
     def flags(self, index):
         """Return flags as normal except that the ItemIsEditable
@@ -196,28 +212,55 @@ class Model(QtGui.QStandardItemModel):
     
 class DataFrameModel(object):
 
-    def __init__(self, treeview):
-        self._treeview = treeview
+    def __init__(self, view):
+        self._view = view
         self._model = Model()
-        self._header = HorizontalHeaderViewWithWidgets(self._model)
-        # self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)
-        self._treeview.setHeader(self._header)
-        self._treeview.setModel(self._model)
+        #self._header = HorizontalHeaderViewWithWidgets(self._model)
+        self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
+        
+        self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
+        self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)
+        
+        # Set a smaller font size on the headers:
+        self._header.setStyleSheet("QHeaderView { font-size: 8pt; color: black;}")
+        self._vertheader.setStyleSheet("QHeaderView { font-size: 8pt; color: black;}")
+        self._vertheader.setHighlightSections(False)
+        self._view.setModel(self._model)
+        self._view.setHorizontalHeader(self._header)
+        self._view.setVerticalHeader(self._vertheader)
+        self._delegate = ItemDelegate(self._view)
+        self._view.setItemDelegate(self._delegate)
+        self._view.setSelectionBehavior(QtGui.QTableView.SelectRows)
+        
         # This dataframe will contain all the scalar data
         # from the shot files that are currently open:
         index = pandas.MultiIndex.from_tuples([('filepath', '')])
         self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
-        header_item = QtGui.QStandardItem('filepath')
-        header_item.setToolTip('filepath')
-        self._model.setHorizontalHeaderItem(0, header_item)
-        self._treeview.setColumnWidth(0, self._header.sectionSizeFromContents(0).width())
+        
+        active_item = QtGui.QStandardItem('active')
+        active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
+        self._model.setHorizontalHeaderItem(0, active_item)
+        
+        status_item = QtGui.QStandardItem()
+        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
+        status_item.setToolTip('status/progress of single-shot analysis')
+        self._model.setHorizontalHeaderItem(1, status_item)
+        
+        filepath_item = QtGui.QStandardItem('filepath')
+        filepath_item.setToolTip('filepath')
+        self._model.setHorizontalHeaderItem(2, filepath_item)
+        
+        self._view.resizeColumnToContents(0)
+        self._view.setColumnWidth(1, 100)
+        self._view.setColumnWidth(2, 100)
         
         # Column indices to names and vice versa for fast lookup:
-        self.column_indices = {'filepath': 0}
-        self.column_names = {0: 'filepath'}
+        self.column_indices = {'__active' : 0, '__status': 1, 'filepath': 2}
+        self.column_names = {0: '__active', 1: '__status', 2: 'filepath'}
         
     def get_model_row_by_filepath(self, filepath):
-        possible_items = self._model.findItems(filepath, column=0)
+        print(self.column_indices['filepath'])
+        possible_items = self._model.findItems(filepath, column=self.column_indices['filepath'])
         if len(possible_items) > 1:
             raise LookupError('Multiple items found')
         elif not possible_items:
@@ -237,9 +280,10 @@ class DataFrameModel(object):
         index = index[0][0]
         if not dataframe_already_updated:
             new_row_data = get_dataframe_from_shot(filepath)
-            self.dataframe = replace_with_padding(self.dataframe, new_row_data, index)  
+            self.dataframe = replace_with_padding(self.dataframe, new_row_data, index) 
+            
         # Check and create necessary new columns in the Qt model:
-        new_column_names = set(self.get_df_column_names()) - set(self.column_names.keys())
+        new_column_names = set(self.get_df_column_names()) - set(self.column_names.values())
         new_columns_start = self._model.columnCount()
         self._model.insertColumns(new_columns_start, len(new_column_names))
         for i, column_name in enumerate(sorted(new_column_names)):
@@ -250,12 +294,16 @@ class DataFrameModel(object):
             header_item = QtGui.QStandardItem(column_name)
             header_item.setToolTip(column_name)
             self._model.setHorizontalHeaderItem(column_number, header_item)
-            # self._treeview.setColumnWidth(column_number, self._header.sectionSizeFromContents(column_number).width())
-            self._treeview.setColumnWidth(column_number, 100)
+            # self._view.setColumnWidth(column_number, self._header.sectionSizeFromContents(column_number).width())
+            # self._view.setColumnWidth(column_number, 100)
+            #self._view.resizeColumnToContents(column_number)
             
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
         for column_number, column_name in self.column_names.items():
+            if column_name.startswith('__'):
+                # One of our special columns, does not correspond to a column in the dataframe:
+                continue
             item = self._model.item(model_row_number, column_number)
             if item is None:
                 # This is the first time we've written a value to this part of the model:
@@ -273,15 +321,34 @@ class DataFrameModel(object):
                 short_value_str = value_str
             item.setText(short_value_str)
             item.setToolTip(repr(value))
+            vert_header_item = QtGui.QStandardItem(os.path.splitext(os.path.basename(filepath))[0])
+            self._model.setVerticalHeaderItem(model_row_number, vert_header_item)
         
+        for i, column_name in enumerate(sorted(new_column_names)):
+            # Resize any new columns to fit contents:
+            column_number = new_columns_start + i
+            self._view.resizeColumnToContents(column_number)
         
+    def new_row(self, filepath):
+        
+        active_item = QtGui.QStandardItem()
+        active_item.setCheckable(True)
+        
+        status_item = QtGui.QStandardItem()
+        
+        name_item = QtGui.QStandardItem(filepath)
+        
+        return [active_item, status_item, name_item] 
+        
+    
     @bprofile.BProfile('add_file.png')
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
             return
         # Add the new row to the model:
-        self._model.appendRow([QtGui.QStandardItem(filepath)])
+        self._model.appendRow(self.new_row(filepath))
+        self._view.resizeRowToContents(self._model.rowCount()-1)
         # Add the new row to the dataframe.
         new_row_data = get_dataframe_from_shot(filepath)
         self.dataframe = concat_with_padding(self.dataframe, new_row_data)
@@ -301,7 +368,6 @@ class FileBox(object):
         self.logger.info('starting')
         
         loader = UiLoader()
-        # loader.registerCustomWidget(TreeView) # unsure if we will be needing this
         self.ui = loader.load('filebox.ui')
         container.addWidget(self.ui)
         
@@ -324,7 +390,7 @@ class FileBox(object):
         # or paused:
         self.incoming_queue = Queue.Queue()
         
-        self.shots_model = DataFrameModel(self.ui.treeView)
+        self.shots_model = DataFrameModel(self.ui.tableView)
             
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
