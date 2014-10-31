@@ -160,7 +160,7 @@ class LyseMainWindow(QtGui.QMainWindow):
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
-    
+    close_signal = Signal()
     def __init__(self):
         QtGui.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
         
@@ -170,6 +170,10 @@ class EditColumnsDialog(QtGui.QDialog):
             self.newWindow.emit(self.effectiveWinId())
         return result
 
+    def closeEvent(self, event):
+        self.close_signal.emit()
+        event.ignore()
+        
         
 class EditColumns(object):
     ROLE_SORT_DATA = QtCore.Qt.UserRole + 1
@@ -178,36 +182,43 @@ class EditColumns(object):
     
     def __init__(self, filebox, column_names, columns_visible):
         self.filebox = filebox
+        self.column_names = column_names.copy()
         self.columns_visible = columns_visible.copy()
+        self.old_columns_visible = columns_visible.copy()
         
         loader = UiLoader()
         self.ui = loader.load('edit_columns.ui', EditColumnsDialog())
         
         self.model = UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
-        self.model.setHorizontalHeaderLabels(['visible', 'Name'])
         self.select_all_checkbox = QtGui.QCheckBox()
         self.select_all_checkbox.setTristate(False)
-        self.header.setWidget(self.COL_VISIBLE, self.select_all_checkbox)
         self.ui.treeView.setHeader(self.header)
         self.proxy_model = QtGui.QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
         self.proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
         self.proxy_model.setFilterKeyColumn(self.COL_NAME)
         self.ui.treeView.setSortingEnabled(True)
+        self.header.setStretchLastSection(True)
         self.proxy_model.setSortRole(self.ROLE_SORT_DATA)
         self.ui.treeView.setModel(self.proxy_model)
         self.ui.setWindowModality(QtCore.Qt.ApplicationModal)
         
+        self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        # Make the actions for the context menu:
+        self.action_set_selected_visible = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'Show selected columns',  self.ui)
+        self.action_set_selected_hidden = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'Hide selected columns',  self.ui)
+            
         self.connect_signals()
-        
-        self.populate_model(column_names, columns_visible)
-        
-        self.ui.show()
+        self.populate_model(column_names, self.columns_visible)
+
         
     def connect_signals(self):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
+        self.ui.close_signal.connect(self.close)
         self.ui.lineEdit_filter.textEdited.connect(self.on_filter_text_edited)
         self.ui.pushButton_make_it_so.clicked.connect(self.make_it_so)
         self.ui.pushButton_cancel.clicked.connect(self.cancel)
@@ -217,8 +228,16 @@ class EditColumns(object):
         self.select_all_checkbox.stateChanged.connect(self.on_select_all_state_changed)
         self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
             self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
+        self.ui.treeView.customContextMenuRequested.connect(self.on_treeView_context_menu_requested)
+        self.action_set_selected_visible.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
+        self.action_set_selected_hidden.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
             
     def populate_model(self, column_names, columns_visible):
+        self.model.clear()
+        self.model.setHorizontalHeaderLabels(['', 'Name'])
+        self.header.setWidget(self.COL_VISIBLE, self.select_all_checkbox)
         # Which indices in self.columns_visible the row numbers correspond to
         self.column_indices = {}
         for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
@@ -245,6 +264,22 @@ class EditColumns(object):
         self.update_select_all_checkstate()
         self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
         
+    def on_treeView_context_menu_requested(self, point):
+        menu = QtGui.QMenu(self.ui)
+        menu.addAction(self.action_set_selected_visible)
+        menu.addAction(self.action_set_selected_hidden)
+        menu.exec_(QtGui.QCursor.pos())
+        
+    def on_set_selected_triggered(self, visible):
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        for index in selected_indexes:
+            row = self.proxy_model.mapToSource(index).row()
+            visible_item = self.model.item(row, self.COL_VISIBLE)
+            self.update_visible_state(visible_item, visible)
+        self.update_select_all_checkstate()
+        self.do_sort()
+        self.filebox.set_columns_visible(self.columns_visible)
+        
     def on_filter_text_edited(self, text):
         self.proxy_model.setFilterWildcard(text)
         
@@ -254,7 +289,8 @@ class EditColumns(object):
             self.update_visible_state(visible_item, state)
         self.do_sort()
         self.select_all_checkbox.setTristate(False)
-       
+        self.filebox.set_columns_visible(self.columns_visible)
+        
     def update_visible_state(self, item, state):
         assert item.column() == self.COL_VISIBLE, "unexpected column"
         row = item.row()
@@ -278,12 +314,13 @@ class EditColumns(object):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
             else:
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
-                
+            
     def on_model_item_changed(self, item):
         state = item.checkState()
         self.update_visible_state(item, state)
         self.update_select_all_checkstate()
         self.do_sort()
+        self.filebox.set_columns_visible(self.columns_visible)
         
     def do_sort(self):
         header = self.ui.treeView.header()
@@ -291,12 +328,34 @@ class EditColumns(object):
         sort_order = header.sortIndicatorOrder()
         self.ui.treeView.sortByColumn(sort_column, sort_order)
         
+    def update_columns(self, column_names, columns_visible):
+        self.columns_visible = columns_visible.copy()
+        self.column_names = column_names.copy()
+        # If editing is cancelled, any new columns should be set to visible.
+        # So we will add any new columns to our old_columns_visible dict,
+        # with them set to visible.
+        for index in self.columns_visible:
+            if index not in self.old_columns_visible:
+                self.old_columns_visible[index] = True
+        self.populate_model(column_names, self.columns_visible)
+       
+    def show(self):
+        self.old_columns_visible = self.columns_visible.copy()
+        self.ui.show()
+        for column in range(2):
+           self.ui.treeView.resizeColumnToContents(column)
+        
+    def close(self):
+        self.columns_visible = self.old_columns_visible.copy()
+        self.filebox.set_columns_visible(self.columns_visible)
+        self.populate_model(self.column_names, self.columns_visible)
+        self.ui.hide()
+        
     def cancel(self):
         self.ui.close()
         
     def make_it_so(self):
-        self.filebox.set_columns_visible(self.columns_visible)
-        self.ui.close()
+        self.ui.hide()
         
             
 class ItemDelegate(QtGui.QStyledItemDelegate):
@@ -358,7 +417,7 @@ class UneditableModel(QtGui.QStandardItemModel):
         return result & ~QtCore.Qt.ItemIsEditable
         
     
-class DataFrameModel(object):
+class DataFrameModel(QtCore.QObject):
 
     COL_ACTIVE = 0
     COL_STATUS = 1
@@ -366,7 +425,10 @@ class DataFrameModel(object):
     
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
     
+    columns_changed = Signal()
+    
     def __init__(self, view):
+        QtCore.QObject.__init__(self)
         self._view = view
         self._model = UneditableModel()
         self._header = HorizontalHeaderViewWithWidgets(self._model)
@@ -403,6 +465,7 @@ class DataFrameModel(object):
         active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
         self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         self.checkbox_all_active = QtGui.QCheckBox()
+        self.checkbox_all_active.setCheckState(QtCore.Qt.Checked)
         self.checkbox_all_active.setTristate(False)
         self._header.setWidget(self.COL_ACTIVE, self.checkbox_all_active)
         
@@ -521,6 +584,10 @@ class DataFrameModel(object):
             column_number = new_columns_start + i
             self._view.resizeColumnToContents(column_number)
         
+        if new_column_names:
+            self.columns_changed.emit()
+            
+            
     def new_row(self, filepath):
         active_item = QtGui.QStandardItem()
         active_item.setCheckable(True)
@@ -560,6 +627,8 @@ class FileBox(object):
         loader = UiLoader()
         self.ui = loader.load('filebox.ui')
         container.addWidget(self.ui)
+        self.shots_model = DataFrameModel(self.ui.tableView)
+        self.edit_columns_dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
         
         self.connect_signals()
         
@@ -580,8 +649,6 @@ class FileBox(object):
         # or paused:
         self.incoming_queue = Queue.Queue()
         
-        self.shots_model = DataFrameModel(self.ui.tableView)
-            
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
         self.incoming = threading.Thread(target = self.incoming_buffer_loop)
@@ -596,15 +663,15 @@ class FileBox(object):
         
     def connect_signals(self):
         self.ui.pushButton_edit_columns.clicked.connect(self.on_edit_columns_clicked)
+        self.shots_model.columns_changed.connect(self.on_columns_changed)
         
     def on_edit_columns_clicked(self):
-        # visible = {}
-        # for column in self.treeview.get_columns():
-            # label = column.get_widget()
-            # if isinstance(label, gtk.Label):
-                # title = label.get_text()
-                # visible[title] = column.get_visible()
-        self.dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
+        self.edit_columns_dialog.show()
+        
+    def on_columns_changed(self):
+        column_names = self.shots_model.column_names
+        columns_visible = self.shots_model.columns_visible
+        self.edit_columns_dialog.update_columns(column_names, columns_visible)
         
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
