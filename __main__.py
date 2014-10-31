@@ -59,7 +59,6 @@ from qtutils.outputbox import OutputBox
 import qtutils.icons
 
 # debug import, can be removed in production
-import bprofile
 
 # Set working directory to lyse folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
@@ -94,10 +93,7 @@ def question_dialog(message):
 
 def scientific_notation(x, sigfigs = 4):
     """Returns a unicode string of the float f in scientific notation"""
-    if not isinstance(x, float):
-        raise TypeError('x must be floating point number')
-    if np.isnan(x) or np.isinf(x):
-        return str(x)
+    
     times = u'\u00d7'
     thinspace = u'\u2009'
     sups = {u'-': u'\u207b',
@@ -111,15 +107,15 @@ def scientific_notation(x, sigfigs = 4):
             u'7': u'\u2077',
             u'8': u'\u2078',
             u'9': u'\u2079'}
-    
+            
+    if not isinstance(x, float):
+        raise TypeError('x must be floating point number')
+    if np.isnan(x) or np.isinf(x):
+        return str(x)
     if x != 0:
-        try:
-            exponent = int(np.floor(np.log10(np.abs(x))))
-            # Only multiples of 10^3
-            exponent = int(np.floor(exponent/3)*3)
-        except Exception:
-            import IPython
-            IPython.embed()
+        exponent = int(np.floor(np.log10(np.abs(x))))
+        # Only multiples of 10^3
+        exponent = int(np.floor(exponent/3)*3)
     else:
         exponent = 0
     significand = x/10**exponent
@@ -226,7 +222,7 @@ class EditColumns(object):
         # Which indices in self.columns_visible the row numbers correspond to
         self.column_indices = {}
         for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
-            if name.startswith('__'):
+            if not isinstance(name, tuple):
                 # one of our special columns, ignore:
                 continue
             visible = columns_visible[column_index]
@@ -238,9 +234,9 @@ class EditColumns(object):
             else:
                 visible_item.setCheckState(QtCore.Qt.Unchecked)
                 visible_item.setData(QtCore.Qt.Unchecked, self.ROLE_SORT_DATA)
-                
-            name_item = QtGui.QStandardItem(name)
-            name_item.setData(name, self.ROLE_SORT_DATA)
+            name_as_string = ', '.join(name).strip(', ')
+            name_item = QtGui.QStandardItem(name_as_string)
+            name_item.setData(name_as_string, self.ROLE_SORT_DATA)
             self.model.appendRow([visible_item, name_item])
             self.column_indices[self.model.rowCount() - 1] = column_index
             
@@ -305,16 +301,13 @@ class EditColumns(object):
             
 class ItemDelegate(QtGui.QStyledItemDelegate):
     """An item delegate with a fixed height and a progress bar in one column"""
-    EXTRA_ROW_HEIGHT = 7
+    EXTRA_ROW_HEIGHT = 2
 
     def __init__(self, view, model, col_status, role_status_percent):
         self.view = view
         self.model = model
         self.COL_STATUS = col_status
         self.ROLE_STATUS_PERCENT = role_status_percent
-        
-        # We hold onto a single progress bar, setting its parameters and using it to paint to every
-        # self.progress_bar = QtGui.QProgressBar()parameters
         QtGui.QStyledItemDelegate.__init__(self)
         
     def sizeHint(self, *args):
@@ -328,13 +321,31 @@ class ItemDelegate(QtGui.QStyledItemDelegate):
         if index.column() == self.COL_STATUS:
             status_percent = self.model.data(index, self.ROLE_STATUS_PERCENT)
             if status_percent == 100:
+                # Render as a normal item - this shows whatever icon is set instead of a progress bar.
                 return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
             else:
-                ############ work in progress keep working from here #############
+                # Method of rendering a progress bar into the view copied from
+                # Qt's 'network-torrent' example:
+                # http://qt-project.org/doc/qt-4.8/network-torrent-torrentclient-cpp.html
+                
+                # Set up a QStyleOptionProgressBar to precisely mimic the
+                # environment of a progress bar.
                 progress_bar_option = QtGui.QStyleOptionProgressBarV2()
-                # initStyleOption(&opt);
-                painter.drawControl(QtGui.QStyle.CE_ProgressBar, option)
-                #################################################################
+                progress_bar_option.state = QtGui.QStyle.State_Enabled
+                progress_bar_option.direction = qapplication.layoutDirection()
+                progress_bar_option.rect = option.rect
+                progress_bar_option.fontMetrics = qapplication.fontMetrics()
+                progress_bar_option.minimum = 0
+                progress_bar_option.maximum = 100
+                progress_bar_option.textAlignment = QtCore.Qt.AlignCenter
+                progress_bar_option.textVisible = True
+
+                # Set the progress and text values of the style option.
+                progress_bar_option.progress = status_percent
+                progress_bar_option.text = '%d%%'%status_percent
+
+                # Draw the progress bar onto the view.
+                qapplication.style().drawControl(QtGui.QStyle.CE_ProgressBar, progress_bar_option, painter)
         else:
             return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
         
@@ -358,15 +369,21 @@ class DataFrameModel(object):
     def __init__(self, view):
         self._view = view
         self._model = UneditableModel()
-        #self._header = HorizontalHeaderViewWithWidgets(self._model)
+        self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
         
         self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
-        self._header = QtGui.QHeaderView(QtCore.Qt.Horizontal)
         
         # Set a smaller font size on the headers:
-        self._header.setStyleSheet("QHeaderView { font-size: 8pt; color: black;}")
-        self._vertheader.setStyleSheet("QHeaderView { font-size: 8pt; color: black;}")
+        self._header.set_custom_style("font-size: 8pt;")
+        self._vertheader.setStyleSheet("""
+                                       QHeaderView {
+                                         font-size: 8pt;
+                                         color: black;
+                                         padding-top: 0px;
+                                         padding-bottom: 0px;
+                                       }"
+                                       """)
         self._vertheader.setHighlightSections(False)
         self._view.setModel(self._model)
         self._view.setHorizontalHeader(self._header)
@@ -379,10 +396,15 @@ class DataFrameModel(object):
         # from the shot files that are currently open:
         index = pandas.MultiIndex.from_tuples([('filepath', '')])
         self.dataframe = pandas.DataFrame({'filepath':[]}, columns=index)
+        # How many levels the dataframe's multiindex has:
+        self.nlevels = self.dataframe.columns.nlevels
         
-        active_item = QtGui.QStandardItem('active')
+        active_item = QtGui.QStandardItem()
         active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
         self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
+        self.checkbox_all_active = QtGui.QCheckBox()
+        self.checkbox_all_active.setTristate(False)
+        self._header.setWidget(self.COL_ACTIVE, self.checkbox_all_active)
         
         status_item = QtGui.QStandardItem()
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
@@ -398,12 +420,13 @@ class DataFrameModel(object):
         self._view.setColumnWidth(self.COL_FILEPATH, 100)
         
         # Column indices to names and vice versa for fast lookup:
-        self.column_indices = {'__active' : self.COL_ACTIVE, '__status': self.COL_STATUS, 'filepath': self.COL_FILEPATH}
-        self.column_names = {self.COL_ACTIVE: '__active', self.COL_STATUS: '__status', self.COL_FILEPATH: 'filepath'}
+        self.column_indices = {'__active' : self.COL_ACTIVE, '__status': self.COL_STATUS, ('filepath',''): self.COL_FILEPATH}
+        self.column_names = {self.COL_ACTIVE: '__active', self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath','')}
         self.columns_visible = {self.COL_ACTIVE: True, self.COL_STATUS: True, self.COL_FILEPATH: True}
         
     def get_model_row_by_filepath(self, filepath):
-        possible_items = self._model.findItems(filepath, column=self.column_indices['filepath'])
+        filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
+        possible_items = self._model.findItems(filepath, column=self.column_indices[filepath_colname])
         if len(possible_items) > 1:
             raise LookupError('Multiple items found')
         elif not possible_items:
@@ -412,26 +435,45 @@ class DataFrameModel(object):
         index = item.index()
         return index.row()
         
-    def get_df_column_names(self):
-        return ['\n'.join(item for item in column_name if item) for column_name in self.dataframe.columns]
-       
     def set_columns_visible(self, columns_visible):
         self.columns_visible = columns_visible
         for column_index, visible in columns_visible.items():
             self._view.setColumnHidden(column_index, not visible)
         
+    def update_column_levels(self):
+        """Pads the keys and values of our lists of column names so that
+        they still match those in the dataframe after the number of
+        levels in its multiindex has increased"""
+        extra_levels = self.dataframe.columns.nlevels - self.nlevels
+        if extra_levels > 0:
+            self.nlevels = self.dataframe.columns.nlevels
+            column_indices = {}
+            column_names = {}
+            for column_name in self.column_indices:
+                if not isinstance(column_name, tuple):
+                    # It's one of our special columns
+                    new_column_name = column_name
+                else:
+                    new_column_name = column_name + ('',) * extra_levels
+                column_index = self.column_indices[column_name]
+                column_indices[new_column_name] = column_index
+                column_names[column_index] = new_column_name
+            self.column_indices = column_indices
+            self.column_names = column_names
+            
     def update_row(self, filepath, dataframe_already_updated=False):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot"""
         # Update the row in the dataframe first:
-        index = np.where(self.dataframe['filepath'].values == filepath)
-        index = index[0][0]
+        df_row_index = np.where(self.dataframe['filepath'].values == filepath)
+        df_row_index = df_row_index[0][0]
         if not dataframe_already_updated:
             new_row_data = get_dataframe_from_shot(filepath)
-            self.dataframe = replace_with_padding(self.dataframe, new_row_data, index) 
+            self.dataframe = replace_with_padding(self.dataframe, new_row_data, df_row_index) 
+            self.update_column_levels()
             
         # Check and create necessary new columns in the Qt model:
-        new_column_names = set(self.get_df_column_names()) - set(self.column_names.values())
+        new_column_names = set(self.dataframe.columns) - set(self.column_names.values())
         new_columns_start = self._model.columnCount()
         self._model.insertColumns(new_columns_start, len(new_column_names))
         for i, column_name in enumerate(sorted(new_column_names)):
@@ -440,14 +482,16 @@ class DataFrameModel(object):
             self.column_names[column_number] = column_name
             self.column_indices[column_name] = column_number
             self.columns_visible[column_number] = True
-            header_item = QtGui.QStandardItem(column_name)
-            header_item.setToolTip(column_name)
+            column_name_as_string = '\n'.join(column_name).strip()
+            header_item = QtGui.QStandardItem(column_name_as_string)
+            header_item.setToolTip(column_name_as_string)
             self._model.setHorizontalHeaderItem(column_number, header_item)
             
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
+        dataframe_row = dict(self.dataframe.ix[df_row_index])
         for column_number, column_name in self.column_names.items():
-            if column_name.startswith('__'):
+            if not isinstance(column_name, tuple):
                 # One of our special columns, does not correspond to a column in the dataframe:
                 continue
             item = self._model.item(model_row_number, column_number)
@@ -456,7 +500,8 @@ class DataFrameModel(object):
                 item = QtGui.QStandardItem('NaN')
                 item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
                 self._model.setItem(model_row_number, column_number, item)
-            value = self.dataframe[column_name].values[index][0]
+            # value = self.dataframe[column_name].values[df_row_index][0]
+            value = dataframe_row[column_name]
             if isinstance(value, float):
                 value_str = scientific_notation(value)
             else:
@@ -479,14 +524,13 @@ class DataFrameModel(object):
     def new_row(self, filepath):
         active_item = QtGui.QStandardItem()
         active_item.setCheckable(True)
+        active_item.setCheckState(QtCore.Qt.Checked)
         status_item = QtGui.QStandardItem()
         status_item.setData(0, self.ROLE_STATUS_PERCENT)
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [active_item, status_item, name_item] 
         
-    
-    @bprofile.BProfile('add_file.png')
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
@@ -497,6 +541,7 @@ class DataFrameModel(object):
         # Add the new row to the dataframe.
         new_row_data = get_dataframe_from_shot(filepath)
         self.dataframe = concat_with_padding(self.dataframe, new_row_data)
+        self.update_column_levels()
         self.update_row(filepath, dataframe_already_updated=True)
         
         
@@ -653,10 +698,9 @@ class Lyse(object):
         
     ##### TESTING ONLY REMOVE IN PRODUCTION
     def submit_dummy_shots(self):
-        path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_11.h5'
-        print(zprocess.zmq_get(self.port, data={'filepath': path}))
-        path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_10.h5'
-        print(zprocess.zmq_get(self.port, data={'filepath': path}))
+        for i in range(12):
+            path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_%02d.h5'%i
+            print(zprocess.zmq_get(self.port, data={'filepath': path}))
 
 
 
