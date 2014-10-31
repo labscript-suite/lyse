@@ -89,7 +89,7 @@ QGroupBox
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QPushButton" name="pushButton">
+        <widget class="QPushButton" name="pushButton_analysis_paused">
          <property name="text">
           <string>Analysis running</string>
          </property>
@@ -100,7 +100,7 @@ QGroupBox
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_2">
+        <widget class="QPushButton" name="pushButton_mark_as_not_done">
          <property name="text">
           <string>Mark as not done</string>
          </property>
@@ -111,7 +111,7 @@ QGroupBox
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="pushButton_3">
+        <widget class="QPushButton" name="pushButton_run_multishot_analysis">
          <property name="text">
           <string>Run multishot analysis</string>
          </property>
@@ -151,7 +151,7 @@ QGroupBox
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
           <item>
-           <widget class="QToolButton" name="toolButton">
+           <widget class="QToolButton" name="toolButton_add_shots">
             <property name="toolTip">
              <string>Add shots</string>
             </property>
@@ -165,7 +165,7 @@ QGroupBox
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="toolButton_2">
+           <widget class="QToolButton" name="toolButton_delete_shots">
             <property name="toolTip">
              <string>Remove selected shots</string>
             </property>

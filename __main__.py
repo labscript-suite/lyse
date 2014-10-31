@@ -465,6 +465,7 @@ class DataFrameModel(QtCore.QObject):
         active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
         self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         self.checkbox_all_active = QtGui.QCheckBox()
+        self.checkbox_all_active.setToolTip('whether or not single-shot analysis routines will be run on each shot')
         self.checkbox_all_active.setCheckState(QtCore.Qt.Checked)
         self.checkbox_all_active.setTristate(False)
         self._header.setWidget(self.COL_ACTIVE, self.checkbox_all_active)
@@ -630,6 +631,8 @@ class FileBox(object):
         self.shots_model = DataFrameModel(self.ui.tableView)
         self.edit_columns_dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
         
+        self.last_opened_shots_folder = self.exp_config.get('paths', 'experiment_shot_storage')
+        
         self.connect_signals()
         
         self.analysis_loop_paused = False
@@ -664,6 +667,7 @@ class FileBox(object):
     def connect_signals(self):
         self.ui.pushButton_edit_columns.clicked.connect(self.on_edit_columns_clicked)
         self.shots_model.columns_changed.connect(self.on_columns_changed)
+        self.ui.toolButton_add_shots.clicked.connect(self.on_add_shot_files_clicked)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
@@ -672,6 +676,22 @@ class FileBox(object):
         column_names = self.shots_model.column_names
         columns_visible = self.shots_model.columns_visible
         self.edit_columns_dialog.update_columns(column_names, columns_visible)
+        
+    def on_add_shot_files_clicked(self):
+        shot_files = QtGui.QFileDialog.getOpenFileNames(self.ui,
+                                                         'Select shot files',
+                                                         self.last_opened_shots_folder,
+                                                         "HDF5 files (*.h5)")
+        if not shot_files:
+            # User cancelled selection
+            return
+        # Convert to standard platform specific path, otherwise Qt likes forward slashes:
+        shot_files = [os.path.abspath(shot_file) for shot_file in shot_files]
+        
+        # Save the containing folder for use next time we open the dialog box:
+        self.last_opened_shots_folder = os.path.dirname(shot_files[0])
+        # Open the files:
+        #self.open_globals_file(globals_file)
         
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
