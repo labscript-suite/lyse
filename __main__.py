@@ -474,21 +474,23 @@ class DataFrameModel(QtCore.QObject):
         QtCore.QObject.__init__(self)
         self._view = view
         self._model = UneditableModel()
+
+        headerview_style = """
+                           QHeaderView {
+                             font-size: 8pt;
+                             color: black;
+                           }
+                           QHeaderView::section{
+                             font-size: 8pt;
+                             color: black;
+                           }
+                           """
         self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
-
         self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
+        self._vertheader.setStyleSheet(headerview_style)
+        self._header.setStyleSheet(headerview_style)
 
-        # Set a smaller font size on the headers:
-        self._header.set_custom_style("font-size: 8pt;")
-        self._vertheader.setStyleSheet("""
-                                       QHeaderView {
-                                         font-size: 8pt;
-                                         color: black;
-                                         padding-top: 0px;
-                                         padding-bottom: 0px;
-                                       }"
-                                       """)
         self._vertheader.setHighlightSections(False)
         self._view.setModel(self._model)
         self._view.setHorizontalHeader(self._header)
@@ -514,8 +516,7 @@ class DataFrameModel(QtCore.QObject):
         self.select_all_checkbox.setTristate(False)
         self._header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
 
-        status_item = QtGui.QStandardItem()
-        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
+        status_item = QtGui.QStandardItem('% done')
         status_item.setToolTip('status/progress of single-shot analysis')
         self._model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
 
