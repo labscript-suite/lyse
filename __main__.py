@@ -37,7 +37,7 @@ except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
         
 check_version('labscript_utils', '2.1', '3')
-check_version('qtutils', '1.5.1', '2')
+check_version('qtutils', '1.5.4', '2')
 check_version('zprocess', '1.1.2', '2')
 
 import zprocess.locking
@@ -56,9 +56,8 @@ from lyse.dataframe_utilities import (concat_with_padding,
                                  
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 from qtutils.outputbox import OutputBox
+from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
-
-# debug import, can be removed in production
 
 # Set working directory to lyse folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
@@ -140,7 +139,7 @@ class WebServer(ZMQServer):
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
-                app.filebox.incoming_queue.put([h5_filepath])
+                app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
         return ("error: operation not supported. Recognised requests are:\n "
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
@@ -598,7 +597,7 @@ class DataFrameModel(QtCore.QObject):
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [active_item, status_item, name_item] 
-        
+       
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
@@ -629,6 +628,7 @@ class FileBox(object):
         self.ui = loader.load('filebox.ui')
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.ui.tableView)
+        set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
         self.edit_columns_dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
         
         self.last_opened_shots_folder = self.exp_config.get('paths', 'experiment_shot_storage')
@@ -637,9 +637,9 @@ class FileBox(object):
         
         self.analysis_loop_paused = False
         
-        # A condition to let the looping threads know when to recheck conditions
-        # they're waiting on (instead of having them do time.sleep)
-        self.timing_condition = threading.Condition()
+        # An Event to let the analysis thread know to check for new shots,
+        # rather than polling with time.sleep() in between:
+        self.new_shots = threading.Event()
         
         # The folder that the 'add shots' dialog will open to:
         self.current_folder = self.exp_config.get('paths', 'experiment_shot_storage')
@@ -690,41 +690,37 @@ class FileBox(object):
         
         # Save the containing folder for use next time we open the dialog box:
         self.last_opened_shots_folder = os.path.dirname(shot_files[0])
-        # Open the files:
-        #self.open_globals_file(globals_file)
+        # Queue the files to be opened:
+        for filepath in shot_files:
+            self.incoming_queue.put(filepath)
         
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
     
     def incoming_buffer_loop(self):
+        """We use a queue as a buffer for incoming shots. We don't want to hang and not
+        respond to a client submitting shots, so we just let shots pile up here until we can get to them.
+        The downside to this is that we can't return errors to the cleint if the shot cannot be added,
+        but the suggested workflow is to handle errors here anyway. A client running shots shouldn't stop
+        the experiment on account of errors from the analyis stage, so what's the point of passing errors to it?
+        We'll just raise errors here and the user can decide what to do with them."""
         logger = logging.getLogger('LYSE.FileBox.incoming')  
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
         # imported. So we'll silence them in this thread too:
         h5py._errors.silence_errors()
-        
         while True:
-            filepaths = self.incoming_queue.get()
-            logger.info('adding some files')
-            self.add_files(filepaths)
-            
-    @inmain_decorator()
-    def add_files(self, filepaths):
-        for i, filepath in enumerate(filepaths):
+            filepath = self.incoming_queue.get()
+            if not isinstance(filepath, unicode) or isinstance(filepath, str):
+                raise AssertionError(str(type(filepath)) + ' is not str or unicode')
             self.logger.info('adding %s'%filepath)
-            self.shots_model.add_file(filepath)
-        # with gtk.gdk.lock:
-            # self.update_liststore()
-        # if self.scrolled:
-            # with gtk.gdk.lock:
-                # # Are we scrolled to the bottom of the TreeView?
-                # if self.adjustment.value == self.adjustment.upper - self.adjustment.page_size:
-                    # self.scrolled = False                 
-                    # gobject.idle_add(self.scroll_to_bottom)
-        # # Let waiting threads know to check for new files:
-        # with self.timing_condition:
-            # self.timing_condition.notify_all()
+            inmain(self.shots_model.add_file, filepath)
+            
+        # Let analysis thread know to check for new files:
+        with self.new_shots:
+            self.new_shots.set()
+        
         
 class Lyse(object):
     def __init__(self):
@@ -781,7 +777,6 @@ class Lyse(object):
         # The routine boxes have subprocesses that need to be quit:
         #self.singleshot_routinebox.destroy()
         #self.multishot_routinebox.destroy()
-        #self.server.shutdown()
         
     ##### TESTING ONLY REMOVE IN PRODUCTION
     def submit_dummy_shots(self):
@@ -802,7 +797,7 @@ if __name__ == "__main__":
     server = WebServer(app.port)
     
     # TEST
-    app.submit_dummy_shots()
+    # app.submit_dummy_shots()
     
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
