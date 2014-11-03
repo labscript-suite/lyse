@@ -38,7 +38,7 @@ except ImportError:
         
 check_version('labscript_utils', '2.1', '3')
 check_version('qtutils', '1.5.4', '2')
-check_version('zprocess', '1.1.2', '2')
+check_version('zprocess', '1.1.6', '2')
 
 import zprocess.locking
 from zprocess import ZMQServer
@@ -905,7 +905,8 @@ class Lyse(object):
     ##### TESTING ONLY REMOVE IN PRODUCTION
     def submit_dummy_shots(self):
         for i in range(12):
-            path = r'C:\Experiments\rb_chip\connectiontable\2014\10\21\20141021T135341_connectiontable_%02d.h5'%i
+            path = os.path.abspath(os.path.join('test_shots', '20141021T135341_connectiontable_%02d.h5'%i))
+            print(path)
             print(zprocess.zmq_get(self.port, data={'filepath': path}))
 
 
