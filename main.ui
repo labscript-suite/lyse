@@ -92,11 +92,11 @@ QToolButton:hover:checked {
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_5">
     <item>
-     <widget class="QSplitter" name="splitter_3">
+     <widget class="QSplitter" name="splitter_horizontal">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QSplitter" name="splitter_2">
+      <widget class="QSplitter" name="splitter_vertical">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
        </property>

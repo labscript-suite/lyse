@@ -168,6 +168,13 @@ class RoutineBox(object):
         self.ui = loader.load('routinebox.ui')
         container.addWidget(self.ui)
         
+        if multishot:
+            self.ui.groupBox.setTitle('Multishot routines')
+            
+        else:
+            self.ui.groupBox.setTitle('Singleshot routines')
+            
+        
         self.model = UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
         self.select_all_checkbox = QtGui.QCheckBox()
@@ -863,6 +870,10 @@ class Lyse(object):
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
                                
         self.ui.resize(1600, 900)
+        
+        # Set the splitters to appropriate fractions of their maximum size:
+        self.ui.splitter_horizontal.setSizes([1000,600])
+        self.ui.splitter_vertical.setSizes([300,600])
         self.ui.show()
         # self.ui.showMaximized()
     
