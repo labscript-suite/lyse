@@ -155,7 +155,40 @@ class LyseMainWindow(QtGui.QMainWindow):
             self.newWindow.emit(self.effectiveWinId())
         return result
 
+
+class RoutineBox(object):
+    def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
+        self.multishot = multishot
+        self.filebox = filebox
+        self.exp_config = exp_config
+        self.from_filebox = from_filebox
+        self.to_filebox = to_filebox
         
+        loader = UiLoader()
+        self.ui = loader.load('routinebox.ui')
+        container.addWidget(self.ui)
+        
+        self.model = UneditableModel()
+        self.header = HorizontalHeaderViewWithWidgets(self.model)
+        self.select_all_checkbox = QtGui.QCheckBox()
+        self.select_all_checkbox.setTristate(False)
+        self.ui.treeView.setHeader(self.header)
+        self.header.setStretchLastSection(True)
+        self.ui.treeView.setModel(self.model)
+        
+        self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        # Make the actions for the context menu:
+        self.action_set_selected_visible = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
+        self.action_set_selected_hidden = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
+            
+        self.connect_signals()
+
+    def connect_signals(self):
+        pass
+        
+                                               
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -212,7 +245,6 @@ class EditColumns(object):
             
         self.connect_signals()
         self.populate_model(column_names, self.columns_visible)
-
         
     def connect_signals(self):
         if os.name == 'nt':
@@ -271,8 +303,8 @@ class EditColumns(object):
         
     def on_set_selected_triggered(self, visible):
         selected_indexes = self.ui.treeView.selectedIndexes()
-        for index in selected_indexes:
-            row = self.proxy_model.mapToSource(index).row()
+        selected_rows = set(self.proxy_model.mapToSource(index).row() for index in selected_indexes)
+        for row in selected_rows:
             visible_item = self.model.item(row, self.COL_VISIBLE)
             self.update_visible_state(visible_item, visible)
         self.update_select_all_checkstate()
@@ -452,6 +484,7 @@ class DataFrameModel(QtCore.QObject):
         self._delegate = ItemDelegate(self._view, self._model, self.COL_STATUS, self.ROLE_STATUS_PERCENT)
         self._view.setItemDelegate(self._delegate)
         self._view.setSelectionBehavior(QtGui.QTableView.SelectRows)
+        self._view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         
         # This dataframe will contain all the scalar data
         # from the shot files that are currently open:
@@ -463,11 +496,11 @@ class DataFrameModel(QtCore.QObject):
         active_item = QtGui.QStandardItem()
         active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
         self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
-        self.checkbox_all_active = QtGui.QCheckBox()
-        self.checkbox_all_active.setToolTip('whether or not single-shot analysis routines will be run on each shot')
-        self.checkbox_all_active.setCheckState(QtCore.Qt.Checked)
-        self.checkbox_all_active.setTristate(False)
-        self._header.setWidget(self.COL_ACTIVE, self.checkbox_all_active)
+        self.select_all_checkbox = QtGui.QCheckBox()
+        self.select_all_checkbox.setToolTip('whether or not single-shot analysis routines will be run on each shot')
+        self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
+        self.select_all_checkbox.setTristate(False)
+        self._header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
         
         status_item = QtGui.QStandardItem()
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
@@ -487,6 +520,54 @@ class DataFrameModel(QtCore.QObject):
         self.column_names = {self.COL_ACTIVE: '__active', self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath','')}
         self.columns_visible = {self.COL_ACTIVE: True, self.COL_STATUS: True, self.COL_FILEPATH: True}
         
+        # Make the actions for the context menu:
+        self.action_set_selected_active = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'Set selected shots active',  self._view)
+        self.action_set_selected_inactive = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'Set selected shots inactive',  self._view)
+        self.action_remove_selected = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
+            
+        self.connect_signals()
+    def connect_signals(self):
+        self._model.itemChanged.connect(self.on_model_item_changed)
+        # A context manager with which we can temporarily disconnect the above connection.
+        self.model_item_changed_disconnected = DisconnectContextManager(
+            self._model.itemChanged, self.on_model_item_changed)
+        self.select_all_checkbox.stateChanged.connect(self.on_select_all_state_changed)
+        self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
+            self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
+        self._view.customContextMenuRequested.connect(self.on_view_context_menu_requested)
+        self.action_set_selected_active.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
+        self.action_set_selected_inactive.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
+        self.action_remove_selected.triggered.connect(self.on_remove_selection)
+        
+    def on_select_all_state_changed(self, state):
+        with self.model_item_changed_disconnected:
+            for row in range(self._model.rowCount()):
+                active_item = self._model.item(row, self.COL_ACTIVE)
+                active_item.setCheckState(state)
+            self.select_all_checkbox.setTristate(False)
+        
+    def update_select_all_checkstate(self):
+        with self.select_all_checkbox_state_changed_disconnected:
+            all_states = []
+            for row in range(self._model.rowCount()):
+                active_item = self._model.item(row, self.COL_ACTIVE)
+                all_states.append(active_item.checkState())
+            if all(state == QtCore.Qt.Checked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
+            elif all(state == QtCore.Qt.Unchecked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
+                
+    def on_model_item_changed(self, item):
+        if item.column() == self.COL_ACTIVE:
+            self.update_select_all_checkstate()
+        
     def get_model_row_by_filepath(self, filepath):
         filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
         possible_items = self._model.findItems(filepath, column=self.column_indices[filepath_colname])
@@ -497,6 +578,37 @@ class DataFrameModel(QtCore.QObject):
         item = possible_items[0]
         index = item.index()
         return index.row()
+        
+    def on_remove_selection(self):
+        selected_indexes = self._view.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        if not question_dialog("Remove %d shots?" % len(selected_rows)):
+            return
+        # Remove from DataFrame first:
+        self.dataframe = self.dataframe.drop(selected_rows)
+        self.dataframe.index = pandas.Index(range(len(self.dataframe)))
+        # Delete one at a time from Qt model, since indexes change with each deletion:
+        while selected_rows:
+            some_row = selected_rows.pop()
+            self._model.removeRow(some_row)
+            selected_indexes = self._view.selectedIndexes()
+            selected_rows = set(index.row() for index in selected_indexes)
+        self.update_select_all_checkstate()
+        
+    def on_view_context_menu_requested(self, point):
+        menu = QtGui.QMenu(self._view)
+        menu.addAction(self.action_set_selected_active)
+        menu.addAction(self.action_set_selected_inactive)
+        menu.addAction(self.action_remove_selected)
+        menu.exec_(QtGui.QCursor.pos())
+        
+    def on_set_selected_triggered(self, active):
+        selected_indexes = self._view.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        for row in selected_rows:
+            active_item = self._model.item(row, self.COL_ACTIVE)
+            active_item.setCheckState(active)
+        self.update_select_all_checkstate()
         
     def set_columns_visible(self, columns_visible):
         self.columns_visible = columns_visible
@@ -587,7 +699,6 @@ class DataFrameModel(QtCore.QObject):
         if new_column_names:
             self.columns_changed.emit()
             
-            
     def new_row(self, filepath):
         active_item = QtGui.QStandardItem()
         active_item.setCheckable(True)
@@ -601,6 +712,7 @@ class DataFrameModel(QtCore.QObject):
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
+            app.output_box.output('Adding duplicate shot %s ignored\n'%filepath, red=True)
             return
         # Add the new row to the model:
         self._model.appendRow(self.new_row(filepath))
@@ -668,6 +780,7 @@ class FileBox(object):
         self.ui.pushButton_edit_columns.clicked.connect(self.on_edit_columns_clicked)
         self.shots_model.columns_changed.connect(self.on_columns_changed)
         self.ui.toolButton_add_shots.clicked.connect(self.on_add_shot_files_clicked)
+        self.ui.toolButton_remove_shots.clicked.connect(self.shots_model.on_remove_selection)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
@@ -742,12 +855,12 @@ class Lyse(object):
         from_multishot = Queue.Queue()
         
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
-        #self.singleshot_routinebox = RoutineBox(self.ui.verticalLayout_singleshot_routinebox,
-        #                                        self, to_singleshot, from_singleshot, self.outputbox.port)
-        #self.multishot_routinebox = RoutineBox(self.ui.verticalLayout_multishot_routinebox,
-        #                                       self, to_multishot, from_multishot, self.outputbox.port, multishot=True)
-        self.filebox = FileBox(self.ui.verticalLayout_filebox,
-                               self.exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot)
+        self.singleshot_routinebox = RoutineBox(self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
+                                                self, to_singleshot, from_singleshot, self.output_box.port)
+        self.multishot_routinebox = RoutineBox(self.ui.verticalLayout_multishot_routinebox, self.exp_config,
+                                               self, to_multishot, from_multishot, self.output_box.port, multishot=True)
+        self.filebox = FileBox(self.ui.verticalLayout_filebox, self.exp_config,
+                               to_singleshot, from_singleshot, to_multishot, from_multishot)
                                
         self.ui.resize(1600, 900)
         self.ui.show()
@@ -797,7 +910,7 @@ if __name__ == "__main__":
     server = WebServer(app.port)
     
     # TEST
-    # app.submit_dummy_shots()
+    app.submit_dummy_shots()
     
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()

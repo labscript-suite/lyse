@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>736</width>
-    <height>616</height>
+    <width>400</width>
+    <height>300</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -83,75 +83,25 @@ QGroupBox
     font-weight: bold;
 }</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_3">
+  <layout class="QVBoxLayout" name="verticalLayout_4">
    <item>
-    <layout class="QVBoxLayout" name="verticalLayout">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QPushButton" name="pushButton_analysis_paused">
-         <property name="text">
-          <string>Analysis running</string>
-         </property>
-         <property name="icon">
-          <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
-           <normaloff>:/qtutils/fugue/control.png</normaloff>:/qtutils/fugue/control.png</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_mark_as_not_done">
-         <property name="text">
-          <string>Mark as not done</string>
-         </property>
-         <property name="icon">
-          <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
-           <normaloff>:/qtutils/fugue/arrow-curve-180.png</normaloff>:/qtutils/fugue/arrow-curve-180.png</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_run_multishot_analysis">
-         <property name="text">
-          <string>Run multishot analysis</string>
-         </property>
-         <property name="icon">
-          <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
-           <normaloff>:/qtutils/fugue/arrow-curve.png</normaloff>:/qtutils/fugue/arrow-curve.png</iconset>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </item>
-     <item>
-      <widget class="QGroupBox" name="groupBox">
-       <property name="title">
-        <string>Shots</string>
-       </property>
-       <property name="flat">
-        <bool>false</bool>
-       </property>
-       <property name="checkable">
-        <bool>false</bool>
-       </property>
+    <widget class="QGroupBox" name="groupBox">
+     <property name="title">
+      <string>Singleshot routines</string>
+     </property>
+     <property name="flat">
+      <bool>false</bool>
+     </property>
+     <property name="checkable">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_3">
+      <item>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
           <item>
-           <widget class="QToolButton" name="toolButton_add_shots">
+           <widget class="QToolButton" name="toolButton_add_routine">
             <property name="toolTip">
              <string>Add shots</string>
             </property>
@@ -165,7 +115,7 @@ QGroupBox
            </widget>
           </item>
           <item>
-           <widget class="QToolButton" name="toolButton_remove_shots">
+           <widget class="QToolButton" name="toolButton_remove_routines">
             <property name="toolTip">
              <string>Remove selected shots</string>
             </property>
@@ -184,7 +134,7 @@ QGroupBox
              <string>Edit which columns are displayed</string>
             </property>
             <property name="text">
-             <string>Columns...</string>
+             <string>Output file</string>
             </property>
             <property name="icon">
              <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
@@ -208,25 +158,103 @@ QGroupBox
          </layout>
         </item>
         <item>
-         <widget class="QTableView" name="tableView">
-          <property name="autoScroll">
-           <bool>false</bool>
-          </property>
-          <property name="alternatingRowColors">
-           <bool>true</bool>
-          </property>
-          <property name="verticalScrollMode">
-           <enum>QAbstractItemView::ScrollPerPixel</enum>
-          </property>
-          <property name="horizontalScrollMode">
-           <enum>QAbstractItemView::ScrollPerPixel</enum>
-          </property>
-         </widget>
+         <layout class="QHBoxLayout" name="horizontalLayout">
+          <item>
+           <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+             <spacer name="verticalSpacer">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QToolButton" name="toolButton_2">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+                <normaloff>:/qtutils/fugue/arrow-stop-090.png</normaloff>:/qtutils/fugue/arrow-stop-090.png</iconset>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="toolButton_3">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+                <normaloff>:/qtutils/fugue/arrow-090.png</normaloff>:/qtutils/fugue/arrow-090.png</iconset>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="toolButton">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+                <normaloff>:/qtutils/fugue/arrow-270.png</normaloff>:/qtutils/fugue/arrow-270.png</iconset>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QToolButton" name="toolButton_4">
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+                <normaloff>:/qtutils/fugue/arrow-stop-270.png</normaloff>:/qtutils/fugue/arrow-stop-270.png</iconset>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="verticalSpacer_2">
+              <property name="orientation">
+               <enum>Qt::Vertical</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>20</width>
+                <height>40</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QTreeView" name="treeView">
+            <property name="autoScroll">
+             <bool>false</bool>
+            </property>
+            <property name="alternatingRowColors">
+             <bool>true</bool>
+            </property>
+            <property name="verticalScrollMode">
+             <enum>QAbstractItemView::ScrollPerPixel</enum>
+            </property>
+            <property name="horizontalScrollMode">
+             <enum>QAbstractItemView::ScrollPerPixel</enum>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </item>
        </layout>
-      </widget>
-     </item>
-    </layout>
+      </item>
+     </layout>
+    </widget>
    </item>
   </layout>
  </widget>
