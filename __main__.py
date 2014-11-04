@@ -158,7 +158,11 @@ class LyseMainWindow(QtGui.QMainWindow):
 
 
 class RoutineBox(object):
-
+    
+    COL_ACTIVE = 0
+    COL_NAME = 1
+    COL_PLOTOPTIONS = 2
+    
     def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
         self.multishot = multishot
         self.filebox = filebox
@@ -172,31 +176,99 @@ class RoutineBox(object):
 
         if multishot:
             self.ui.groupBox.setTitle('Multishot routines')
-
         else:
             self.ui.groupBox.setTitle('Singleshot routines')
 
         self.model = UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
-        self.select_all_checkbox = QtGui.QCheckBox()
-        self.select_all_checkbox.setTristate(False)
         self.ui.treeView.setHeader(self.header)
-        self.header.setStretchLastSection(True)
         self.ui.treeView.setModel(self.model)
-
+        
+        active_item = QtGui.QStandardItem()
+        active_item.setToolTip('whether the analysis routine should run')
+        name_item = QtGui.QStandardItem('name')
+        name_item.setToolTip('the name of the python script for the analysis routine')
+        plot_options_item = QtGui.QStandardItem('plot options')
+        plot_options_item.setToolTip('click to change plot options for this analysis routine')
+        
+        self.select_all_checkbox = QtGui.QCheckBox()
+        self.select_all_checkbox.setToolTip('whether the analysis routine should run')
+        self.header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
+        self.select_all_checkbox.setTristate(False)
+        
+        #self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
+        self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
+        self.model.setHorizontalHeaderItem(self.COL_PLOTOPTIONS, plot_options_item)
+        
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
         self.action_set_selected_visible = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
         self.action_set_selected_hidden = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
-
+        
+        self.last_opened_routine_folder = self.exp_config.get('paths', 'analysislib')
+        
+        self.header.update_indents()
+        self.header.update_widget_positions()
+        
+        self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
+        self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
+        self.ui.treeView.resizeColumnToContents(self.COL_PLOTOPTIONS)
+        
         self.connect_signals()
 
     def connect_signals(self):
-        pass
+        self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
+        self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_routines_clicked)
+        self.model.itemChanged.connect(self.on_model_item_changed)
+        # A context manager with which we can temporarily disconnect the above connection.
+        self.model_item_changed_disconnected = DisconnectContextManager(
+            self.model.itemChanged, self.on_model_item_changed)
+        self.select_all_checkbox.stateChanged.connect(self.on_select_all_state_changed)
+        self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
+            self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
+        self.ui.treeView.customContextMenuRequested.connect(self.on_treeView_context_menu_requested)
+        self.action_set_selected_visible.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
+        self.action_set_selected_hidden.triggered.connect(
+            lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
+        self.ui.toolButton_move_to_top.clicked.connect(self.on_move_to_top_clicked)
+        self.ui.toolButton_move_up.clicked.connect(self.on_move_up_clicked)
+        self.ui.toolButton_move_down.clicked.connect(self.on_move_down_clicked)
+        self.ui.toolButton_move_to_bottom.clicked.connect(self.on_move_to_bottom_clicked)
 
+    def on_add_routines_clicked(self):
+        print('on add routines clicked!')
+        
+    def on_remove_routines_clicked(self):
+        print('on remove routines clicked!')
+        
+    def on_model_item_changed(self, item):
+        print('on model item changed!')
+        
+    def on_select_all_state_changed(self, state):
+        print('on select all state changed!')
+        
+    def on_treeView_context_menu_requested(self, point):
+        print('on treeview context menu requested!')
+        
+    def on_selected_triggered(self, active):
+        print('on selected triggered!')
 
+    def on_move_to_top_clicked(self):
+        print('on move to top clicked!')
+        
+    def on_move_up_clicked(self):
+        print('on move up clicked!')
+        
+    def on_move_down_clicked(self):
+        print('on move down clicked!')
+        
+    def on_move_to_bottom_clicked(self):
+        print('on move to bottom clicked!')
+        
+        
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -791,8 +863,6 @@ class FileBox(object):
         #self.analysis.daemon = True
         # self.analysis.start()
 
-        #self.adjustment.set_value(self.adjustment.upper - self.adjustment.page_size)
-
     def connect_signals(self):
         self.ui.pushButton_edit_columns.clicked.connect(self.on_edit_columns_clicked)
         self.shots_model.columns_changed.connect(self.on_columns_changed)
@@ -932,7 +1002,7 @@ if __name__ == "__main__":
     server = WebServer(app.port)
 
     # TEST
-    app.submit_dummy_shots()
+    # app.submit_dummy_shots()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
