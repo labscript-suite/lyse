@@ -12,6 +12,8 @@
 #####################################################################
 
 import labscript_utils.excepthook
+import zprocess
+to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
 
 import sys
 import os
@@ -218,7 +220,6 @@ class AnalysisWorker(object):
         
         
 if __name__ == '__main__':
-    to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
     filepath = from_parent.get()
     
     # Set a meaningful client id for zprocess.locking:

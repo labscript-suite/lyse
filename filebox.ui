@@ -242,7 +242,7 @@ QGroupBox
          </layout>
         </item>
         <item>
-         <widget class="QTableView" name="tableView">
+         <widget class="TableView" name="tableView">
           <property name="autoScroll">
            <bool>false</bool>
           </property>
@@ -264,6 +264,13 @@ QGroupBox
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TableView</class>
+   <extends>QTableView</extends>
+   <header>qtutils/widgets.h</header>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc"/>
  </resources>

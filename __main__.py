@@ -159,7 +159,7 @@ class LyseMainWindow(QtGui.QMainWindow):
         
 class AnalysisRoutine(object):
 
-    def __init__(self, filepath, model, output_box_port):
+    def __init__(self, filepath, model, output_box_port, restart=False):
         self.filepath = filepath
         self.shortname = os.path.basename(self.filepath)
         self.model = model
@@ -167,8 +167,9 @@ class AnalysisRoutine(object):
         self.COL_ACTIVE = RoutineBox.COL_ACTIVE
         self.COL_STATUS = RoutineBox.COL_STATUS
         self.COL_NAME = RoutineBox.COL_NAME
-        self.COL_PLOTOPTIONS = RoutineBox.COL_PLOTOPTIONS
+        self.COL_PLOT_OPTIONS = RoutineBox.COL_PLOT_OPTIONS
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
+        self.ROLE_INDEX = RoutineBox.ROLE_INDEX
         
         # Start a worker process for this analysis routine:
         child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', output_box_port)
@@ -177,26 +178,88 @@ class AnalysisRoutine(object):
         # Tell the worker what script it with be executing:
         self.to_worker.put(self.filepath)
         
-        # Make a row to put into the model:
-        active_item =  QtGui.QStandardItem()
-        active_item.setCheckable(True)
-        active_item.setCheckState(QtCore.Qt.Checked)
-        info_item = QtGui.QStandardItem()
-        name_item = QtGui.QStandardItem(self.shortname)
-        name_item.setToolTip(self.filepath)
-        plot_options_item = QtGui.QStandardItem()
-        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
-        plot_options_item.setToolTip('Click to change plot options for this analysis routine')
-        self.model.appendRow([active_item, info_item, name_item, plot_options_item])
-        
+        # Only need to do this if we're not restarting
+        if not restart:
+            # Make a row to put into the model:
+            active_item =  QtGui.QStandardItem()
+            active_item.setCheckable(True)
+            active_item.setCheckState(QtCore.Qt.Checked)
+            info_item = QtGui.QStandardItem()
+            name_item = QtGui.QStandardItem(self.shortname)
+            name_item.setToolTip(self.filepath)
+            name_item.setData(self.filepath, self.ROLE_FULLPATH)
+            name_item.setData(self.model.rowCount(), self.ROLE_INDEX)
+            plot_options_item = QtGui.QStandardItem()
+            plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
+            plot_options_item.setToolTip('Click to change plot options for this analysis routine')
+            self.model.appendRow([active_item, info_item, name_item, plot_options_item])
+        else:
+            self.clear_status()
             
+    def clear_status(self):
+        raise NotImplementedError
+        
+
+class TreeView(QtGui.QTreeView):
+    leftClicked = Signal(QtCore.QModelIndex)
+    doubleLeftClicked = Signal(QtCore.QModelIndex)
+    """A QTreeView that emits a custom signal leftClicked(index) after a left
+    click on a valid index, and doubleLeftClicked(index) (in addition) on
+    double click."""
+
+    def __init__(self, *args):
+        QtGui.QTreeView.__init__(self, *args)
+        self._pressed_index = None
+        self._double_click = False
+
+    def mousePressEvent(self, event):
+        result = QtGui.QTreeView.mousePressEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid():
+            self._pressed_index = self.indexAt(event.pos())
+        return result
+
+    def leaveEvent(self, event):
+        result = QtGui.QTreeView.leaveEvent(self, event)
+        self._pressed_index = None
+        self._double_click = False
+        return result
+
+    def mouseDoubleClickEvent(self, event):
+        # Ensure our left click event occurs regardless of whether it is the
+        # second click in a double click or not
+        result = QtGui.QTreeView.mouseDoubleClickEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid():
+            self._pressed_index = self.indexAt(event.pos())
+            self._double_click = True
+        return result
+
+    def mouseReleaseEvent(self, event):
+        result = QtGui.QTreeView.mouseReleaseEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid() and index == self._pressed_index:
+            self.leftClicked.emit(index)
+            if self._double_click:
+                self.doubleLeftClicked.emit(index)
+        self._pressed_index = None
+        self._double_click = False
+        return result
+
+        
 class RoutineBox(object):
     
     COL_ACTIVE = 0
     COL_STATUS = 1
     COL_NAME = 2
-    COL_PLOTOPTIONS = 3
+    COL_PLOT_OPTIONS = 3
     ROLE_FULLPATH = QtCore.Qt.UserRole + 1
+    # This data (stored in the name item) will normally match
+    # the position in the model. However it will be modified just
+    # prior to sort() being called with this role as the sort data.
+    # This is how we will reorder the model's rows instead of
+    # using remove/insert.
+    ROLE_INDEX = QtCore.Qt.UserRole + 2
     
     def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
         self.multishot = multishot
@@ -207,6 +270,7 @@ class RoutineBox(object):
         self.output_box_port = output_box_port
         
         loader = UiLoader()
+        loader.registerCustomWidget(TreeView)
         self.ui = loader.load('routinebox.ui')
         container.addWidget(self.ui)
 
@@ -239,12 +303,12 @@ class RoutineBox(object):
         self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         self.model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
-        self.model.setHorizontalHeaderItem(self.COL_PLOTOPTIONS, plot_options_item)
+        self.model.setHorizontalHeaderItem(self.COL_PLOT_OPTIONS, plot_options_item)
         
         self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
         self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
         self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
-        self.ui.treeView.resizeColumnToContents(self.COL_PLOTOPTIONS)
+        self.ui.treeView.resizeColumnToContents(self.COL_PLOT_OPTIONS)
         
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
@@ -264,6 +328,7 @@ class RoutineBox(object):
         self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
         self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_routines_clicked)
         self.model.itemChanged.connect(self.on_model_item_changed)
+        self.ui.treeView.leftClicked.connect(self.on_treeview_left_clicked)
         # A context manager with which we can temporarily disconnect the above connection.
         self.model_item_changed_disconnected = DisconnectContextManager(
             self.model.itemChanged, self.on_model_item_changed)
@@ -297,7 +362,7 @@ class RoutineBox(object):
         # Queue the files to be opened:
         for filepath in routine_files:
             if filepath in [routine.filepath for routine in self.routines]:
-                app.output_box.output('ignoring duplicate analysis routine %s\n'%filepath, red=True)
+                app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
             routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
             self.routines.append(routine)
@@ -307,6 +372,9 @@ class RoutineBox(object):
         
     def on_model_item_changed(self, item):
         print('on model item changed!')
+        
+    def on_treeview_left_clicked(self, index):
+        print('treeview left clicked!')
         
     def on_select_all_state_changed(self, state):
         print('on select all state changed!')
@@ -331,6 +399,7 @@ class RoutineBox(object):
         
     def on_restart_selected_triggered(self):
        print('on restart selected triggered!')
+       
        
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
@@ -593,6 +662,55 @@ class UneditableModel(QtGui.QStandardItemModel):
         return result & ~QtCore.Qt.ItemIsEditable
 
 
+class TableView(QtGui.QTableView):
+    leftClicked = Signal(QtCore.QModelIndex)
+    doubleLeftClicked = Signal(QtCore.QModelIndex)
+    """A QTableView that emits a custom signal leftClicked(index) after a left
+    click on a valid index, and doubleLeftClicked(index) (in addition) on
+    double click. Multiple inheritance of QObjects is not possible, so we
+    are forced to duplicate code instead of sharing code with the extremely
+    similar TreeView class in this module"""
+
+    def __init__(self, *args):
+        QtGui.QTableView.__init__(self, *args)
+        self._pressed_index = None
+        self._double_click = False
+
+    def mousePressEvent(self, event):
+        result = QtGui.QTableView.mousePressEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid():
+            self._pressed_index = self.indexAt(event.pos())
+        return result
+
+    def leaveEvent(self, event):
+        result = QtGui.QTableView.leaveEvent(self, event)
+        self._pressed_index = None
+        self._double_click = False
+        return result
+
+    def mouseDoubleClickEvent(self, event):
+        # Ensure our left click event occurs regardless of whether it is the
+        # second click in a double click or not
+        result = QtGui.QTableView.mouseDoubleClickEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid():
+            self._pressed_index = self.indexAt(event.pos())
+            self._double_click = True
+        return result
+
+    def mouseReleaseEvent(self, event):
+        result = QtGui.QTableView.mouseReleaseEvent(self, event)
+        index = self.indexAt(event.pos())
+        if event.button() == QtCore.Qt.LeftButton and index.isValid() and index == self._pressed_index:
+            self.leftClicked.emit(index)
+            if self._double_click:
+                self.doubleLeftClicked.emit(index)
+        self._pressed_index = None
+        self._double_click = False
+        return result
+        
+        
 class DataFrameModel(QtCore.QObject):
 
     COL_ACTIVE = 0
@@ -760,6 +878,9 @@ class DataFrameModel(QtCore.QObject):
             active_item.setCheckState(active)
         self.update_select_all_checkstate()
 
+    def on_double_click(self, index):
+        raise NotImplementedError('on double click')
+        
     def set_columns_visible(self, columns_visible):
         self.columns_visible = columns_visible
         for column_index, visible in columns_visible.items():
@@ -862,7 +983,7 @@ class DataFrameModel(QtCore.QObject):
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
-            app.output_box.output('Adding duplicate shot %s ignored\n' % filepath, red=True)
+            app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
             return
         # Add the new row to the model:
         self._model.appendRow(self.new_row(filepath))
@@ -888,6 +1009,7 @@ class FileBox(object):
         self.logger.info('starting')
 
         loader = UiLoader()
+        loader.registerCustomWidget(TableView)
         self.ui = loader.load('filebox.ui')
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.ui.tableView)
@@ -930,7 +1052,7 @@ class FileBox(object):
         self.shots_model.columns_changed.connect(self.on_columns_changed)
         self.ui.toolButton_add_shots.clicked.connect(self.on_add_shot_files_clicked)
         self.ui.toolButton_remove_shots.clicked.connect(self.shots_model.on_remove_selection)
-
+        self.ui.tableView.doubleLeftClicked.connect(self.shots_model.on_double_click)
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
 
