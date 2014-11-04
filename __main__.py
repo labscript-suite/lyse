@@ -169,24 +169,13 @@ class AnalysisRoutine(object):
         self.COL_NAME = RoutineBox.COL_NAME
         self.COL_PLOTOPTIONS = RoutineBox.COL_PLOTOPTIONS
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
-    
+        
         # Start a worker process for this analysis routine:
-        #child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', output_box_port)
-        #self.to_worker, self.from_worker, self.worker = child_handles
+        child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', output_box_port)
+        self.to_worker, self.from_worker, self.worker = child_handles
         
         # Tell the worker what script it with be executing:
-        #self.to_worker.put(self.filepath)
-        
-        # A queue so that the listener loop can communicate to the
-        # do_analysis function when it gets word from the worker that
-        # analysis has completed (or not completed, in the case of
-        # an exception)
-        self.from_listener = Queue.Queue()
-        
-        # Start the thread to listen for responses from the worker:
-        self.listener_thread = threading.Thread(target=self.listener_loop)
-        self.listener_thread.daemon = True
-        self.listener_thread.start()
+        self.to_worker.put(self.filepath)
         
         # Make a row to put into the model:
         active_item =  QtGui.QStandardItem()
@@ -200,9 +189,6 @@ class AnalysisRoutine(object):
         plot_options_item.setToolTip('Click to change plot options for this analysis routine')
         self.model.appendRow([active_item, info_item, name_item, plot_options_item])
         
-    def listener_loop(self):
-        while True:
-            time.sleep(1)
             
 class RoutineBox(object):
     
@@ -240,7 +226,7 @@ class RoutineBox(object):
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
         status_item.setToolTip('The status of this analyis routine\'s execution')
         name_item = QtGui.QStandardItem('name')
-        name_item.setToolTip('T name of the python script for the analysis routine')
+        name_item.setToolTip('The name of the python script for the analysis routine')
         plot_options_item = QtGui.QStandardItem()
         plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
         plot_options_item.setToolTip('Plot options')
