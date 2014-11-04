@@ -156,12 +156,61 @@ class LyseMainWindow(QtGui.QMainWindow):
             self.newWindow.emit(self.effectiveWinId())
         return result
 
+        
+class AnalysisRoutine(object):
 
+    def __init__(self, filepath, model, output_box_port):
+        self.filepath = filepath
+        self.shortname = os.path.basename(self.filepath)
+        self.model = model
+        
+        self.COL_ACTIVE = RoutineBox.COL_ACTIVE
+        self.COL_STATUS = RoutineBox.COL_STATUS
+        self.COL_NAME = RoutineBox.COL_NAME
+        self.COL_PLOTOPTIONS = RoutineBox.COL_PLOTOPTIONS
+        self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
+    
+        # Start a worker process for this analysis routine:
+        #child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', output_box_port)
+        #self.to_worker, self.from_worker, self.worker = child_handles
+        
+        # Tell the worker what script it with be executing:
+        #self.to_worker.put(self.filepath)
+        
+        # A queue so that the listener loop can communicate to the
+        # do_analysis function when it gets word from the worker that
+        # analysis has completed (or not completed, in the case of
+        # an exception)
+        self.from_listener = Queue.Queue()
+        
+        # Start the thread to listen for responses from the worker:
+        self.listener_thread = threading.Thread(target=self.listener_loop)
+        self.listener_thread.daemon = True
+        self.listener_thread.start()
+        
+        # Make a row to put into the model:
+        active_item =  QtGui.QStandardItem()
+        active_item.setCheckable(True)
+        active_item.setCheckState(QtCore.Qt.Checked)
+        info_item = QtGui.QStandardItem()
+        name_item = QtGui.QStandardItem(self.shortname)
+        name_item.setToolTip(self.filepath)
+        plot_options_item = QtGui.QStandardItem()
+        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
+        plot_options_item.setToolTip('Click to change plot options for this analysis routine')
+        self.model.appendRow([active_item, info_item, name_item, plot_options_item])
+        
+    def listener_loop(self):
+        while True:
+            time.sleep(1)
+            
 class RoutineBox(object):
     
     COL_ACTIVE = 0
-    COL_NAME = 1
-    COL_PLOTOPTIONS = 2
+    COL_STATUS = 1
+    COL_NAME = 2
+    COL_PLOTOPTIONS = 3
+    ROLE_FULLPATH = QtCore.Qt.UserRole + 1
     
     def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
         self.multishot = multishot
@@ -169,7 +218,8 @@ class RoutineBox(object):
         self.exp_config = exp_config
         self.from_filebox = from_filebox
         self.to_filebox = to_filebox
-
+        self.output_box_port = output_box_port
+        
         loader = UiLoader()
         self.ui = loader.load('routinebox.ui')
         container.addWidget(self.ui)
@@ -185,20 +235,30 @@ class RoutineBox(object):
         self.ui.treeView.setModel(self.model)
         
         active_item = QtGui.QStandardItem()
-        active_item.setToolTip('whether the analysis routine should run')
+        active_item.setToolTip('Whether the analysis routine should run')
+        status_item = QtGui.QStandardItem()
+        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
+        status_item.setToolTip('The status of this analyis routine\'s execution')
         name_item = QtGui.QStandardItem('name')
-        name_item.setToolTip('the name of the python script for the analysis routine')
-        plot_options_item = QtGui.QStandardItem('plot options')
-        plot_options_item.setToolTip('click to change plot options for this analysis routine')
+        name_item.setToolTip('T name of the python script for the analysis routine')
+        plot_options_item = QtGui.QStandardItem()
+        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
+        plot_options_item.setToolTip('Plot options')
         
         self.select_all_checkbox = QtGui.QCheckBox()
         self.select_all_checkbox.setToolTip('whether the analysis routine should run')
         self.header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
         self.select_all_checkbox.setTristate(False)
         
-        #self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
+        self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
+        self.model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
         self.model.setHorizontalHeaderItem(self.COL_PLOTOPTIONS, plot_options_item)
+        
+        self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
+        self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
+        self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
+        self.ui.treeView.resizeColumnToContents(self.COL_PLOTOPTIONS)
         
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
@@ -206,15 +266,11 @@ class RoutineBox(object):
             QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
         self.action_set_selected_hidden = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
-        
+        self.action_restart_selected = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/arrow-circle'), 'restart worker process for selected routines',  self.ui)
         self.last_opened_routine_folder = self.exp_config.get('paths', 'analysislib')
         
-        self.header.update_indents()
-        self.header.update_widget_positions()
-        
-        self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
-        self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
-        self.ui.treeView.resizeColumnToContents(self.COL_PLOTOPTIONS)
+        self.routines = []
         
         self.connect_signals()
 
@@ -233,13 +289,32 @@ class RoutineBox(object):
             lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
         self.action_set_selected_hidden.triggered.connect(
             lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
+        self.action_restart_selected.triggered.connect(self.on_restart_selected_triggered)
         self.ui.toolButton_move_to_top.clicked.connect(self.on_move_to_top_clicked)
         self.ui.toolButton_move_up.clicked.connect(self.on_move_up_clicked)
         self.ui.toolButton_move_down.clicked.connect(self.on_move_down_clicked)
         self.ui.toolButton_move_to_bottom.clicked.connect(self.on_move_to_bottom_clicked)
 
     def on_add_routines_clicked(self):
-        print('on add routines clicked!')
+        routine_files = QtGui.QFileDialog.getOpenFileNames(self.ui,
+                                                           'Select analysis routines',
+                                                           self.last_opened_routine_folder,
+                                                           "Python scripts (*.py)")
+        if not routine_files:
+            # User cancelled selection
+            return
+        # Convert to standard platform specific path, otherwise Qt likes forward slashes:
+        routine_files = [os.path.abspath(routine_file) for routine_file in routine_files]
+
+        # Save the containing folder for use next time we open the dialog box:
+        self.last_opened_routine_folder = os.path.dirname(routine_files[0])
+        # Queue the files to be opened:
+        for filepath in routine_files:
+            if filepath in [routine.filepath for routine in self.routines]:
+                app.output_box.output('ignoring duplicate analysis routine %s\n'%filepath, red=True)
+                continue
+            routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
+            self.routines.append(routine)
         
     def on_remove_routines_clicked(self):
         print('on remove routines clicked!')
@@ -268,7 +343,9 @@ class RoutineBox(object):
     def on_move_to_bottom_clicked(self):
         print('on move to bottom clicked!')
         
-        
+    def on_restart_selected_triggered(self):
+       print('on restart selected triggered!')
+       
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -351,6 +428,7 @@ class EditColumns(object):
         self.model.clear()
         self.model.setHorizontalHeaderLabels(['', 'Name'])
         self.header.setWidget(self.COL_VISIBLE, self.select_all_checkbox)
+        self.ui.treeView.resizeColumnToContents(self.COL_VISIBLE)
         # Which indices in self.columns_visible the row numbers correspond to
         self.column_indices = {}
         for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
@@ -372,7 +450,6 @@ class EditColumns(object):
             self.model.appendRow([visible_item, name_item])
             self.column_indices[self.model.rowCount() - 1] = column_index
 
-        self.ui.treeView.resizeColumnToContents(self.COL_VISIBLE)
         self.ui.treeView.resizeColumnToContents(self.COL_NAME)
         self.update_select_all_checkstate()
         self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
@@ -455,8 +532,6 @@ class EditColumns(object):
     def show(self):
         self.old_columns_visible = self.columns_visible.copy()
         self.ui.show()
-        for column in range(2):
-            self.ui.treeView.resizeColumnToContents(column)
 
     def close(self):
         self.columns_visible = self.old_columns_visible.copy()
@@ -588,7 +663,8 @@ class DataFrameModel(QtCore.QObject):
         self.select_all_checkbox.setTristate(False)
         self._header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
 
-        status_item = QtGui.QStandardItem('% done')
+        status_item = QtGui.QStandardItem()
+        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
         status_item.setToolTip('status/progress of single-shot analysis')
         self._model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
 
@@ -1002,7 +1078,7 @@ if __name__ == "__main__":
     server = WebServer(app.port)
 
     # TEST
-    # app.submit_dummy_shots()
+    app.submit_dummy_shots()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()

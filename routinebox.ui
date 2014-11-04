@@ -235,6 +235,9 @@ QGroupBox
         <property name="horizontalScrollMode">
          <enum>QAbstractItemView::ScrollPerPixel</enum>
         </property>
+        <property name="indentation">
+         <number>0</number>
+        </property>
        </widget>
       </item>
      </layout>
