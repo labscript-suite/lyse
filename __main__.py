@@ -173,7 +173,6 @@ class AnalysisRoutine(object):
         self.COL_NAME = RoutineBox.COL_NAME
         self.COL_PLOT_OPTIONS = RoutineBox.COL_PLOT_OPTIONS
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
-        self.ROLE_INDEX = RoutineBox.ROLE_INDEX
         
         self.to_worker, self.from_worker, self.worker = self.start_worker()
         
@@ -185,7 +184,6 @@ class AnalysisRoutine(object):
         name_item = QtGui.QStandardItem(self.shortname)
         name_item.setToolTip(self.filepath)
         name_item.setData(self.filepath, self.ROLE_FULLPATH)
-        name_item.setData(self.model.rowCount(), self.ROLE_INDEX)
         plot_options_item = QtGui.QStandardItem()
         plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
         plot_options_item.setToolTip('Click to change plot options for this analysis routine')
@@ -310,12 +308,12 @@ class RoutineBox(object):
     COL_NAME = 2
     COL_PLOT_OPTIONS = 3
     ROLE_FULLPATH = QtCore.Qt.UserRole + 1
-    # This data (stored in the name item) will normally match
-    # the position in the model. However it will be modified just
+    # This data (stored in the name item) does not necessarily match
+    # the position in the model. It will be set just
     # prior to sort() being called with this role as the sort data.
     # This is how we will reorder the model's rows instead of
     # using remove/insert.
-    ROLE_INDEX = QtCore.Qt.UserRole + 2
+    ROLE_SORTINDEX = QtCore.Qt.UserRole + 2
     
     def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
         self.multishot = multishot
@@ -360,6 +358,7 @@ class RoutineBox(object):
         self.model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
         self.model.setHorizontalHeaderItem(self.COL_PLOT_OPTIONS, plot_options_item)
+        self.model.setSortRole(self.ROLE_SORTINDEX)
         
         self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
         self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
@@ -471,7 +470,8 @@ class RoutineBox(object):
             self.update_select_all_checkstate()
         
     def on_treeview_left_clicked(self, index):
-        print('treeview left clicked!')
+        if index.column() == self.COL_PLOT_OPTIONS:
+            raise NotImplementedError('Plot options not implemented')
         
     def on_select_all_state_changed(self, state):
         with self.select_all_checkbox_state_changed_disconnected:
@@ -500,16 +500,48 @@ class RoutineBox(object):
         self.update_select_all_checkstate()
 
     def on_move_to_top_clicked(self):
-        print('on move to top clicked!')
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        n = self.model.rowCount()
+        order = range(n)
+        for i in sorted(selected_rows):
+            while 0 < i < n and (order[i - 1] not in selected_rows):
+                # swap!
+                order[i], order[i - 1] = order[i - 1], order[i]
+                i -= 1
+        self.reorder(order)
         
     def on_move_up_clicked(self):
-        print('on move up clicked!')
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        n = self.model.rowCount()
+        order = range(n)
+        for i in sorted(selected_rows):
+            if 0 < i < n and (order[i - 1] not in selected_indexes):
+                order[i], order[i - 1] = order[i - 1], order[i]
+        self.reorder(order)
         
     def on_move_down_clicked(self):
-        print('on move down clicked!')
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        n = self.model.rowCount()
+        order = range(n)
+        for i in sorted(selected_rows):
+            if 0 <= i < n - 1 and (order[i + 1] not in selected_indexes):
+                order[i], order[i + 1] = order[i + 1], order[i]
+        self.reorder(order)
         
     def on_move_to_bottom_clicked(self):
-        print('on move to bottom clicked!')
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        n = self.model.rowCount()
+        order = range(n)
+        for i in sorted(selected_rows):
+            while 0 <= i < n - 1 and (order[i + 1] not in selected_indexes):
+                # swap!
+                order[i], order[i + 1] = order[i + 1], order[i]
+                i += 1
+        self.reorder(order)
         
     def on_restart_selected_triggered(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
@@ -521,6 +553,16 @@ class RoutineBox(object):
                 routine.restart()
         self.update_select_all_checkstate()
        
+    def reorder(self, order):
+        print(order)
+        # Apply the reordering to the liststore:
+        for old_index, new_index in enumerate(order):
+            name_item = self.model.item(old_index, self.COL_NAME)
+            name_item.setData(new_index, self.ROLE_SORTINDEX)
+        self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
+        # Apply new order to our list of routines too:
+        self.routines = [self.routines[i] for i in order]
+        
     def update_select_all_checkstate(self):
         with self.select_all_checkbox_state_changed_disconnected:
             all_states = []
