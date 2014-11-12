@@ -10,6 +10,8 @@ import logging
 import threading
 import signal
 import subprocess
+import time
+
 
 # Turn on our error catching for all subsequent imports
 import labscript_utils.excepthook
@@ -160,10 +162,11 @@ class LyseMainWindow(QtGui.QMainWindow):
         
 class AnalysisRoutine(object):
 
-    def __init__(self, filepath, model, output_box_port, restart=False):
+    def __init__(self, filepath, model, output_box_port):
         self.filepath = filepath
         self.shortname = os.path.basename(self.filepath)
         self.model = model
+        self.output_box_port = output_box_port
         
         self.COL_ACTIVE = RoutineBox.COL_ACTIVE
         self.COL_STATUS = RoutineBox.COL_STATUS
@@ -172,31 +175,83 @@ class AnalysisRoutine(object):
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
         self.ROLE_INDEX = RoutineBox.ROLE_INDEX
         
-        # Start a worker process for this analysis routine:
-        child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', output_box_port)
-        self.to_worker, self.from_worker, self.worker = child_handles
+        self.to_worker, self.from_worker, self.worker = self.start_worker()
         
-        # Tell the worker what script it with be executing:
-        self.to_worker.put(self.filepath)
-        
-        # Only need to do this if we're not restarting
-        if not restart:
-            # Make a row to put into the model:
-            active_item =  QtGui.QStandardItem()
-            active_item.setCheckable(True)
-            active_item.setCheckState(QtCore.Qt.Checked)
-            info_item = QtGui.QStandardItem()
-            name_item = QtGui.QStandardItem(self.shortname)
-            name_item.setToolTip(self.filepath)
-            name_item.setData(self.filepath, self.ROLE_FULLPATH)
-            name_item.setData(self.model.rowCount(), self.ROLE_INDEX)
-            plot_options_item = QtGui.QStandardItem()
-            plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
-            plot_options_item.setToolTip('Click to change plot options for this analysis routine')
-            self.model.appendRow([active_item, info_item, name_item, plot_options_item])
-        else:
-            self.clear_status()
+        # Make a row to put into the model:
+        active_item =  QtGui.QStandardItem()
+        active_item.setCheckable(True)
+        active_item.setCheckState(QtCore.Qt.Checked)
+        info_item = QtGui.QStandardItem()
+        name_item = QtGui.QStandardItem(self.shortname)
+        name_item.setToolTip(self.filepath)
+        name_item.setData(self.filepath, self.ROLE_FULLPATH)
+        name_item.setData(self.model.rowCount(), self.ROLE_INDEX)
+        plot_options_item = QtGui.QStandardItem()
+        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
+        plot_options_item.setToolTip('Click to change plot options for this analysis routine')
+        self.model.appendRow([active_item, info_item, name_item, plot_options_item])
             
+        self.exiting = False
+        
+    def start_worker(self):
+        # Start a worker process for this analysis routine:
+        child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', self.output_box_port)
+        to_worker, from_worker, worker = child_handles
+        # Tell the worker what script it with be executing:
+        to_worker.put(self.filepath)
+        return to_worker, from_worker, worker
+        
+    def get_row_index(self):
+        """Returns the row index for this routine's row in the model"""
+        for row in range(self.model.rowCount()):
+            name_item = self.model.item(row, self.COL_NAME)
+            fullpath = name_item.data(self.ROLE_FULLPATH)
+            if fullpath == self.filepath:
+                return row
+           
+    def restart(self):
+        # TODO set status to 'restarting' or an icon or something, and gray out the item?
+        self.end_child(restart=True)
+        
+    def remove(self):
+        """End the child process and remove from the treeview"""
+        self.end_child()
+        self.model.removeRow(self.get_row_index())
+         
+    def end_child(self, restart=False):
+        self.to_worker.put(['quit',None])
+        timeout_time = time.time() + 2
+        self.exiting = True
+        QtCore.QTimer.singleShot(50,
+            lambda: self.check_child_exited(self.worker, timeout_time, kill=False, restart=restart))
+
+    def check_child_exited(self, worker, timeout_time, kill=False, restart=False):
+        worker.poll()
+        if worker.returncode is None and time.time() < timeout_time:
+            QtCore.QTimer.singleShot(50,
+                lambda: self.check_child_exited(worker, timeout_time, kill, restart))
+            return
+        elif worker.returncode is None:
+            if not kill:
+                worker.terminate()
+                app.output_box.output('%s worker not responding.\n'%self.shortname)
+                timeout_time = time.time() + 2
+                QtCore.QTimer.singleShot(50,
+                    lambda: self.check_child_exited(worker, timeout_time, kill=True, restart=restart))
+                return
+            else:
+                worker.kill()
+                app.output_box.output('%s worker killed\n'%self.shortname, red=True)
+        elif kill:
+            app.output_box.output('%s worker terminated\n'%self.shortname, red=True)
+        else:
+            app.output_box.output('%s worker exited cleanly\n'%self.shortname)
+        
+        if restart:
+            self.to_worker, self.from_worker, self.worker = self.start_worker()
+            app.output_box.output('%s worker restarted\n'%self.shortname)
+        self.exiting = False
+        
     def clear_status(self):
         raise NotImplementedError
         
@@ -329,7 +384,7 @@ class RoutineBox(object):
 
     def connect_signals(self):
         self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
-        self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_routines_clicked)
+        self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_selection)
         self.model.itemChanged.connect(self.on_model_item_changed)
         self.ui.treeView.leftClicked.connect(self.on_treeview_left_clicked)
         self.ui.treeView.doubleLeftClicked.connect(self.on_treeview_double_left_clicked)
@@ -345,6 +400,7 @@ class RoutineBox(object):
         self.action_set_selected_inactive.triggered.connect(
             lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
         self.action_restart_selected.triggered.connect(self.on_restart_selected_triggered)
+        self.action_remove_selected.triggered.connect(self.on_remove_selection)
         self.ui.toolButton_move_to_top.clicked.connect(self.on_move_to_top_clicked)
         self.ui.toolButton_move_up.clicked.connect(self.on_move_up_clicked)
         self.ui.toolButton_move_down.clicked.connect(self.on_move_down_clicked)
@@ -397,8 +453,18 @@ class RoutineBox(object):
             error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
                          
-    def on_remove_routines_clicked(self):
-        print('on remove routines clicked!')
+    def on_remove_selection(self):
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        if not question_dialog("Remove %d routines?" % len(selected_rows)):
+            return
+        name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
+        filepaths = [item.data(self.ROLE_FULLPATH) for item in name_items]
+        for routine in self.routines[:]:
+            if routine.filepath in filepaths:
+                routine.remove()
+                self.routines.remove(routine)
+        self.update_select_all_checkstate()
         
     def on_model_item_changed(self, item):
         if item.column() == self.COL_ACTIVE:
@@ -446,7 +512,14 @@ class RoutineBox(object):
         print('on move to bottom clicked!')
         
     def on_restart_selected_triggered(self):
-        print('on restart selected triggered!')
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
+        filepaths = [item.data(self.ROLE_FULLPATH) for item in name_items]
+        for routine in self.routines:
+            if routine.filepath in filepaths:
+                routine.restart()
+        self.update_select_all_checkstate()
        
     def update_select_all_checkstate(self):
         with self.select_all_checkbox_state_changed_disconnected:
@@ -1289,7 +1362,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     # Do not run qapplication.exec_() whilst waiting for keyboard input if
     # we hop into interactive mode.
-    QtCore.pyqtRemoveInputHook()
+    QtCore.pyqtRemoveInputHook() # TODO remove once updating to pyqt 4.11 or whatever fixes that bug
 
     qapplication.exec_()
     server.shutdown()
