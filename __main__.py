@@ -313,12 +313,14 @@ class RoutineBox(object):
         
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
-        self.action_set_selected_visible = QtGui.QAction(
+        self.action_set_selected_active = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
-        self.action_set_selected_hidden = QtGui.QAction(
+        self.action_set_selected_inactive = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
         self.action_restart_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/arrow-circle'), 'restart worker process for selected routines',  self.ui)
+        self.action_remove_selected = QtGui.QAction(
+            QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected routines',  self.ui)
         self.last_opened_routine_folder = self.exp_config.get('paths', 'analysislib')
         
         self.routines = []
@@ -338,9 +340,9 @@ class RoutineBox(object):
         self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
             self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
         self.ui.treeView.customContextMenuRequested.connect(self.on_treeView_context_menu_requested)
-        self.action_set_selected_visible.triggered.connect(
+        self.action_set_selected_active.triggered.connect(
             lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
-        self.action_set_selected_hidden.triggered.connect(
+        self.action_set_selected_inactive.triggered.connect(
             lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
         self.action_restart_selected.triggered.connect(self.on_restart_selected_triggered)
         self.ui.toolButton_move_to_top.clicked.connect(self.on_move_to_top_clicked)
@@ -368,8 +370,13 @@ class RoutineBox(object):
                 continue
             routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
             self.routines.append(routine)
+        self.update_select_all_checkstate()
         
     def on_treeview_double_left_clicked(self, index):
+        # If double clicking on the the name item, open
+        # the routine in the specified text editor:
+        if index.column() != self.COL_NAME:
+            return
         name_item = self.model.item(index.row(), self.COL_NAME)
         routine_filepath = name_item.data(self.ROLE_FULLPATH)
         # get path to text editor
@@ -394,19 +401,37 @@ class RoutineBox(object):
         print('on remove routines clicked!')
         
     def on_model_item_changed(self, item):
-        print('on model item changed!')
+        if item.column() == self.COL_ACTIVE:
+            self.update_select_all_checkstate()
         
     def on_treeview_left_clicked(self, index):
         print('treeview left clicked!')
         
     def on_select_all_state_changed(self, state):
-        print('on select all state changed!')
+        with self.select_all_checkbox_state_changed_disconnected:
+            # Do not allow a switch *to* a partially checked state:
+            self.select_all_checkbox.setTristate(False)
+        state = self.select_all_checkbox.checkState()
+        with self.model_item_changed_disconnected:
+            for row in range(self.model.rowCount()):
+                active_item = self.model.item(row, self.COL_ACTIVE)
+                active_item.setCheckState(state)
         
     def on_treeView_context_menu_requested(self, point):
-        print('on treeview context menu requested!')
+        menu = QtGui.QMenu(self.ui.treeView)
+        menu.addAction(self.action_set_selected_active)
+        menu.addAction(self.action_set_selected_inactive)
+        menu.addAction(self.action_restart_selected)
+        menu.addAction(self.action_remove_selected)
+        menu.exec_(QtGui.QCursor.pos())
         
-    def on_selected_triggered(self, active):
-        print('on selected triggered!')
+    def on_set_selected_triggered(self, active):
+        selected_indexes = self.ui.treeView.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        for row in selected_rows:
+            active_item = self.model.item(row, self.COL_ACTIVE)
+            active_item.setCheckState(active)
+        self.update_select_all_checkstate()
 
     def on_move_to_top_clicked(self):
         print('on move to top clicked!')
@@ -421,8 +446,22 @@ class RoutineBox(object):
         print('on move to bottom clicked!')
         
     def on_restart_selected_triggered(self):
-       print('on restart selected triggered!')
+        print('on restart selected triggered!')
        
+    def update_select_all_checkstate(self):
+        with self.select_all_checkbox_state_changed_disconnected:
+            all_states = []
+            for row in range(self.model.rowCount()):
+                active_item = self.model.item(row, self.COL_ACTIVE)
+                all_states.append(active_item.checkState())
+            if all(state == QtCore.Qt.Checked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
+            elif all(state == QtCore.Qt.Unchecked for state in all_states):
+                self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                print('partially checked!')
+                self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
+                
        
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
@@ -552,11 +591,15 @@ class EditColumns(object):
         self.proxy_model.setFilterWildcard(text)
 
     def on_select_all_state_changed(self, state):
+        with self.select_all_checkbox_state_changed_disconnected:
+            # Do not allow a switch *to* a partially checked state:
+            self.select_all_checkbox.setTristate(False)
+        state = self.select_all_checkbox.checkState()
         for row in range(self.model.rowCount()):
             visible_item = self.model.item(row, self.COL_VISIBLE)
             self.update_visible_state(visible_item, state)
         self.do_sort()
-        self.select_all_checkbox.setTristate(False)
+        
         self.filebox.set_columns_visible(self.columns_visible)
 
     def update_visible_state(self, item, state):
@@ -760,6 +803,7 @@ class DataFrameModel(QtCore.QObject):
                              color: black;
                            }
                            """
+                           
         self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
         self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
@@ -837,11 +881,14 @@ class DataFrameModel(QtCore.QObject):
         self.action_remove_selected.triggered.connect(self.on_remove_selection)
 
     def on_select_all_state_changed(self, state):
+        with self.select_all_checkbox_state_changed_disconnected:
+            # Do not allow a switch *to* a partially checked state:
+            self.select_all_checkbox.setTristate(False)
+        state = self.select_all_checkbox.checkState()
         with self.model_item_changed_disconnected:
             for row in range(self._model.rowCount()):
                 active_item = self._model.item(row, self.COL_ACTIVE)
                 active_item.setCheckState(state)
-            self.select_all_checkbox.setTristate(False)
 
     def update_select_all_checkstate(self):
         with self.select_all_checkbox_state_changed_disconnected:
@@ -903,6 +950,8 @@ class DataFrameModel(QtCore.QObject):
         self.update_select_all_checkstate()
 
     def on_double_click(self, index):
+        if index.column() == self.COL_ACTIVE:
+            return
         filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
         shot_filepath = filepath_item.text()
         
