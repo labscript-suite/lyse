@@ -9,6 +9,7 @@ import Queue
 import logging
 import threading
 import signal
+import subprocess
 
 # Turn on our error catching for all subsequent imports
 import labscript_utils.excepthook
@@ -329,6 +330,7 @@ class RoutineBox(object):
         self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_routines_clicked)
         self.model.itemChanged.connect(self.on_model_item_changed)
         self.ui.treeView.leftClicked.connect(self.on_treeview_left_clicked)
+        self.ui.treeView.doubleLeftClicked.connect(self.on_treeview_double_left_clicked)
         # A context manager with which we can temporarily disconnect the above connection.
         self.model_item_changed_disconnected = DisconnectContextManager(
             self.model.itemChanged, self.on_model_item_changed)
@@ -367,6 +369,27 @@ class RoutineBox(object):
             routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
             self.routines.append(routine)
         
+    def on_treeview_double_left_clicked(self, index):
+        name_item = self.model.item(index.row(), self.COL_NAME)
+        routine_filepath = name_item.data(self.ROLE_FULLPATH)
+        # get path to text editor
+        editor_path = self.exp_config.get('programs', 'text_editor')
+        editor_args = self.exp_config.get('programs', 'text_editor_arguments')
+        # Get the current labscript file:
+        if not editor_path:
+            error_dialog("No editor specified in the labconfig.")
+        if '{file}' in editor_args:
+            # Split the args on spaces into a list, replacing {file} with the labscript file
+            editor_args = [arg if arg != '{file}' else routine_filepath for arg in editor_args.split()]
+        else:
+            # Otherwise if {file} isn't already in there, append it to the other args:
+            editor_args = [routine_filepath] + editor_args.split()
+        try:
+            subprocess.Popen([editor_path] + editor_args)
+        except Exception as e:
+            error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
+                         (self.exp_config.config_path, str(e)))
+                         
     def on_remove_routines_clicked(self):
         print('on remove routines clicked!')
         
@@ -721,9 +744,10 @@ class DataFrameModel(QtCore.QObject):
 
     columns_changed = Signal()
 
-    def __init__(self, view):
+    def __init__(self, view, exp_config):
         QtCore.QObject.__init__(self)
         self._view = view
+        self.exp_config = exp_config
         self._model = UneditableModel()
 
         headerview_style = """
@@ -879,7 +903,26 @@ class DataFrameModel(QtCore.QObject):
         self.update_select_all_checkstate()
 
     def on_double_click(self, index):
-        raise NotImplementedError('on double click')
+        filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
+        shot_filepath = filepath_item.text()
+        
+        # get path to text editor
+        viewer_path = self.exp_config.get('programs', 'hdf5_viewer')
+        viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
+        # Get the current labscript file:
+        if not viewer_path:
+            error_dialog("No hdf5 viewer specified in the labconfig.")
+        if '{file}' in viewer_args:
+            # Split the args on spaces into a list, replacing {file} with the labscript file
+            viewer_args = [arg if arg != '{file}' else shot_filepath for arg in viewer_args.split()]
+        else:
+            # Otherwise if {file} isn't already in there, append it to the other args:
+            viewer_args = [shot_filepath] + viewer_args.split()
+        try:
+            subprocess.Popen([viewer_path] + viewer_args)
+        except Exception as e:
+            error_dialog("Unable to launch hdf5 viewer specified in %s. Error was: %s" %
+                         (self.exp_config.config_path, str(e)))
         
     def set_columns_visible(self, columns_visible):
         self.columns_visible = columns_visible
@@ -1012,7 +1055,7 @@ class FileBox(object):
         loader.registerCustomWidget(TableView)
         self.ui = loader.load('filebox.ui')
         container.addWidget(self.ui)
-        self.shots_model = DataFrameModel(self.ui.tableView)
+        self.shots_model = DataFrameModel(self.ui.tableView, self.exp_config)
         set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
         self.edit_columns_dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
 
@@ -1053,6 +1096,7 @@ class FileBox(object):
         self.ui.toolButton_add_shots.clicked.connect(self.on_add_shot_files_clicked)
         self.ui.toolButton_remove_shots.clicked.connect(self.shots_model.on_remove_selection)
         self.ui.tableView.doubleLeftClicked.connect(self.shots_model.on_double_click)
+        
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
 
