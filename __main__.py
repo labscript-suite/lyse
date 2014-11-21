@@ -455,6 +455,8 @@ class RoutineBox(object):
     def on_remove_selection(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
+        if not selected_rows:
+            return
         if not question_dialog("Remove %d routines?" % len(selected_rows)):
             return
         name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
@@ -503,44 +505,68 @@ class RoutineBox(object):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         n = self.model.rowCount()
-        order = range(n)
-        for i in sorted(selected_rows):
-            while 0 < i < n and (order[i - 1] not in selected_rows):
-                # swap!
-                order[i], order[i - 1] = order[i - 1], order[i]
-                i -= 1
+        i_selected = 0
+        i_unselected = len(selected_rows)
+        order = []
+        for i in range(n):
+            if i in selected_rows:
+                order.append(i_selected)
+                i_selected += 1
+            else:
+                order.append(i_unselected)
+                i_unselected += 1
         self.reorder(order)
         
     def on_move_up_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         n = self.model.rowCount()
-        order = range(n)
-        for i in sorted(selected_rows):
-            if 0 < i < n and (order[i - 1] not in selected_indexes):
-                order[i], order[i - 1] = order[i - 1], order[i]
+        order = []
+        last_unselected_index = None
+        for i in range(n):
+            if i in selected_rows:
+                if last_unselected_index is None:
+                    order.append(i)
+                else:
+                    order.append(i - 1)
+                    order[last_unselected_index] += 1
+            else:
+                last_unselected_index = i
+                order.append(i)
         self.reorder(order)
         
     def on_move_down_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         n = self.model.rowCount()
-        order = range(n)
-        for i in sorted(selected_rows):
-            if 0 <= i < n - 1 and (order[i + 1] not in selected_indexes):
-                order[i], order[i + 1] = order[i + 1], order[i]
+        order = []
+        last_unselected_index = None
+        for i in reversed(range(n)):
+            if i in selected_rows:
+                if last_unselected_index is None:
+                    order.insert(0, i)
+                else:
+                    order.insert(0, i + 1)
+                    order[last_unselected_index - n] -= 1
+            else:
+                last_unselected_index = i
+                order.insert(0, i)
         self.reorder(order)
         
     def on_move_to_bottom_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         n = self.model.rowCount()
-        order = range(n)
-        for i in sorted(selected_rows):
-            while 0 <= i < n - 1 and (order[i + 1] not in selected_indexes):
-                # swap!
-                order[i], order[i + 1] = order[i + 1], order[i]
-                i += 1
+        i_selected = n - len(selected_rows)
+        i_unselected = 0
+        order = []
+        for i in range(n):
+            if i in selected_rows:
+                order.append(i_selected)
+                i_selected += 1
+            else:
+                order.append(i_unselected)
+                i_unselected += 1
         self.reorder(order)
         
     def on_restart_selected_triggered(self):
@@ -554,7 +580,7 @@ class RoutineBox(object):
         self.update_select_all_checkstate()
        
     def reorder(self, order):
-        print(order)
+        assert len(order) == len(set(order)), 'ordering contains non-unique elements'
         # Apply the reordering to the liststore:
         for old_index, new_index in enumerate(order):
             name_item = self.model.item(old_index, self.COL_NAME)
@@ -1036,6 +1062,8 @@ class DataFrameModel(QtCore.QObject):
     def on_remove_selection(self):
         selected_indexes = self._view.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
+        if not selected_rows:
+            return
         if not question_dialog("Remove %d shots?" % len(selected_rows)):
             return
         # Remove from DataFrame first:
