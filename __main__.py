@@ -1255,17 +1255,14 @@ class FileBox(object):
 
         self.connect_signals()
 
-        self.analysis_loop_paused = False
+        self.analysis_paused = False
 
-        # An Event to let the analysis thread know to check for new shots,
-        # rather than polling with time.sleep() in between:
-        self.new_shots = threading.Event()
+        # An Event to let the analysis thread know to check for shots that
+        # need analysing, rather than using a time.sleep:
+        self.analysis_pending = threading.Event()
 
         # The folder that the 'add shots' dialog will open to:
         self.current_folder = self.exp_config.get('paths', 'experiment_shot_storage')
-
-        # Whether the last scroll to the bottom of the treeview has been processed:
-        self.scrolled = True
 
         # A queue for storing incoming files from the ZMQ server so
         # the server can keep receiving files even if analysis is slow
@@ -1278,9 +1275,9 @@ class FileBox(object):
         self.incoming.daemon = True
         self.incoming.start()
 
-        #self.analysis = threading.Thread(target = self.analysis_loop)
-        #self.analysis.daemon = True
-        # self.analysis.start()
+        self.analysis = threading.Thread(target = self.analysis_loop)
+        self.analysis.daemon = True
+        self.analysis.start()
 
     def connect_signals(self):
         self.ui.pushButton_edit_columns.clicked.connect(self.on_edit_columns_clicked)
@@ -1288,6 +1285,7 @@ class FileBox(object):
         self.ui.toolButton_add_shots.clicked.connect(self.on_add_shot_files_clicked)
         self.ui.toolButton_remove_shots.clicked.connect(self.shots_model.on_remove_selection)
         self.ui.tableView.doubleLeftClicked.connect(self.shots_model.on_double_click)
+        self.ui.pushButton_analysis_running.toggled.connect(self.on_analysis_running_toggled)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
@@ -1314,6 +1312,17 @@ class FileBox(object):
         for filepath in shot_files:
             self.incoming_queue.put(filepath)
 
+    def on_analysis_running_toggled(self, pressed):
+        if pressed:
+            self.analysis_paused = True
+            self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
+            self.ui.pushButton_analysis_running.setText('Analysis paused')
+        else:
+            self.analysis_paused = False
+            self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
+            self.ui.pushButton_analysis_running.setText('Analysis running')
+            self.analysis_pending.set()
+        
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
 
@@ -1341,7 +1350,21 @@ class FileBox(object):
         with self.new_shots:
             self.new_shots.set()
 
-
+    def analysis_loop(self):
+        logger = logging.getLogger('LYSE.FileBox.analysis_loop')
+        # HDF5 prints lots of errors by default, for things that aren't
+        # actually errors. These are silenced on a per thread basis,
+        # and automatically silenced in the main thread when h5py is
+        # imported. So we'll silence them in this thread too:
+        h5py._errors.silence_errors()
+        while True:
+            self.analysis_pending.wait()
+            self.analysis_pending.clear()
+            if self.analysis_paused:
+                continue
+            
+            
+        
 class Lyse(object):
 
     def __init__(self):
