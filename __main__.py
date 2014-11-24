@@ -143,6 +143,8 @@ class WebServer(ZMQServer):
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
+                if not isinstance(h5_filepath, unicode) or isinstance(h5_filepath, str):
+                    raise AssertionError(str(type(h5_filepath)) + ' is not str or unicode')
                 app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
         return ("error: operation not supported. Recognised requests are:\n "
@@ -925,7 +927,7 @@ class DataFrameModel(QtCore.QObject):
     COL_FILEPATH = 2
 
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
-
+    
     columns_changed = Signal()
 
     def __init__(self, view, exp_config):
@@ -1142,9 +1144,10 @@ class DataFrameModel(QtCore.QObject):
             self.column_indices = column_indices
             self.column_names = column_names
 
-    def update_row(self, filepath, dataframe_already_updated=False):
+    @inmain_decorator()
+    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None):
         """"Updates a row in the dataframe and Qt model
-        to the data in the HDF5 file for that shot"""
+        to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # Update the row in the dataframe first:
         df_row_index = np.where(self.dataframe['filepath'].values == filepath)
         df_row_index = df_row_index[0][0]
@@ -1202,6 +1205,10 @@ class DataFrameModel(QtCore.QObject):
             column_number = new_columns_start + i
             self._view.resizeColumnToContents(column_number)
 
+        if status_percent is not None:
+            status_item = self._model.item(model_row_number, self.COL_STATUS)
+            status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
+            
         if new_column_names:
             self.columns_changed.emit()
 
@@ -1215,6 +1222,7 @@ class DataFrameModel(QtCore.QObject):
         name_item = QtGui.QStandardItem(filepath)
         return [active_item, status_item, name_item]
 
+    @inmain_decorator()
     def add_file(self, filepath):
         if filepath in self.dataframe['filepath'].values:
             # Ignore duplicates:
@@ -1229,7 +1237,17 @@ class DataFrameModel(QtCore.QObject):
         self.update_column_levels()
         self.update_row(filepath, dataframe_already_updated=True)
 
-
+    @inmain_decorator()
+    def get_first_incomplete(self):
+        """Returns the filepath of the first shot in the model that has not
+        been analysed"""
+        for row in range(self._model.rowCount()):
+            status_item = self._model.item(row, self.COL_STATUS)
+            if status_item.data(self.ROLE_STATUS_PERCENT) != 100:
+                filepath_item = self._model.item(row, self.COL_FILEPATH)
+                return filepath_item.text()
+        
+        
 class FileBox(object):
 
     def __init__(self, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
@@ -1240,7 +1258,7 @@ class FileBox(object):
         self.from_singleshot = from_singleshot
         self.from_multishot = from_multishot
 
-        self.logger = logging.getLogger('LYSE.FileBox')
+        self.logger = logging.getLogger('lyse.FileBox')
         self.logger.info('starting')
 
         loader = UiLoader()
@@ -1256,7 +1274,8 @@ class FileBox(object):
         self.connect_signals()
 
         self.analysis_paused = False
-
+        self.multishot_required = False
+        
         # An Event to let the analysis thread know to check for shots that
         # need analysing, rather than using a time.sleep:
         self.analysis_pending = threading.Event()
@@ -1329,11 +1348,11 @@ class FileBox(object):
     def incoming_buffer_loop(self):
         """We use a queue as a buffer for incoming shots. We don't want to hang and not
         respond to a client submitting shots, so we just let shots pile up here until we can get to them.
-        The downside to this is that we can't return errors to the cleint if the shot cannot be added,
+        The downside to this is that we can't return errors to the client if the shot cannot be added,
         but the suggested workflow is to handle errors here anyway. A client running shots shouldn't stop
         the experiment on account of errors from the analyis stage, so what's the point of passing errors to it?
         We'll just raise errors here and the user can decide what to do with them."""
-        logger = logging.getLogger('LYSE.FileBox.incoming')
+        logger = logging.getLogger('lyse.FileBox.incoming')
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
@@ -1341,17 +1360,13 @@ class FileBox(object):
         h5py._errors.silence_errors()
         while True:
             filepath = self.incoming_queue.get()
-            if not isinstance(filepath, unicode) or isinstance(filepath, str):
-                raise AssertionError(str(type(filepath)) + ' is not str or unicode')
             self.logger.info('adding %s' % filepath)
-            inmain(self.shots_model.add_file, filepath)
-
-        # Let analysis thread know to check for new files:
-        with self.new_shots:
-            self.new_shots.set()
-
+            self.shots_model.add_file(filepath)
+            # Let the analysis loop know to look for new shots:
+            self.analysis_pending.set()
+            
     def analysis_loop(self):
-        logger = logging.getLogger('LYSE.FileBox.analysis_loop')
+        logger = logging.getLogger('lyse.FileBox.analysis_loop')
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
@@ -1361,9 +1376,45 @@ class FileBox(object):
             self.analysis_pending.wait()
             self.analysis_pending.clear()
             if self.analysis_paused:
+                logger.info('analysis is paused')
                 continue
-            
-            
+            # Find the first shot that has not finished being analysed:
+            filepath = self.shots_model.get_first_incomplete()
+            if filepath is not None:
+                logger.info('analysing: %s'%filepath)
+                self.do_singleshot_analysis(filepath)
+                self.multishot_required = True
+            if filepath is None and self.multishot_required:
+                logger.info('doing multishot analysis')
+                self.do_multishot_analysis()
+   
+    @inmain_decorator()
+    def pause_analysis(self):
+        # This automatically triggers the slot that sets self.analysis_paused
+        self.ui.pushButton_analysis_running.setChecked(True)
+        
+    def do_singleshot_analysis(self, filepath):
+        self.to_singleshot.put(['analyse', filepath])
+        while True:
+            signal, status_percent = self.from_singleshot.get()
+            self.shots_model.update_row(path, status_percent=status_percent)
+            if signal == 'done':
+                return
+            elif signal == 'error':
+                self.pause_analysis()
+                return
+                        
+    def do_multishot_analysis(self):
+        self.to_multishot.put(['analyse', filepath])
+        while True:
+            signal, status_percent = self.to_multishot.get()
+            if signal == 'done':
+                self.multishot_required = False
+                return
+            elif signal == 'error':
+                self.pause_analysis()
+                return
+        
         
 class Lyse(object):
 
