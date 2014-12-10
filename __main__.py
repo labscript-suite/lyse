@@ -176,6 +176,9 @@ class AnalysisRoutine(object):
         self.COL_PLOT_OPTIONS = RoutineBox.COL_PLOT_OPTIONS
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
         
+        self.error = False
+        self.done = False
+        
         self.to_worker, self.from_worker, self.worker = self.start_worker()
         
         # Make a row to put into the model:
@@ -200,6 +203,40 @@ class AnalysisRoutine(object):
         # Tell the worker what script it with be executing:
         to_worker.put(self.filepath)
         return to_worker, from_worker, worker
+        
+    def do_analysis(self, filepath):
+        print('analysing %s'%filepath)
+        success = True
+        return success
+        
+    @inmain_decorator()
+    def set_status(self, status):
+        # print(set_status
+        status_item = self.model.item(self.get_row_index(), self.COL_STATUS)
+        if status == 'done':
+            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
+            self.done = True
+            self.error = False
+        elif status == 'working':
+            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/hourglass'))
+            self.done = False
+            self.error = False
+        elif status == 'error':
+            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/exclamation'))
+            self.error = True
+            self.done = False
+        elif status == 'clear':
+            status_item.setData(None, QtCore.Qt.DecorationRole)
+            icon = None
+            self.done = False
+            self.error = False
+        else:
+            raise ValueError(status)
+        
+    @inmain_decorator()
+    def enabled(self):
+        enabled_item = self.model.item(self.get_row_index(), self.COL_ACTIVE)
+        return (enabled_item.checkState() == QtCore.Qt.Checked)
         
     def get_row_index(self):
         """Returns the row index for this routine's row in the model"""
@@ -251,9 +288,6 @@ class AnalysisRoutine(object):
             self.to_worker, self.from_worker, self.worker = self.start_worker()
             app.output_box.output('%s worker restarted\n'%self.shortname)
         self.exiting = False
-        
-    def clear_status(self):
-        raise NotImplementedError
         
 
 class TreeView(QtGui.QTreeView):
@@ -325,6 +359,8 @@ class RoutineBox(object):
         self.to_filebox = to_filebox
         self.output_box_port = output_box_port
         
+        self.logger = logging.getLogger('lyse.RoutineBox.%s'%('multishot' if multishot else 'singleshot'))  
+        
         loader = UiLoader()
         loader.registerCustomWidget(TreeView)
         self.ui = loader.load('routinebox.ui')
@@ -383,6 +419,10 @@ class RoutineBox(object):
         
         self.connect_signals()
 
+        self.analysis = threading.Thread(target = self.analysis_loop)
+        self.analysis.daemon = True
+        self.analysis.start()
+        
     def connect_signals(self):
         self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
         self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_selection)
@@ -581,6 +621,59 @@ class RoutineBox(object):
                 routine.restart()
         self.update_select_all_checkstate()
        
+    def analysis_loop(self):
+        while True:
+            filepath = self.from_filebox.get()
+            if self.multishot:
+                assert filepath is None
+                # TODO: get the filepath of the output h5 file: 
+                # filepath = self.filechooserentry.get_text()
+            self.logger.info('got a file to process: %s'%filepath)
+            self.do_analysis(filepath)
+    
+    def todo(self):
+        """How many analysis routines are not done?"""
+        return len([r for r in self.routines if r.enabled() and not r.done])
+        
+    def do_analysis(self, filepath):
+        """Run all analysis routines once on the given filepath,
+        which is a shot file if we are a singleshot routine box"""
+        remaining = self.todo()
+        for routine in self.routines:
+            routine.set_status('clear')
+        error = False
+        while remaining:
+            self.logger.debug('%d routines left to do'%remaining)
+            for routine in self.routines:
+                if routine.enabled() and not routine.done:
+                    break
+            else:
+                routine = None
+            if routine is not None:
+                self.logger.info('running analysis routine %s'%routine.shortname)
+                routine.set_status('working')
+                success = routine.do_analysis(filepath)
+                if success:
+                    routine.set_status('done')
+                    self.logger.debug('success')
+                else:
+                    routine.set_status('error')
+                    self.logger.debug('failure')
+                    error = True
+                    break
+            # Race conditions here, but it's only for reporting percent done
+            # so it doesn't matter if it's wrong briefly:
+            remaining = self.todo()
+            total = len([r for r in self.routines if r.enabled()])
+            done = total - remaining
+            status_percent = 100*float(done)/(remaining + done)
+            self.to_filebox.put(['progress', status_percent])
+        if error:
+            self.to_filebox.put(['error', None])
+        else:
+            self.to_filebox.put(['done', None])
+        self.logger.debug('completed analysis of %s'%filepath)
+            
     def reorder(self, order):
         assert len(order) == len(set(order)), 'ordering contains non-unique elements'
         # Apply the reordering to the liststore:
@@ -605,7 +698,15 @@ class RoutineBox(object):
                 print('partially checked!')
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
                 
-       
+   # TESTING ONLY REMOVE IN PRODUCTION
+    def queue_dummy_routines(self):
+        folder = r'dummy_routoines'
+        for filepath in ['hello.py', 'test.py']:
+            routine = AnalysisRoutine(os.path.join(folder, filepath), self.model, self.output_box_port)
+            self.routines.append(routine)
+        self.update_select_all_checkstate()
+            
+            
 class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -1079,6 +1180,14 @@ class DataFrameModel(QtCore.QObject):
             selected_rows = set(index.row() for index in selected_indexes)
         self.update_select_all_checkstate()
 
+
+    def mark_selection_not_done(self):
+        selected_indexes = self._view.selectedIndexes()
+        selected_rows = set(index.row() for index in selected_indexes)
+        for row in selected_rows:
+            status_item = self._model.item(row, self.COL_STATUS)
+            status_item.setData(0, self.ROLE_STATUS_PERCENT)
+        
     def on_view_context_menu_requested(self, point):
         menu = QtGui.QMenu(self._view)
         menu.addAction(self.action_set_selected_active)
@@ -1305,6 +1414,8 @@ class FileBox(object):
         self.ui.toolButton_remove_shots.clicked.connect(self.shots_model.on_remove_selection)
         self.ui.tableView.doubleLeftClicked.connect(self.shots_model.on_double_click)
         self.ui.pushButton_analysis_running.toggled.connect(self.on_analysis_running_toggled)
+        self.ui.pushButton_mark_as_not_done.clicked.connect(self.on_mark_selection_not_done_clicked)
+        self.ui.pushButton_run_multishot_analysis.clicked.connect(self.on_run_multishot_analysis_clicked)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
@@ -1341,6 +1452,15 @@ class FileBox(object):
             self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
             self.ui.pushButton_analysis_running.setText('Analysis running')
             self.analysis_pending.set()
+     
+    def on_mark_selection_not_done_clicked(self):
+        self.shots_model.mark_selection_not_done()
+        # Let the analysis loop know to look for these shots:
+        self.analysis_pending.set()
+        
+    def on_run_multishot_analysis_clicked(self):
+         self.multishot_required = True
+         self.analysis_pending.set()
         
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
@@ -1375,18 +1495,26 @@ class FileBox(object):
         while True:
             self.analysis_pending.wait()
             self.analysis_pending.clear()
-            if self.analysis_paused:
-                logger.info('analysis is paused')
-                continue
-            # Find the first shot that has not finished being analysed:
-            filepath = self.shots_model.get_first_incomplete()
-            if filepath is not None:
-                logger.info('analysing: %s'%filepath)
-                self.do_singleshot_analysis(filepath)
-                self.multishot_required = True
-            if filepath is None and self.multishot_required:
+            at_least_one_shot_analysed = False
+            while True:
+                if not self.analysis_paused:
+                    # Find the first shot that has not finished being analysed:
+                    filepath = self.shots_model.get_first_incomplete()
+                    if filepath is not None:
+                        logger.info('analysing: %s'%filepath)
+                        self.do_singleshot_analysis(filepath)
+                        at_least_one_shot_analysed = True
+                    if filepath is None and at_least_one_shot_analysed:
+                        self.multishot_required = True
+                    if filepath is None:
+                        break
+                else:
+                    logger.info('analysis is paused')
+                    break
+            if self.multishot_required:
                 logger.info('doing multishot analysis')
                 self.do_multishot_analysis()
+            
    
     @inmain_decorator()
     def pause_analysis(self):
@@ -1394,10 +1522,10 @@ class FileBox(object):
         self.ui.pushButton_analysis_running.setChecked(True)
         
     def do_singleshot_analysis(self, filepath):
-        self.to_singleshot.put(['analyse', filepath])
+        self.to_singleshot.put(filepath)
         while True:
             signal, status_percent = self.from_singleshot.get()
-            self.shots_model.update_row(path, status_percent=status_percent)
+            self.shots_model.update_row(filepath, status_percent=status_percent)
             if signal == 'done':
                 return
             elif signal == 'error':
@@ -1405,9 +1533,9 @@ class FileBox(object):
                 return
                         
     def do_multishot_analysis(self):
-        self.to_multishot.put(['analyse', filepath])
+        self.to_multishot.put(None)
         while True:
-            signal, status_percent = self.to_multishot.get()
+            signal, _ = self.from_multishot.get()
             if signal == 'done':
                 self.multishot_required = False
                 return
@@ -1497,7 +1625,8 @@ if __name__ == "__main__":
 
     # TEST
     app.submit_dummy_shots()
-
+    app.singleshot_routinebox.queue_dummy_routines()
+    
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
     timer.start(500)
