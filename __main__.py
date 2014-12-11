@@ -42,7 +42,7 @@ except ImportError:
 
 check_version('labscript_utils', '2.1', '3')
 check_version('qtutils', '1.5.4', '2')
-check_version('zprocess', '1.1.6', '2')
+check_version('zprocess', '1.1.7', '2')
 
 import zprocess.locking
 from zprocess import ZMQServer
@@ -211,7 +211,6 @@ class AnalysisRoutine(object):
         
     @inmain_decorator()
     def set_status(self, status):
-        # print(set_status
         status_item = self.model.item(self.get_row_index(), self.COL_STATUS)
         if status == 'done':
             status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
@@ -227,7 +226,6 @@ class AnalysisRoutine(object):
             self.done = False
         elif status == 'clear':
             status_item.setData(None, QtCore.Qt.DecorationRole)
-            icon = None
             self.done = False
             self.error = False
         else:
@@ -638,9 +636,9 @@ class RoutineBox(object):
     def do_analysis(self, filepath):
         """Run all analysis routines once on the given filepath,
         which is a shot file if we are a singleshot routine box"""
-        remaining = self.todo()
         for routine in self.routines:
             routine.set_status('clear')
+        remaining = self.todo()
         error = False
         while remaining:
             self.logger.debug('%d routines left to do'%remaining)
@@ -1508,6 +1506,9 @@ class FileBox(object):
                         self.multishot_required = True
                     if filepath is None:
                         break
+                    if self.multishot_required:
+                        logger.info('doing multishot analysis')
+                        self.do_multishot_analysis()
                 else:
                     logger.info('analysis is paused')
                     break
@@ -1626,6 +1627,7 @@ if __name__ == "__main__":
     # TEST
     app.submit_dummy_shots()
     app.singleshot_routinebox.queue_dummy_routines()
+    app.multishot_routinebox.queue_dummy_routines()
     
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
