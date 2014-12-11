@@ -37,8 +37,8 @@ matplotlib.use("QT4Agg")
 
 import lyse
 lyse.spinning_top = True
-#import lyse.figure_manager
-#lyse.figure_manager.install()
+import lyse.figure_manager
+lyse.figure_manager.install()
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
@@ -46,14 +46,11 @@ import pylab
 import zprocess.locking, labscript_utils.h5_lock, h5py
 
 import zprocess
+from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+
 from labscript_utils.modulewatcher import ModuleWatcher
 
-if not sys.stdout.isatty():
-    # Prevent bug on windows where writing to stdout without a command
-    # window causes a crash:
-    sys.stdout = sys.stderr = open(os.devnull,'w')
 
-    
 def set_win_appusermodel(window_id):
     from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
     icon_path = os.path.abspath('lyse.ico')
@@ -121,10 +118,11 @@ class AnalysisWorker(object):
             task, data = self.from_parent.get()
             with kill_lock:
                 if task == 'quit':
-                    qapplication.quit()
-                elif task in ['single', 'multi']:
+                    inmain(qapplication.quit)
+                elif task == 'analyse':
+                    path = data
                     try:
-                        self.do_analysis(task ,data)
+                        self.do_analysis(path)
                         self.to_parent.put(['done', None])
                     except:
                         traceback_lines = traceback.format_exception(*sys.exc_info())
@@ -135,85 +133,80 @@ class AnalysisWorker(object):
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
-    def do_analysis(self,task,path):
+    @inmain_decorator()
+    def do_analysis(self, path):
+        if path is not None:
+            print('\n======== %s ==== %s ========' %(os.path.basename(self.filepath), os.path.basename(path)))
+        else:
+            print('\n======== %s ========' %os.path.basename(self.filepath))
         axis_limits = {}
-        with gtk.gdk.lock:
-            for f in self.figures:
-                for i, a in enumerate(f.axes):
-                    # Save the limits of the axes to restore them afterward:
-                    axis_limits[f,i] = a.get_xlim(), a.get_ylim()
-                f.clear()
+        for f in self.figures:
+            for i, a in enumerate(f.axes):
+                # Save the limits of the axes to restore them afterward:
+                axis_limits[f,i] = a.get_xlim(), a.get_ylim()
+            f.clear()
         # The namespace the routine will run in:
-        sandbox = {'path':path,'__file__':self.filepath,'__name__':'__main__', '__file__': self.filepath}
+        sandbox = {'path':path, '__file__':self.filepath, '__name__':'__main__', '__file__': self.filepath}
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
-                execfile(self.filepath,sandbox,sandbox)
-        except:
-            raise
+                execfile(self.filepath, sandbox, sandbox)
         finally:
             # reset the current figure to figure 1:
             lyse.figure_manager.figuremanager.set_first_figure_current()
             # Introspect the figures that were produced:
-            with gtk.gdk.lock:
-                for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
-                    if not fig.axes:
-                        continue
-                    elif not fig in self.figures:
-                        # If we don't already have this figure, make a window
-                        # to put it in:
-                        gobject.idle_add(self.new_figure,fig,identifier)
+            for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+                if not fig.axes:
+                    continue
+                elif not fig in self.figures:
+                    # If we don't already have this figure, make a window
+                    # to put it in:
+                    self.new_figure(fig, identifier)
+                else:
+                    self.update_window_title(self.windows[fig], identifier)
+                    if not self.autoscaling[fig].get_active():
+                        # Restore the axis limits:
+                        for j, a in enumerate(fig.axes):
+                            a.autoscale(enable=False)
+                            try:
+                                xlim, ylim = axis_limits[fig,j]
+                                a.set_xlim(xlim)
+                                a.set_ylim(ylim)
+                            except KeyError:
+                                continue
                     else:
-                        gobject.idle_add(self.update_window_title_idle, self.windows[fig], identifier)
-                        if not self.autoscaling[fig].get_active():
-                            # Restore the axis limits:
-                            for j, a in enumerate(fig.axes):
-                                a.autoscale(enable=False)
-                                try:
-                                    xlim, ylim = axis_limits[fig,j]
-                                    a.set_xlim(xlim)
-                                    a.set_ylim(ylim)
-                                except KeyError:
-                                    continue
-                        else:
-                            for j, a in enumerate(fig.axes):
-                                a.autoscale(enable=True)
+                        for j, a in enumerate(fig.axes):
+                            a.autoscale(enable=True)
                     
-            
             # Redraw all figures:
-            with gtk.gdk.lock:
-                for canvas in self.canvases:
-                    canvas.draw()
+            for canvas in self.canvases:
+                canvas.draw()
                 
-    def update_window_title_idle(self, window, identifier):
-        with gtk.gdk.lock:
-            self.update_window_title(window,identifier)
-        
     def update_window_title(self, window, identifier):
-        window.set_title(str(identifier) + ' - ' + os.path.basename(self.filepath))
+        window.setWindowTitle(str(identifier) + ' - ' + os.path.basename(self.filepath))
         
     def new_figure(self, fig, identifier):
-        with gtk.gdk.lock:
-            window = gtk.Window()
-            self.update_window_title(window, identifier)
-            l, w = fig.get_size_inches()
-            window.resize(int(l*100),int(w*100))
-            window.set_icon_from_file('lyse.svg')
-            c = FigureCanvas(fig)
-            v = gtk.VBox()
-            n = NavigationToolbar(c,window)
-            b = gtk.ToggleButton('Autoscale')
-            v.pack_start(b,False,False)
-            v.pack_start(c)
-            v.pack_start(n,False,False)
-            window.add(v)
-            window.show_all()
-            window.present()
-            self.canvases.append(c)
-            self.figures.append(fig)
-            self.autoscaling[fig] = b
-            self.windows[fig] = window
+        window = QtGui.QDialog()
+        self.update_window_title(window, identifier)
+        l, w = fig.get_size_inches()
+        dpi = fig.get_dpi()
+        window.resize(int(l*dpi),int(w*dpi))
+        # window.set_icon_from_file('lyse.svg')
+        # c = FigureCanvas(fig)
+        # v = gtk.VBox()
+        # n = NavigationToolbar(c,window)
+        # b = gtk.ToggleButton('Autoscale')
+        # v.pack_start(b,False,False)
+        # v.pack_start(c)
+        # v.pack_start(n,False,False)
+        # window.add(v)
+        # window.show_all()
+        # window.present()
+        # self.canvases.append(c)
+        # self.figures.append(fig)
+        # self.autoscaling[fig] = b
+        # self.windows[fig] = window
         
     def reset_figs(self):
         pass

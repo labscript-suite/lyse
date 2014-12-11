@@ -205,9 +205,14 @@ class AnalysisRoutine(object):
         return to_worker, from_worker, worker
         
     def do_analysis(self, filepath):
-        print('analysing %s'%filepath)
-        success = True
-        return success
+        self.to_worker.put(['analyse', filepath])
+        signal, data = self.from_worker.get()
+        if signal == 'error':
+            return False
+        elif signal == 'done':
+            return True
+        else:
+            raise ValueError('invalid signal %s'%str(signal))
         
     @inmain_decorator()
     def set_status(self, status):
@@ -698,7 +703,7 @@ class RoutineBox(object):
                 
    # TESTING ONLY REMOVE IN PRODUCTION
     def queue_dummy_routines(self):
-        folder = r'dummy_routoines'
+        folder = os.path.abspath('test_routines')
         for filepath in ['hello.py', 'test.py']:
             routine = AnalysisRoutine(os.path.join(folder, filepath), self.model, self.output_box_port)
             self.routines.append(routine)
