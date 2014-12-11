@@ -121,24 +121,21 @@ class AnalysisWorker(object):
                     inmain(qapplication.quit)
                 elif task == 'analyse':
                     path = data
-                    try:
-                        self.do_analysis(path)
+                    success = self.do_analysis(path)
+                    if success:
                         self.to_parent.put(['done', None])
-                    except:
-                        traceback_lines = traceback.format_exception(*sys.exc_info())
-                        del traceback_lines[1:3]
-                        message = ''.join(traceback_lines)
-                        sys.stderr.write(message)
-                        self.to_parent.put(['error', message])
+                    else:
+                        self.to_parent.put(['error', None])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
     @inmain_decorator()
     def do_analysis(self, path):
+        now = time.strftime('[%x %X]')
         if path is not None:
-            print('\n======== %s ==== %s ========' %(os.path.basename(self.filepath), os.path.basename(path)))
+            print('%s %s %s ' %(now, os.path.basename(self.filepath), os.path.basename(path)))
         else:
-            print('\n======== %s ========' %os.path.basename(self.filepath))
+            print('%s %s' %(now, os.path.basename(self.filepath)))
         axis_limits = {}
         for f in self.figures:
             for i, a in enumerate(f.axes):
@@ -152,7 +149,16 @@ class AnalysisWorker(object):
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 execfile(self.filepath, sandbox, sandbox)
+        except:
+            traceback_lines = traceback.format_exception(*sys.exc_info())
+            del traceback_lines[1]
+            message = ''.join(traceback_lines)
+            sys.stderr.write(message)
+            return False
+        else:
+            return True
         finally:
+            print('')
             # reset the current figure to figure 1:
             lyse.figure_manager.figuremanager.set_first_figure_current()
             # Introspect the figures that were produced:
@@ -182,6 +188,7 @@ class AnalysisWorker(object):
             # Redraw all figures:
             for canvas in self.canvases:
                 canvas.draw()
+        
                 
     def update_window_title(self, window, identifier):
         window.setWindowTitle(str(identifier) + ' - ' + os.path.basename(self.filepath))
