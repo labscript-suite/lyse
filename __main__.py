@@ -143,7 +143,7 @@ class WebServer(ZMQServer):
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
-                if not isinstance(h5_filepath, unicode) or isinstance(h5_filepath, str):
+                if not (isinstance(h5_filepath, unicode) or isinstance(h5_filepath, str)):
                     raise AssertionError(str(type(h5_filepath)) + ' is not str or unicode')
                 app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
@@ -1630,9 +1630,9 @@ if __name__ == "__main__":
     server = WebServer(app.port)
 
     # TEST
-    app.submit_dummy_shots()
-    app.singleshot_routinebox.queue_dummy_routines()
-    app.multishot_routinebox.queue_dummy_routines()
+    #app.submit_dummy_shots()
+    #app.singleshot_routinebox.queue_dummy_routines()
+    #app.multishot_routinebox.queue_dummy_routines()
     
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
