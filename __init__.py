@@ -42,6 +42,8 @@ def data(filepath=None, host='localhost', timeout=5):
         try:
             padding = ('',)*(df.columns.nlevels - 1)
             df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
+            df.index.names = ['sequence', 'run time']
+            # df.set_index(['sequence', 'run time'], inplace=True, drop=False)
         except KeyError:
             # Empty dataframe?
             pass
