@@ -94,11 +94,12 @@ def question_dialog(message):
     return (reply == QtGui.QMessageBox.Yes)
 
 
-def scientific_notation(x, sigfigs=4):
+def scientific_notation(x, sigfigs=4, mode='eng'):
     """Returns a unicode string of the float f in scientific notation"""
 
     times = u'\u00d7'
     thinspace = u'\u2009'
+    hairspace = u'\u200a'
     sups = {u'-': u'\u207b',
             u'0': u'\u2070',
             u'1': u'\xb9',
@@ -111,6 +112,26 @@ def scientific_notation(x, sigfigs=4):
             u'8': u'\u2078',
             u'9': u'\u2079'}
 
+    prefixes = {
+        -24: u"y",
+        -21: u"z",
+        -18: u"a",
+        -15: u"f",
+        -12: u"p",
+        -9: u"n",
+        -6: u"\u03bc",
+        -3: u"m",
+        0: u"",
+        3: u"k",
+        6: u"M",
+        9: u"G",
+        12: u"T",
+        15: u"P",
+        18: u"E",
+        21: u"Z",
+        24: u"Y"
+    }
+
     if not isinstance(x, float):
         raise TypeError('x must be floating point number')
     if np.isnan(x) or np.isinf(x):
@@ -121,14 +142,19 @@ def scientific_notation(x, sigfigs=4):
         exponent = int(np.floor(exponent / 3) * 3)
     else:
         exponent = 0
+
     significand = x / 10 ** exponent
     pre_decimal, post_decimal = divmod(significand, 1)
     digits = sigfigs - len(str(int(pre_decimal)))
     significand = round(significand, digits)
     result = str(significand)
     if exponent:
-        superscript = ''.join(sups.get(char, char) for char in str(exponent))
-        result += thinspace + times + thinspace + '10' + superscript
+        if mode == 'exponential':
+            superscript = ''.join(sups.get(char, char) for char in str(exponent))
+            result += thinspace + times + thinspace + '10' + superscript
+        elif mode == 'eng':
+            prefix = prefixes[exponent]
+            result += hairspace + prefix
     return result
 
 
