@@ -41,7 +41,7 @@ import lyse.figure_manager
 lyse.figure_manager.install()
 
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
+from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
 import zprocess.locking, labscript_utils.h5_lock, h5py
 
@@ -77,9 +77,10 @@ class PlotWindow(QtGui.QDialog):
             self.newWindow.emit(self.effectiveWinId())
         return result
 
-    # def closeEvent(self, event):
-    #     self.close_signal.emit()
-    #     event.ignore()
+    def closeEvent(self, event):
+        # self.close_signal.emit()
+        self.hide()
+        event.ignore()
         
 
 class Plot(object):
@@ -150,10 +151,18 @@ class Plot(object):
         l, w = self.figure.get_size_inches()
         dpi = self.figure.get_dpi()
         self.canvas.resize(int(l*dpi),int(w*dpi))
+        self.ui.adjustSize()
 
     @inmain_decorator()
     def draw(self):
         self.canvas.draw()
+
+    def show(self):
+        self.ui.show()
+
+    @property
+    def is_shown(self):
+        return self.ui.isVisible()
 
 
 class AnalysisWorker(object):
@@ -167,20 +176,6 @@ class AnalysisWorker(object):
         
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
-
-
-
-        # # Keeping track of figures and canvases:
-        # self.figures = []
-        # self.canvases = []
-        # self.windows = {}
-        
-        # # Whether or not to autoscale each figure with new data:
-        # self.autoscaling = {}
-
-
-
-
 
         # An object with a method to unload user modules if any have
         # changed on disk:
@@ -261,13 +256,14 @@ class AnalysisWorker(object):
                 # to put it in:
                 self.new_figure(fig, identifier)
             else:
+                if not plot.is_shown:
+                    plot.show()
                 plot.set_window_title(identifier, self.filepath)
+                plot.update_window_size()
                 if plot.lock_axes:
                     plot.restore_axis_limits()
+                plot.draw()
 
-        # Redraw all figures:
-        for plot in self.plots.values():
-            plot.draw()
 
     def new_figure(self, fig, identifier):
         self.plots[fig] = Plot(fig, identifier, self.filepath)
