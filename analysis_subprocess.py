@@ -47,6 +47,7 @@ import zprocess.locking, labscript_utils.h5_lock, h5py
 
 import zprocess
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+import qtutils.icons
 
 from labscript_utils.modulewatcher import ModuleWatcher
 
@@ -68,19 +69,93 @@ class PlotWindow(QtGui.QDialog):
     close_signal = Signal()
 
     def __init__(self):
-        QtGui.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
+        QtGui.QWidget.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
         
     def event(self, event):
-        result = QtGui.QDialog.event(self, event)
+        result = QtGui.QWidget.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
             self.newWindow.emit(self.effectiveWinId())
         return result
 
-    def closeEvent(self, event):
-        self.close_signal.emit()
-        event.ignore()
+    # def closeEvent(self, event):
+    #     self.close_signal.emit()
+    #     event.ignore()
         
-        
+
+class Plot(object):
+    def __init__(self, figure, identifier, filepath):
+        loader = UiLoader()
+        self.ui = loader.load('plot_window.ui', PlotWindow())
+        self.set_window_title(identifier, filepath)
+
+        self.figure = figure
+        self.canvas = FigureCanvas(figure)
+        self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
+
+        self.lock_action = self.navigation_toolbar.addAction(
+            QtGui.QIcon(':qtutils/fugue/lock-unlock'),
+           'Lock axes', self.on_lock_axes_triggered)
+        self.lock_action.setCheckable(True)
+        self.lock_action.setToolTip('Lock axes')
+
+        self.ui.verticalLayout_canvas.addWidget(self.canvas)
+        self.ui.verticalLayout_navigation_toolbar.addWidget(self.navigation_toolbar)
+
+        self.lock_axes = False
+        self.axis_limits = None
+
+        self.figure = figure
+
+        self.update_window_size()
+
+        self.ui.show()
+
+    def on_lock_axes_triggered(self):
+        if self.lock_action.isChecked():
+            self.lock_axes = True
+            self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock'))
+        else:
+            self.lock_axes = False
+            self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
+
+    @inmain_decorator()
+    def save_axis_limits(self):
+        axis_limits = {}
+        for i, ax in enumerate(self.figure.axes):
+            # Save the limits of the axes to restore them afterward:
+            axis_limits[i] = ax.get_xlim(), ax.get_ylim()
+
+        self.axis_limits = axis_limits
+
+    @inmain_decorator()
+    def clear(self):
+        self.figure.clear()
+
+    @inmain_decorator()
+    def restore_axis_limits(self):
+        for i, ax in enumerate(self.figure.axes):
+            try:
+                xlim, ylim = self.axis_limits[i]
+                ax.set_xlim(xlim)
+                ax.set_ylim(ylim)
+            except KeyError:
+                continue
+
+    @inmain_decorator()
+    def set_window_title(self, identifier, filepath):
+        self.ui.setWindowTitle(str(identifier) + ' - ' + os.path.basename(filepath))
+
+    @inmain_decorator()
+    def update_window_size(self):
+        l, w = self.figure.get_size_inches()
+        dpi = self.figure.get_dpi()
+        self.canvas.resize(int(l*dpi),int(w*dpi))
+
+    @inmain_decorator()
+    def draw(self):
+        self.canvas.draw()
+
+
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
         self.to_parent = to_parent
@@ -90,14 +165,23 @@ class AnalysisWorker(object):
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
         
-        # Keeping track of figures and canvases:
-        self.figures = []
-        self.canvases = []
-        self.windows = {}
+        # Plot objects, keyed by matplotlib Figure object:
+        self.plots = {}
+
+
+
+        # # Keeping track of figures and canvases:
+        # self.figures = []
+        # self.canvases = []
+        # self.windows = {}
         
-        # Whether or not to autoscale each figure with new data:
-        self.autoscaling = {}
-        
+        # # Whether or not to autoscale each figure with new data:
+        # self.autoscaling = {}
+
+
+
+
+
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
@@ -136,12 +220,9 @@ class AnalysisWorker(object):
             print('%s %s %s ' %(now, os.path.basename(self.filepath), os.path.basename(path)))
         else:
             print('%s %s' %(now, os.path.basename(self.filepath)))
-        axis_limits = {}
-        for f in self.figures:
-            for i, a in enumerate(f.axes):
-                # Save the limits of the axes to restore them afterward:
-                axis_limits[f,i] = a.get_xlim(), a.get_ylim()
-            f.clear()
+
+        self.pre_analysis_plot_actions()
+
         # The namespace the routine will run in:
         sandbox = {'path':path, '__file__':self.filepath, '__name__':'__main__', '__file__': self.filepath}
         # Do not let the modulewatcher unload any modules whilst we're working:
@@ -159,62 +240,38 @@ class AnalysisWorker(object):
             return True
         finally:
             print('')
-            # reset the current figure to figure 1:
-            lyse.figure_manager.figuremanager.set_first_figure_current()
-            # Introspect the figures that were produced:
-            for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
-                if not fig.axes:
-                    continue
-                elif not fig in self.figures:
-                    # If we don't already have this figure, make a window
-                    # to put it in:
-                    self.new_figure(fig, identifier)
-                else:
-                    self.update_window_title(self.windows[fig], identifier)
-                    if not self.autoscaling[fig].get_active():
-                        # Restore the axis limits:
-                        for j, a in enumerate(fig.axes):
-                            a.autoscale(enable=False)
-                            try:
-                                xlim, ylim = axis_limits[fig,j]
-                                a.set_xlim(xlim)
-                                a.set_ylim(ylim)
-                            except KeyError:
-                                continue
-                    else:
-                        for j, a in enumerate(fig.axes):
-                            a.autoscale(enable=True)
-                    
-            # Redraw all figures:
-            for canvas in self.canvases:
-                canvas.draw()
+            self.post_analysis_plot_actions()
         
-                
-    def update_window_title(self, window, identifier):
-        window.setWindowTitle(str(identifier) + ' - ' + os.path.basename(self.filepath))
-        
+    def pre_analysis_plot_actions(self):
+        for plot in self.plots.values():
+            plot.save_axis_limits()
+            plot.clear()
+
+    def post_analysis_plot_actions(self):
+        # reset the current figure to figure 1:
+        lyse.figure_manager.figuremanager.set_first_figure_current()
+        # Introspect the figures that were produced:
+        for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+            if not fig.axes:
+                continue
+            try:
+                plot = self.plots[fig]
+            except KeyError:
+                # If we don't already have this figure, make a window
+                # to put it in:
+                self.new_figure(fig, identifier)
+            else:
+                plot.set_window_title(identifier, self.filepath)
+                if plot.lock_axes:
+                    plot.restore_axis_limits()
+
+        # Redraw all figures:
+        for plot in self.plots.values():
+            plot.draw()
+
     def new_figure(self, fig, identifier):
-        window = QtGui.QDialog()
-        self.update_window_title(window, identifier)
-        l, w = fig.get_size_inches()
-        dpi = fig.get_dpi()
-        window.resize(int(l*dpi),int(w*dpi))
-        # window.set_icon_from_file('lyse.svg')
-        # c = FigureCanvas(fig)
-        # v = gtk.VBox()
-        # n = NavigationToolbar(c,window)
-        # b = gtk.ToggleButton('Autoscale')
-        # v.pack_start(b,False,False)
-        # v.pack_start(c)
-        # v.pack_start(n,False,False)
-        # window.add(v)
-        # window.show_all()
-        # window.present()
-        # self.canvases.append(c)
-        # self.figures.append(fig)
-        # self.autoscaling[fig] = b
-        # self.windows[fig] = window
-        
+        self.plots[fig] = Plot(fig, identifier, self.filepath)
+
     def reset_figs(self):
         pass
         
