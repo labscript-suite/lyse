@@ -87,6 +87,11 @@ class Plot(object):
     def __init__(self, figure, identifier, filepath):
         loader = UiLoader()
         self.ui = loader.load('plot_window.ui', PlotWindow())
+
+        # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
+        if os.name == 'nt':
+            self.ui.newWindow.connect(set_win_appusermodel)
+
         self.set_window_title(identifier, filepath)
 
         self.figure = figure
