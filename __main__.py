@@ -242,7 +242,11 @@ class AnalysisRoutine(object):
         
     @inmain_decorator()
     def set_status(self, status):
-        status_item = self.model.item(self.get_row_index(), self.COL_STATUS)
+        index = self.get_row_index()
+        if index is None:
+            # Yelp, we've just been deleted. Nothing to do here.
+            return
+        status_item = self.model.item(index, self.COL_STATUS)
         if status == 'done':
             status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
             self.done = True
@@ -264,7 +268,11 @@ class AnalysisRoutine(object):
         
     @inmain_decorator()
     def enabled(self):
-        enabled_item = self.model.item(self.get_row_index(), self.COL_ACTIVE)
+        index = self.get_row_index()
+        if index is None:
+            # Yelp, we've just been deleted. Nothing to do here.
+            return
+        enabled_item = self.model.item(index, self.COL_ACTIVE)
         return (enabled_item.checkState() == QtCore.Qt.Checked)
         
     def get_row_index(self):
@@ -274,7 +282,7 @@ class AnalysisRoutine(object):
             fullpath = name_item.data(self.ROLE_FULLPATH)
             if fullpath == self.filepath:
                 return row
-           
+
     def restart(self):
         # TODO set status to 'restarting' or an icon or something, and gray out the item?
         self.end_child(restart=True)
@@ -282,7 +290,11 @@ class AnalysisRoutine(object):
     def remove(self):
         """End the child process and remove from the treeview"""
         self.end_child()
-        self.model.removeRow(self.get_row_index())
+        index = self.get_row_index()
+        if index is None:
+            # Already gone
+            return
+        self.model.removeRow(index)
          
     def end_child(self, restart=False):
         self.to_worker.put(['quit',None])
