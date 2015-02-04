@@ -263,8 +263,8 @@ class AnalysisWorker(object):
             else:
                 if not plot.is_shown:
                     plot.show()
+                    plot.update_window_size()
                 plot.set_window_title(identifier, self.filepath)
-                plot.update_window_size()
                 if plot.lock_axes:
                     plot.restore_axis_limits()
                 plot.draw()
