@@ -266,8 +266,8 @@ class AnalysisRoutine(object):
     def enabled(self):
         index = self.get_row_index()
         if index is None:
-            # Yelp, we've just been deleted. Nothing to do here.
-            return
+            # Yelp, we've just been deleted.
+            return False
         enabled_item = self.model.item(index, self.COL_ACTIVE)
         return (enabled_item.checkState() == QtCore.Qt.Checked)
         
