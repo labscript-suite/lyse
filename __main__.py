@@ -693,7 +693,11 @@ class RoutineBox(object):
             remaining = self.todo()
             total = len([r for r in self.routines if r.enabled()])
             done = total - remaining
-            status_percent = 100*float(done)/(remaining + done)
+            try:
+                status_percent = 100*float(done)/(remaining + done)
+            except ZeroDivisionError:
+                # All routines got deleted mid-analysis, we're done here:
+                status_percent = 100.0
             self.to_filebox.put(['progress', status_percent])
         if error:
             self.to_filebox.put(['error', None])
