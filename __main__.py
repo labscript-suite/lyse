@@ -702,7 +702,7 @@ class RoutineBox(object):
         if error:
             self.to_filebox.put(['error', None])
         else:
-            self.to_filebox.put(['done', None])
+            self.to_filebox.put(['done', 100.0])
         self.logger.debug('completed analysis of %s'%filepath)
             
     def reorder(self, order):
