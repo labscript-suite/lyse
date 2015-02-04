@@ -199,7 +199,6 @@ class AnalysisRoutine(object):
         self.COL_ACTIVE = RoutineBox.COL_ACTIVE
         self.COL_STATUS = RoutineBox.COL_STATUS
         self.COL_NAME = RoutineBox.COL_NAME
-        self.COL_PLOT_OPTIONS = RoutineBox.COL_PLOT_OPTIONS
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
         
         self.error = False
@@ -215,10 +214,7 @@ class AnalysisRoutine(object):
         name_item = QtGui.QStandardItem(self.shortname)
         name_item.setToolTip(self.filepath)
         name_item.setData(self.filepath, self.ROLE_FULLPATH)
-        plot_options_item = QtGui.QStandardItem()
-        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
-        plot_options_item.setToolTip('Click to change plot options for this analysis routine')
-        self.model.appendRow([active_item, info_item, name_item, plot_options_item])
+        self.model.appendRow([active_item, info_item, name_item])
             
         self.exiting = False
         
@@ -383,7 +379,6 @@ class RoutineBox(object):
     COL_ACTIVE = 0
     COL_STATUS = 1
     COL_NAME = 2
-    COL_PLOT_OPTIONS = 3
     ROLE_FULLPATH = QtCore.Qt.UserRole + 1
     # This data (stored in the name item) does not necessarily match
     # the position in the model. It will be set just
@@ -424,25 +419,21 @@ class RoutineBox(object):
         status_item.setToolTip('The status of this analyis routine\'s execution')
         name_item = QtGui.QStandardItem('name')
         name_item.setToolTip('The name of the python script for the analysis routine')
-        plot_options_item = QtGui.QStandardItem()
-        plot_options_item.setIcon(QtGui.QIcon(':qtutils/fugue/chart--pencil'))
-        plot_options_item.setToolTip('Plot options')
         
         self.select_all_checkbox = QtGui.QCheckBox()
         self.select_all_checkbox.setToolTip('whether the analysis routine should run')
         self.header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
+        self.header.setStretchLastSection(True)
         self.select_all_checkbox.setTristate(False)
         
         self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         self.model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
-        self.model.setHorizontalHeaderItem(self.COL_PLOT_OPTIONS, plot_options_item)
         self.model.setSortRole(self.ROLE_SORTINDEX)
         
         self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
         self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
         self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
-        self.ui.treeView.resizeColumnToContents(self.COL_PLOT_OPTIONS)
         
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
@@ -468,7 +459,6 @@ class RoutineBox(object):
         self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
         self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_selection)
         self.model.itemChanged.connect(self.on_model_item_changed)
-        self.ui.treeView.leftClicked.connect(self.on_treeview_left_clicked)
         self.ui.treeView.doubleLeftClicked.connect(self.on_treeview_double_left_clicked)
         # A context manager with which we can temporarily disconnect the above connection.
         self.model_item_changed_disconnected = DisconnectContextManager(
@@ -553,10 +543,6 @@ class RoutineBox(object):
     def on_model_item_changed(self, item):
         if item.column() == self.COL_ACTIVE:
             self.update_select_all_checkstate()
-        
-    def on_treeview_left_clicked(self, index):
-        if index.column() == self.COL_PLOT_OPTIONS:
-            raise NotImplementedError('Plot options not implemented')
         
     def on_select_all_state_changed(self, state):
         with self.select_all_checkbox_state_changed_disconnected:
@@ -1094,6 +1080,7 @@ class DataFrameModel(QtCore.QObject):
         self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
         self._vertheader.setStyleSheet(headerview_style)
         self._header.setStyleSheet(headerview_style)
+        self._header.setStretchLastSection(True)
 
         self._vertheader.setHighlightSections(False)
         self._view.setModel(self._model)
@@ -1668,10 +1655,11 @@ if __name__ == "__main__":
     server = WebServer(app.port)
 
     # TEST
-    #app.submit_dummy_shots()
-    #app.singleshot_routinebox.queue_dummy_routines()
-    #app.multishot_routinebox.queue_dummy_routines()
-    
+    if socket.gethostname() == 'bilbo-laptop':
+        app.submit_dummy_shots()
+        app.singleshot_routinebox.queue_dummy_routines()
+        app.multishot_routinebox.queue_dummy_routines()
+
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
     timer.start(500)
