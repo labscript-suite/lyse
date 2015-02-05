@@ -94,6 +94,7 @@ class Plot(object):
 
         self.set_window_title(identifier, filepath)
 
+        figure.tight_layout()
         self.figure = figure
         self.canvas = FigureCanvas(figure)
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
@@ -109,8 +110,6 @@ class Plot(object):
 
         self.lock_axes = False
         self.axis_limits = None
-
-        self.figure = figure
 
         self.update_window_size()
 
