@@ -110,6 +110,9 @@ def get_dataframe_from_shot(filepath):
     df = flat_dict_to_hierarchical_dataframe(flat_dict)
     return df
     
+def get_dataframe_from_shots(filepaths):
+    return concat_with_padding(*[get_dataframe_from_shot(filepath) for filepath in filepaths])
+
 def get_series_from_shot(filepath):
     nested_dict = get_nested_dict_from_shot(filepath)
     flat_dict =  flatten_dict(nested_dict)
@@ -129,15 +132,20 @@ def pad_columns(df, n):
     index = pandas.MultiIndex.from_tuples(new_columns)
     return pandas.DataFrame(data,columns = index)
 
-def concat_with_padding(df1, df2):
-    """Concatenates two dataframes with MultiIndex column labels,
-    padding the shallower hierarchy such that the two MultiIndexes have
+def concat_with_padding(*dataframes):
+    """Concatenates dataframes with MultiIndex column labels,
+    padding shallower hierarchies such that the MultiIndexes have
     the same nlevels."""
-    if df1.columns.nlevels < df2.columns.nlevels:
-        df1 = pad_columns(df1, df2.columns.nlevels)
-    elif df1.columns.nlevels > df2.columns.nlevels:
-        df2 = pad_columns(df2, df1.columns.nlevels)
-    return df1.append(df2, ignore_index=True)
+    dataframes = list(dataframes)
+    try:
+        max_nlevels = max(df.columns.nlevels for df in dataframes)
+    except:
+        import zprocess
+        zprocess.embed()
+    for i, df in enumerate(dataframes):
+        if df.columns.nlevels < max_nlevels:
+            dataframes[i] = pad_columns(df, max_nlevels)
+    return pandas.concat(dataframes, ignore_index=True)
     
 def replace_with_padding(df,row,index):
     if df.columns.nlevels < row.columns.nlevels:

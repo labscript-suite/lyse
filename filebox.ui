@@ -125,7 +125,7 @@ QGroupBox
              <string>Analysis running</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/control.png</normaloff>:/qtutils/fugue/control.png</iconset>
             </property>
             <property name="checkable">
@@ -139,7 +139,7 @@ QGroupBox
              <string>Mark as not done</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/arrow-curve-180.png</normaloff>:/qtutils/fugue/arrow-curve-180.png</iconset>
             </property>
            </widget>
@@ -150,7 +150,7 @@ QGroupBox
              <string>Run multishot analysis</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/arrow-curve.png</normaloff>:/qtutils/fugue/arrow-curve.png</iconset>
             </property>
            </widget>
@@ -196,7 +196,7 @@ QGroupBox
              <string>...</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/plus.png</normaloff>:/qtutils/fugue/plus.png</iconset>
             </property>
            </widget>
@@ -210,7 +210,7 @@ QGroupBox
              <string>...</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/minus.png</normaloff>:/qtutils/fugue/minus.png</iconset>
             </property>
            </widget>
@@ -224,7 +224,7 @@ QGroupBox
              <string>Columns...</string>
             </property>
             <property name="icon">
-             <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+             <iconset>
               <normaloff>:/qtutils/fugue/table--pencil.png</normaloff>:/qtutils/fugue/table--pencil.png</iconset>
             </property>
            </widget>
@@ -257,6 +257,16 @@ QGroupBox
           </property>
           <property name="horizontalScrollMode">
            <enum>QAbstractItemView::ScrollPerPixel</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QProgressBar" name="progressBar_add_shots">
+          <property name="value">
+           <number>24</number>
+          </property>
+          <property name="format">
+           <string>Adding shots: %v/%m (%p%)</string>
           </property>
          </widget>
         </item>

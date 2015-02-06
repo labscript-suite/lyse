@@ -56,6 +56,7 @@ import lyse
 
 from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
+                                      get_dataframe_from_shots,
                                       replace_with_padding)
 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
@@ -726,7 +727,6 @@ class RoutineBox(object):
             elif all(state == QtCore.Qt.Unchecked for state in all_states):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
             else:
-                print('partially checked!')
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
                 
    # TESTING ONLY REMOVE IN PRODUCTION
@@ -1195,23 +1195,21 @@ class DataFrameModel(QtCore.QObject):
         return index.row()
 
     def on_remove_selection(self):
-        selected_indexes = self._view.selectedIndexes()
-        selected_rows = set(index.row() for index in selected_indexes)
-        if not selected_rows:
+        selection_model = self._view.selectionModel()
+        selected_indexes = selection_model.selectedRows()
+        selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
+        if not selected_name_items:
             return
-        if not question_dialog("Remove %d shots?" % len(selected_rows)):
+        if not question_dialog("Remove %d shots?" % len(selected_name_items)):
             return
         # Remove from DataFrame first:
-        self.dataframe = self.dataframe.drop(selected_rows)
+        self.dataframe = self.dataframe.drop(index.row() for index in selected_indexes)
         self.dataframe.index = pandas.Index(range(len(self.dataframe)))
-        # Delete one at a time from Qt model, since indexes change with each deletion:
-        while selected_rows:
-            some_row = selected_rows.pop()
-            self._model.removeRow(some_row)
-            selected_indexes = self._view.selectedIndexes()
-            selected_rows = set(index.row() for index in selected_indexes)
+        # Delete one at a time from Qt model:
+        for name_item in selected_name_items:
+            row = name_item.row()
+            self._model.removeRow(row)
         self.update_select_all_checkstate()
-
 
     def mark_selection_not_done(self):
         selected_indexes = self._view.selectedIndexes()
@@ -1286,14 +1284,21 @@ class DataFrameModel(QtCore.QObject):
             self.column_names = column_names
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None):
+    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # Update the row in the dataframe first:
         df_row_index = np.where(self.dataframe['filepath'].values == filepath)
-        df_row_index = df_row_index[0][0]
+        try:
+            df_row_index = df_row_index[0][0]
+        except IndexError:
+            # Row has been deleted, nothing to do here:
+            return
         if not dataframe_already_updated:
-            new_row_data = get_dataframe_from_shot(filepath)
+            if new_row_data is None:
+                # This can be passed in from the caller as a performace optimisation.
+                # Opening the file can be slow, better not to do it in the GUI thread.
+                new_row_data = get_dataframe_from_shot(filepath)
             self.dataframe = replace_with_padding(self.dataframe, new_row_data, df_row_index)
             self.update_column_levels()
 
@@ -1364,19 +1369,33 @@ class DataFrameModel(QtCore.QObject):
         return [active_item, status_item, name_item]
 
     @inmain_decorator()
-    def add_file(self, filepath):
-        if filepath in self.dataframe['filepath'].values:
-            # Ignore duplicates:
-            app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
-            return
-        # Add the new row to the model:
-        self._model.appendRow(self.new_row(filepath))
-        self._view.resizeRowToContents(self._model.rowCount() - 1)
-        # Add the new row to the dataframe.
-        new_row_data = get_dataframe_from_shot(filepath)
+    def add_files(self, filepaths, new_row_data=None):
+        to_add = []
+        for filepath in filepaths:
+            if filepath in self.dataframe['filepath'].values:
+                # Ignore duplicates:
+                app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
+                if new_row_data is not None:
+                    df_row_index = np.where(new_row_data['filepath'].values == filepath)
+                    new_row_data = new_row_data.drop(df_row_index[0])
+                    new_row_data.index = pandas.Index(range(len(new_row_data)))
+            else:
+                to_add.append(filepath)
+        for filepath in to_add:
+            # Add the new row to the model:
+            self._model.appendRow(self.new_row(filepath))
+            self._view.resizeRowToContents(self._model.rowCount() - 1)
+        # Add the new rows to the dataframe.
+        if new_row_data is None:
+            # This can be passed in from the caller as a performace optimisation.
+            # Opening the file can be slow, better not to do it in the GUI thread:
+            new_row_data = get_dataframe_from_shots(to_add)
+        else:
+            assert len(new_row_data) == len(to_add)
         self.dataframe = concat_with_padding(self.dataframe, new_row_data)
         self.update_column_levels()
-        self.update_row(filepath, dataframe_already_updated=True)
+        for filepath in to_add:
+            self.update_row(filepath, dataframe_already_updated=True)
 
     @inmain_decorator()
     def get_first_incomplete(self):
@@ -1405,6 +1424,7 @@ class FileBox(object):
         loader = UiLoader()
         loader.registerCustomWidget(TableView)
         self.ui = loader.load('filebox.ui')
+        self.ui.progressBar_add_shots.hide()
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.ui.tableView, self.exp_config)
         set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
@@ -1497,6 +1517,16 @@ class FileBox(object):
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
 
+    @inmain_decorator()
+    def set_add_shots_progress(self, completed, total):
+        if completed == total:
+            self.ui.progressBar_add_shots.hide()
+        else:
+            self.ui.progressBar_add_shots.setMaximum(total)
+            self.ui.progressBar_add_shots.setValue(completed)
+            if self.ui.progressBar_add_shots.isHidden():
+                self.ui.progressBar_add_shots.show()
+
     def incoming_buffer_loop(self):
         """We use a queue as a buffer for incoming shots. We don't want to hang and not
         respond to a client submitting shots, so we just let shots pile up here until we can get to them.
@@ -1510,13 +1540,39 @@ class FileBox(object):
         # and automatically silenced in the main thread when h5py is
         # imported. So we'll silence them in this thread too:
         h5py._errors.silence_errors()
+        n_shots_added = 0
         while True:
+            filepaths = []
             filepath = self.incoming_queue.get()
-            self.logger.info('adding %s' % filepath)
-            self.shots_model.add_file(filepath)
+            filepaths.append(filepath)
+            if self.incoming_queue.qsize() == 0:
+                # Wait momentarily in case more arrive so we can batch process them:
+                time.sleep(0.1)
+            while True:
+                try:
+                    filepath = self.incoming_queue.get(False)
+                except Queue.Empty:
+                    break
+                else:
+                    filepaths.append(filepath)
+                    if len(filepaths) >= 10:
+                        break
+            logger.info('adding:\n%s' % '\n'.join(filepaths))
+            if n_shots_added == 0:
+                total_shots = self.incoming_queue.qsize() + len(filepaths)
+                self.set_add_shots_progress(1, total_shots)
+            # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
+            new_row_data = get_dataframe_from_shots(filepaths)
+            self.shots_model.add_files(filepaths, new_row_data)
+            n_shots_added += len(filepaths)
+            shots_remaining = self.incoming_queue.qsize()
+            total_shots = n_shots_added + shots_remaining
+            self.set_add_shots_progress(n_shots_added, total_shots)
+            if shots_remaining == 0:
+                n_shots_added = 0 # reset our counter for the next batch
             # Let the analysis loop know to look for new shots:
             self.analysis_pending.set()
-            
+
     def analysis_loop(self):
         logger = logging.getLogger('lyse.FileBox.analysis_loop')
         # HDF5 prints lots of errors by default, for things that aren't
@@ -1560,10 +1616,15 @@ class FileBox(object):
         self.to_singleshot.put(filepath)
         while True:
             signal, status_percent = self.from_singleshot.get()
-            self.shots_model.update_row(filepath, status_percent=status_percent)
+            if signal in ['error', 'progress']:
+                # Do the file reading here outside the GUI thread so as not to hang the GUI:
+                new_row_data = get_dataframe_from_shot(filepath)
+                self.shots_model.update_row(filepath, status_percent=status_percent, new_row_data=new_row_data)
             if signal == 'done':
+                # No need to update the dataframa again, that should have been done with the last 'progress' signal:
+                self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
-            elif signal == 'error':
+            if signal == 'error':
                 self.pause_analysis()
                 return
                         
