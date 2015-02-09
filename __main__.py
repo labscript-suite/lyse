@@ -1555,19 +1555,27 @@ class FileBox(object):
                     break
                 else:
                     filepaths.append(filepath)
-                    if len(filepaths) >= 10:
+                    if len(filepaths) >= 5:
                         break
             logger.info('adding:\n%s' % '\n'.join(filepaths))
             if n_shots_added == 0:
                 total_shots = self.incoming_queue.qsize() + len(filepaths)
                 self.set_add_shots_progress(1, total_shots)
             # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
-            new_row_data = get_dataframe_from_shots(filepaths)
-            self.shots_model.add_files(filepaths, new_row_data)
-            n_shots_added += len(filepaths)
-            shots_remaining = self.incoming_queue.qsize()
-            total_shots = n_shots_added + shots_remaining
+            dataframes = []
+            for i, filepath in enumerate(filepaths):
+                dataframe = get_dataframe_from_shot(filepath)
+                dataframes.append(dataframe)
+                n_shots_added += 1
+                shots_remaining = self.incoming_queue.qsize()
+                total_shots = n_shots_added + shots_remaining + len(filepaths) - (i + 1)
+                if i != len(filepaths) - 1:
+                    # Leave the last update until after dataframe concatenation.
+                    # Looks more responsive that way:
+                    self.set_add_shots_progress(n_shots_added, total_shots)
+            new_row_data = concat_with_padding(*dataframes)
             self.set_add_shots_progress(n_shots_added, total_shots)
+            self.shots_model.add_files(filepaths, new_row_data)
             if shots_remaining == 0:
                 n_shots_added = 0 # reset our counter for the next batch
             # Let the analysis loop know to look for new shots:
@@ -1703,10 +1711,15 @@ class Lyse(object):
 
     # TESTING ONLY REMOVE IN PRODUCTION
     def submit_dummy_shots(self):
-        for i in range(12):
-            path = os.path.abspath(os.path.join('test_shots', '20141021T135341_connectiontable_%02d.h5' % i))
-            print(path)
-            print(zprocess.zmq_get(self.port, data={'filepath': path}))
+        folder = '/run/user/1000/gvfs/smb-share:server=becnas.physics.monash.edu.au,share=monashbec/Experiments/krb/aligning_k39_source/2014-May/07'
+        for f in sorted(os.listdir(folder)):
+            path = os.path.join(folder, f)
+            zprocess.zmq_get(self.port, data={'filepath': path})
+
+        # for i in range(12):
+        #     path = os.path.abspath(os.path.join('test_shots', '20141021T135341_connectiontable_%02d.h5' % i))
+        #     print(path)
+        #     print(zprocess.zmq_get(self.port, data={'filepath': path}))
 
 
 if __name__ == "__main__":
@@ -1722,8 +1735,8 @@ if __name__ == "__main__":
     # TEST
     if socket.gethostname() == 'bilbo-laptop':
         app.submit_dummy_shots()
-        app.singleshot_routinebox.queue_dummy_routines()
-        app.multishot_routinebox.queue_dummy_routines()
+        # app.singleshot_routinebox.queue_dummy_routines()
+        # app.multishot_routinebox.queue_dummy_routines()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
