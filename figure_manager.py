@@ -13,8 +13,6 @@
 
 import lyse
 import sys
-if 'matplotlib.pyplot' in sys.modules:
-    raise ImportError('lyse must be imported prior to pylab/pyplot in order to correctly override the figure() function.')
 
 class FigureManager(object):
 
@@ -75,14 +73,21 @@ class FigureManager(object):
             self._show()
 
 
-# For some reason, new installs of 32-bit Enthought + PyGTK + matplotlib(with GtK support)
-# on 64-bit windows systems are crashing when adding analyses into lyse unless you
-# import gtk before matplotlib.pyplot. We are not sure why!
-import gtk
-import matplotlib.pyplot
-import matplotlib.figure
- 
-figuremanager = FigureManager()
-matplotlib.pyplot.figure = figuremanager
-matplotlib.pyplot.close = figuremanager.close
-matplotlib.pyplot.show = figuremanager.show
+figuremanager = None
+matplotlib = None
+
+def install():
+    if 'matplotlib.pyplot' in sys.modules:
+        message = ('install() must be imported prior to importing pylab/pyplot ' +
+                   'in order to correctly override the figure() function.')
+        raise RuntimeError(message)
+
+    global matplotlib
+    global figuremanager
+    import matplotlib.pyplot
+    import matplotlib.figure
+
+    figuremanager = FigureManager()
+    matplotlib.pyplot.figure = figuremanager
+    matplotlib.pyplot.close = figuremanager.close
+    matplotlib.pyplot.show = figuremanager.show

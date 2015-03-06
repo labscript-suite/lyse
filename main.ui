@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>948</width>
+    <height>749</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>lyse - the labscript suite</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+    <normaloff>:/qtutils/custom/lyse.png</normaloff>:/qtutils/custom/lyse.png</iconset>
+  </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>false</bool>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <property name="styleSheet">
+    <string notr="true">QPushButton {
+     border: none;
+     padding: 4px;
+ }
+
+QPushButton:hover {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+ QPushButton:pressed {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+QPushButton:checked {
+     background-color: #dadbde;
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+QPushButton:hover:checked {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+QToolButton {
+     border: none;
+     padding: 2px;
+ }
+
+QToolButton:hover {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+ QToolButton:pressed {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+QToolButton:checked {
+     background-color: #dadbde;
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+
+QToolButton:hover:checked {
+     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
+     border: 1px solid #8f8f91;
+     border-radius: 3px;
+ }
+</string>
+   </property>
+   <layout class="QVBoxLayout" name="verticalLayout_5">
+    <item>
+     <widget class="QSplitter" name="splitter_horizontal">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QSplitter" name="splitter_vertical">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <widget class="QSplitter" name="splitter">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <widget class="QWidget" name="verticalLayoutWidget">
+         <layout class="QVBoxLayout" name="verticalLayout_singleshot_routinebox"/>
+        </widget>
+        <widget class="QWidget" name="verticalLayoutWidget_2">
+         <layout class="QVBoxLayout" name="verticalLayout_multishot_routinebox"/>
+        </widget>
+       </widget>
+       <widget class="QWidget" name="verticalLayoutWidget_3">
+        <layout class="QVBoxLayout" name="verticalLayout_filebox"/>
+       </widget>
+      </widget>
+      <widget class="QWidget" name="verticalLayoutWidget_4">
+       <layout class="QVBoxLayout" name="verticalLayout_output_box"/>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>948</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menuFile">
+    <property name="title">
+     <string>File</string>
+    </property>
+    <addaction name="actionLoad_configuration"/>
+    <addaction name="actionRevert_configuration"/>
+    <addaction name="actionSave_configuration"/>
+    <addaction name="actionSave_configuration_as"/>
+    <addaction name="actionQuit"/>
+   </widget>
+   <addaction name="menuFile"/>
+  </widget>
+  <action name="actionLoad_configuration">
+   <property name="icon">
+    <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+     <normaloff>:/qtutils/fugue/folder-open.png</normaloff>:/qtutils/fugue/folder-open.png</iconset>
+   </property>
+   <property name="text">
+    <string>Load configuration</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionSave_configuration_as">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+     <normaloff>:/qtutils/fugue/disk--plus.png</normaloff>:/qtutils/fugue/disk--plus.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save as...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
+   </property>
+  </action>
+  <action name="actionQuit">
+   <property name="icon">
+    <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+     <normaloff>:/qtutils/fugue/cross-button.png</normaloff>:/qtutils/fugue/cross-button.png</iconset>
+   </property>
+   <property name="text">
+    <string>Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="actionSave_configuration">
+   <property name="icon">
+    <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+     <normaloff>:/qtutils/fugue/disk.png</normaloff>:/qtutils/fugue/disk.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save configuration</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionRevert_configuration">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc">
+     <normaloff>:/qtutils/fugue/arrow-curve-180-left.png</normaloff>:/qtutils/fugue/arrow-curve-180-left.png</iconset>
+   </property>
+   <property name="text">
+    <string>Revert configuration</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../../Anaconda/Lib/site-packages/qtutils/icons/icons.qrc"/>
+ </resources>
+ <connections/>
+</ui>

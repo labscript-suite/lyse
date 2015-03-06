@@ -4,3 +4,4 @@ syntax: glob
 *.pyg
 *.log
 *.toc
+*.pyc
