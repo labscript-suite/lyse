@@ -33,7 +33,6 @@ for name in API_NAMES:
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import pyqtSignal as Signal
-from PyQt4.QtCore import pyqtSlot as Slot
 
 try:
     from labscript_utils import check_version
@@ -46,20 +45,18 @@ check_version('zprocess', '1.1.7', '2')
 
 import zprocess.locking
 from zprocess import ZMQServer
-from zmq import ZMQError
 
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 import labscript_utils.shared_drive as shared_drive
-import lyse
 
 from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
                                       get_dataframe_from_shots,
                                       replace_with_padding)
 
-from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
@@ -169,7 +166,7 @@ class WebServer(ZMQServer):
             return app.filebox.shots_model.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
-                h5_filepath = labscript_utils.shared_drive.path_to_local(request_data['filepath'])
+                h5_filepath = shared_drive.path_to_local(request_data['filepath'])
                 if not (isinstance(h5_filepath, unicode) or isinstance(h5_filepath, str)):
                     raise AssertionError(str(type(h5_filepath)) + ' is not str or unicode')
                 app.filebox.incoming_queue.put(h5_filepath)
@@ -1054,9 +1051,8 @@ class TableView(QtGui.QTableView):
         
 class DataFrameModel(QtCore.QObject):
 
-    COL_ACTIVE = 0
-    COL_STATUS = 1
-    COL_FILEPATH = 2
+    COL_STATUS = 0
+    COL_FILEPATH = 1
 
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
     
@@ -1102,15 +1098,6 @@ class DataFrameModel(QtCore.QObject):
         # How many levels the dataframe's multiindex has:
         self.nlevels = self.dataframe.columns.nlevels
 
-        active_item = QtGui.QStandardItem()
-        active_item.setToolTip('whether or not single-shot analysis routines will be run on each shot')
-        self._model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
-        self.select_all_checkbox = QtGui.QCheckBox()
-        self.select_all_checkbox.setToolTip('whether or not single-shot analysis routines will be run on each shot')
-        self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
-        self.select_all_checkbox.setTristate(False)
-        self._header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
-
         status_item = QtGui.QStandardItem()
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
         status_item.setToolTip('status/progress of single-shot analysis')
@@ -1120,68 +1107,23 @@ class DataFrameModel(QtCore.QObject):
         filepath_item.setToolTip('filepath')
         self._model.setHorizontalHeaderItem(self.COL_FILEPATH, filepath_item)
 
-        self._view.resizeColumnToContents(self.COL_ACTIVE)
         self._view.setColumnWidth(self.COL_STATUS, 70)
         self._view.setColumnWidth(self.COL_FILEPATH, 100)
 
         # Column indices to names and vice versa for fast lookup:
-        self.column_indices = {'__active': self.COL_ACTIVE,
-                               '__status': self.COL_STATUS, ('filepath', ''): self.COL_FILEPATH}
-        self.column_names = {self.COL_ACTIVE: '__active',
-                             self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath', '')}
-        self.columns_visible = {self.COL_ACTIVE: True, self.COL_STATUS: True, self.COL_FILEPATH: True}
+        self.column_indices = {'__status': self.COL_STATUS, ('filepath', ''): self.COL_FILEPATH}
+        self.column_names = {self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath', '')}
+        self.columns_visible = {self.COL_STATUS: True, self.COL_FILEPATH: True}
 
         # Make the actions for the context menu:
-        self.action_set_selected_active = QtGui.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'Set selected shots active',  self._view)
-        self.action_set_selected_inactive = QtGui.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'Set selected shots inactive',  self._view)
         self.action_remove_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
 
         self.connect_signals()
 
     def connect_signals(self):
-        self._model.itemChanged.connect(self.on_model_item_changed)
-        # A context manager with which we can temporarily disconnect the above connection.
-        self.model_item_changed_disconnected = DisconnectContextManager(
-            self._model.itemChanged, self.on_model_item_changed)
-        self.select_all_checkbox.stateChanged.connect(self.on_select_all_state_changed)
-        self.select_all_checkbox_state_changed_disconnected = DisconnectContextManager(
-            self.select_all_checkbox.stateChanged, self.on_select_all_state_changed)
         self._view.customContextMenuRequested.connect(self.on_view_context_menu_requested)
-        self.action_set_selected_active.triggered.connect(
-            lambda: self.on_set_selected_triggered(QtCore.Qt.Checked))
-        self.action_set_selected_inactive.triggered.connect(
-            lambda: self.on_set_selected_triggered(QtCore.Qt.Unchecked))
         self.action_remove_selected.triggered.connect(self.on_remove_selection)
-
-    def on_select_all_state_changed(self, state):
-        with self.select_all_checkbox_state_changed_disconnected:
-            # Do not allow a switch *to* a partially checked state:
-            self.select_all_checkbox.setTristate(False)
-        state = self.select_all_checkbox.checkState()
-        with self.model_item_changed_disconnected:
-            for row in range(self._model.rowCount()):
-                active_item = self._model.item(row, self.COL_ACTIVE)
-                active_item.setCheckState(state)
-
-    def update_select_all_checkstate(self):
-        with self.select_all_checkbox_state_changed_disconnected:
-            all_states = []
-            for row in range(self._model.rowCount()):
-                active_item = self._model.item(row, self.COL_ACTIVE)
-                all_states.append(active_item.checkState())
-            if all(state == QtCore.Qt.Checked for state in all_states):
-                self.select_all_checkbox.setCheckState(QtCore.Qt.Checked)
-            elif all(state == QtCore.Qt.Unchecked for state in all_states):
-                self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
-            else:
-                self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
-
-    def on_model_item_changed(self, item):
-        if item.column() == self.COL_ACTIVE:
-            self.update_select_all_checkstate()
 
     def get_model_row_by_filepath(self, filepath):
         filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
@@ -1220,22 +1162,10 @@ class DataFrameModel(QtCore.QObject):
         
     def on_view_context_menu_requested(self, point):
         menu = QtGui.QMenu(self._view)
-        menu.addAction(self.action_set_selected_active)
-        menu.addAction(self.action_set_selected_inactive)
         menu.addAction(self.action_remove_selected)
         menu.exec_(QtGui.QCursor.pos())
 
-    def on_set_selected_triggered(self, active):
-        selected_indexes = self._view.selectedIndexes()
-        selected_rows = set(index.row() for index in selected_indexes)
-        for row in selected_rows:
-            active_item = self._model.item(row, self.COL_ACTIVE)
-            active_item.setCheckState(active)
-        self.update_select_all_checkstate()
-
     def on_double_click(self, index):
-        if index.column() == self.COL_ACTIVE:
-            return
         filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
         shot_filepath = filepath_item.text()
         
@@ -1359,14 +1289,11 @@ class DataFrameModel(QtCore.QObject):
             self.columns_changed.emit()
 
     def new_row(self, filepath):
-        active_item = QtGui.QStandardItem()
-        active_item.setCheckable(True)
-        active_item.setCheckState(QtCore.Qt.Checked)
         status_item = QtGui.QStandardItem()
         status_item.setData(0, self.ROLE_STATUS_PERCENT)
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
-        return [active_item, status_item, name_item]
+        return [status_item, name_item]
 
     @inmain_decorator()
     def add_files(self, filepaths, new_row_data=None):
@@ -1702,25 +1629,6 @@ class Lyse(object):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
 
-    def destroy(self, *args):
-        raise NotImplementedError
-        # gtk.main_quit()
-        # The routine boxes have subprocesses that need to be quit:
-        # self.singleshot_routinebox.destroy()
-        # self.multishot_routinebox.destroy()
-
-    # TESTING ONLY REMOVE IN PRODUCTION
-    def submit_dummy_shots(self):
-        folder = '/run/user/1000/gvfs/smb-share:server=becnas.physics.monash.edu.au,share=monashbec/Experiments/krb/aligning_k39_source/2014-May/07'
-        for f in sorted(os.listdir(folder)):
-            path = os.path.join(folder, f)
-            zprocess.zmq_get(self.port, data={'filepath': path})
-
-        # for i in range(12):
-        #     path = os.path.abspath(os.path.join('test_shots', '20141021T135341_connectiontable_%02d.h5' % i))
-        #     print(path)
-        #     print(zprocess.zmq_get(self.port, data={'filepath': path}))
-
 
 if __name__ == "__main__":
     logger = setup_logging('lyse')
@@ -1729,14 +1637,9 @@ if __name__ == "__main__":
     qapplication = QtGui.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
     app = Lyse()
+
     # Start the web server:
     server = WebServer(app.port)
-
-    # TEST
-    if socket.gethostname() == 'bilbo-laptop':
-        app.submit_dummy_shots()
-        # app.singleshot_routinebox.queue_dummy_routines()
-        # app.multishot_routinebox.queue_dummy_routines()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()

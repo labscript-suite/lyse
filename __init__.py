@@ -30,7 +30,7 @@ import types
 
 from zprocess import zmq_get
 
-__version__ = '2.0-dev'
+__version__ = '2.0.0'
 
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
