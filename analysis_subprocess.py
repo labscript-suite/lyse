@@ -63,14 +63,11 @@ def set_win_appusermodel(window_id):
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
     
     
-class PlotWindow(QtGui.QDialog):
+class PlotWindow(QtGui.QWidget):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
     close_signal = Signal()
 
-    def __init__(self):
-        QtGui.QWidget.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
-        
     def event(self, event):
         result = QtGui.QWidget.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
@@ -78,7 +75,6 @@ class PlotWindow(QtGui.QDialog):
         return result
 
     def closeEvent(self, event):
-        # self.close_signal.emit()
         self.hide()
         event.ignore()
         
