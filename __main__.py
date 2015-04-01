@@ -1080,7 +1080,6 @@ class DataFrameModel(QtCore.QObject):
         self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
         self._vertheader.setStyleSheet(headerview_style)
         self._header.setStyleSheet(headerview_style)
-        self._header.setStretchLastSection(True)
 
         self._vertheader.setHighlightSections(False)
         self._view.setModel(self._model)
