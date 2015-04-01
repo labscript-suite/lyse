@@ -11,8 +11,6 @@
 #                                                                   #
 #####################################################################
 
-spinning_top = False
-
 from dataframe_utilities import get_series_from_shot as _get_singleshot
 from dataframe_utilities import dict_diff
 import os
@@ -31,6 +29,17 @@ import types
 from zprocess import zmq_get
 
 __version__ = '2.0.0'
+
+# If running stand-alone, and not from within lyse, the below two variables
+# will be as follows. Otherwise lyse will override them with spinning_top =
+# True and path <name of hdf5 file being analysed>:
+spinning_top = False
+
+if len(sys.argv) > 1:
+    path = sys.argv[1]
+else:
+    path = None
+
 
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
