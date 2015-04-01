@@ -1151,7 +1151,6 @@ class DataFrameModel(QtCore.QObject):
         for name_item in selected_name_items:
             row = name_item.row()
             self._model.removeRow(row)
-        self.update_select_all_checkstate()
 
     def mark_selection_not_done(self):
         selected_indexes = self._view.selectedIndexes()
