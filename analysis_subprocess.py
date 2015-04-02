@@ -55,11 +55,11 @@ class _DeprecationDict(dict):
     """Dictionary that spouts deprecation warnings when you try to access some
     keys."""
     def __init__(self, *args, **kwargs):
-        self.deprecated_keys = set() # To be added to after the deprecated items are added to the dict
+        self.deprecation_messages = {} # To be added to after the deprecated items are added to the dict.
         dict.__init__(self, *args, **kwargs)
 
     def __getitem__(self, key):
-        if key in self.deprecated_keys:
+        if key in self.deprecation_messages:
             import warnings
             import linecache
             # DeprecationWarnings are ignored by default. Clear the filter so
@@ -78,8 +78,7 @@ class _DeprecationDict(dict):
                 fnl = filename.lower()
                 if fnl.endswith((".pyc", ".pyo")):
                     filename = filename[:-1]
-                message = ("use of 'path' global variable is deprecated and will be removed in a future version of lyse. "
-                           "Please use lyse.path, which defaults to sys.argv[1] when scripts are run stand-alone.")
+                message = self.deprecation_messages[key]
                 warnings.warn_explicit(message, DeprecationWarning, filename, lineno, module)
             finally:
                 # Restore the warnings filter:
@@ -87,9 +86,10 @@ class _DeprecationDict(dict):
         return dict.__getitem__(self, key)
 
     def __setitem__(self, key, value):
-        if key in self.deprecated_keys:
-            # No longer deprecated if the user puts something in place of the originally deprecated item:
-            self.deprecated_keys.remove(key)
+        if key in self.deprecation_messages:
+            # No longer deprecated if the user puts something in place of the
+            # originally deprecated item:
+            del self.deprecation_messages[key]
         return dict.__setitem__(self, key, value)
 
 
@@ -131,7 +131,7 @@ class Plot(object):
 
         self.set_window_title(identifier, filepath)
 
-        figure.tight_layout()
+        # figure.tight_layout()
         self.figure = figure
         self.canvas = FigureCanvas(figure)
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
@@ -264,7 +264,10 @@ class AnalysisWorker(object):
                                    __name__='__main__',
                                    __file__= self.filepath)
         # path global variable is deprecated:
-        sandbox.deprecated_keys.add('path')
+        deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
+                               "in a future version of lyse.  Please use lyse.path, which defaults " +
+                               "to sys.argv[1] when scripts are run stand-alone.")
+        sandbox.deprecation_messages['path'] = deprecation_message
         # Use lyse.path instead:
         lyse.path = path
 
