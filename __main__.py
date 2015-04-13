@@ -1467,44 +1467,53 @@ class FileBox(object):
         h5py._errors.silence_errors()
         n_shots_added = 0
         while True:
-            filepaths = []
-            filepath = self.incoming_queue.get()
-            filepaths.append(filepath)
-            if self.incoming_queue.qsize() == 0:
-                # Wait momentarily in case more arrive so we can batch process them:
-                time.sleep(0.1)
-            while True:
-                try:
-                    filepath = self.incoming_queue.get(False)
-                except Queue.Empty:
-                    break
-                else:
-                    filepaths.append(filepath)
-                    if len(filepaths) >= 5:
+            try:
+                filepaths = []
+                filepath = self.incoming_queue.get()
+                filepaths.append(filepath)
+                if self.incoming_queue.qsize() == 0:
+                    # Wait momentarily in case more arrive so we can batch process them:
+                    time.sleep(0.1)
+                while True:
+                    try:
+                        filepath = self.incoming_queue.get(False)
+                    except Queue.Empty:
                         break
-            logger.info('adding:\n%s' % '\n'.join(filepaths))
-            if n_shots_added == 0:
-                total_shots = self.incoming_queue.qsize() + len(filepaths)
-                self.set_add_shots_progress(1, total_shots)
-            # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
-            dataframes = []
-            for i, filepath in enumerate(filepaths):
-                dataframe = get_dataframe_from_shot(filepath)
-                dataframes.append(dataframe)
-                n_shots_added += 1
-                shots_remaining = self.incoming_queue.qsize()
-                total_shots = n_shots_added + shots_remaining + len(filepaths) - (i + 1)
-                if i != len(filepaths) - 1:
-                    # Leave the last update until after dataframe concatenation.
-                    # Looks more responsive that way:
-                    self.set_add_shots_progress(n_shots_added, total_shots)
-            new_row_data = concat_with_padding(*dataframes)
-            self.set_add_shots_progress(n_shots_added, total_shots)
-            self.shots_model.add_files(filepaths, new_row_data)
-            if shots_remaining == 0:
-                n_shots_added = 0 # reset our counter for the next batch
-            # Let the analysis loop know to look for new shots:
-            self.analysis_pending.set()
+                    else:
+                        filepaths.append(filepath)
+                        if len(filepaths) >= 5:
+                            break
+                logger.info('adding:\n%s' % '\n'.join(filepaths))
+                if n_shots_added == 0:
+                    total_shots = self.incoming_queue.qsize() + len(filepaths)
+                    self.set_add_shots_progress(1, total_shots)
+
+                # Remove duplicates from the list (preserving order) in case the
+                # client sent the same filepath multiple times:
+                filepaths = sorted(set(filepaths), key=filepaths.index) # Inefficient but readable
+                # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
+                dataframes = []
+                for i, filepath in enumerate(filepaths):
+                    dataframe = get_dataframe_from_shot(filepath)
+                    dataframes.append(dataframe)
+                    n_shots_added += 1
+                    shots_remaining = self.incoming_queue.qsize()
+                    total_shots = n_shots_added + shots_remaining + len(filepaths) - (i + 1)
+                    if i != len(filepaths) - 1:
+                        # Leave the last update until after dataframe concatenation.
+                        # Looks more responsive that way:
+                        self.set_add_shots_progress(n_shots_added, total_shots)
+                new_row_data = concat_with_padding(*dataframes)
+                self.set_add_shots_progress(n_shots_added, total_shots)
+                self.shots_model.add_files(filepaths, new_row_data)
+                if shots_remaining == 0:
+                    n_shots_added = 0 # reset our counter for the next batch
+                # Let the analysis loop know to look for new shots:
+                self.analysis_pending.set()
+            except Exception:
+                # Keep this incoming loop running at all costs, but make the
+                # otherwise uncaught exception visible to the user:
+                zprocess.raise_exception_in_thread(sys.exc_info())
 
     def analysis_loop(self):
         logger = logging.getLogger('lyse.FileBox.analysis_loop')
