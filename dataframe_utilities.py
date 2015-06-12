@@ -45,8 +45,11 @@ def get_nested_dict_from_shot(filepath):
                                     row[orientation][label][image][key] = val
         row['filepath'] = filepath
         row['agnostic_path'] = labscript_utils.shared_drive.path_to_agnostic(filepath)
-        row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])        
-        row['sequence_index'] = h5_file.attrs['sequence_index']    
+        row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])
+        try:
+            row['sequence_index'] = h5_file.attrs['sequence_index']
+        except:
+            row['sequence_index'] = float('nan')
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
         try:
