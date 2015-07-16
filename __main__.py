@@ -151,8 +151,14 @@ def scientific_notation(x, sigfigs=4, mode='eng'):
             superscript = ''.join(sups.get(char, char) for char in str(exponent))
             result += thinspace + times + thinspace + '10' + superscript
         elif mode == 'eng':
-            prefix = prefixes[exponent]
-            result += hairspace + prefix
+            try:
+                # If our number has an SI prefix then use it
+                prefix = prefixes[exponent]
+                result += hairspace + prefix
+            except:
+                # Otherwise display in scientific notation
+                superscript = ''.join(sups.get(char, char) for char in str(exponent))
+                result += thinspace + times + thinspace + '10' + superscript
     return result
 
 
