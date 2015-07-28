@@ -717,8 +717,11 @@ class RoutineBox(object):
             name_item.setData(new_index, self.ROLE_SORTINDEX)
         self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
         # Apply new order to our list of routines too:
-        self.routines = [self.routines[i] for i in order]
-        
+        reordered_routines = [None]*len(order)
+        for routine, index in zip(self.routines, order):
+            reordered_routines[index] = routine
+        self.routines = reordered_routines
+
     def update_select_all_checkstate(self):
         with self.select_all_checkbox_state_changed_disconnected:
             all_states = []
