@@ -30,6 +30,12 @@ from zprocess import zmq_get
 
 __version__ = '2.0.0'
 
+# Known version incompatabilities
+from distutils.version import StrictVersion
+from labscript_utils import VersionException
+if StrictVersion(pandas.__version__) >= StrictVersion('0.17.0'):
+    raise VersionException('lyse version %s is incompatible with pandas %s. Please downgrade pandas to 0.16.2.' % (__version__, pandas.__version__))
+
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
 # True and path <name of hdf5 file being analysed>:
