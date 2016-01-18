@@ -30,11 +30,13 @@ from zprocess import zmq_get
 
 __version__ = '2.0.0'
 
-# Known version incompatabilities
-from distutils.version import StrictVersion
-from labscript_utils import VersionException
-if StrictVersion(pandas.__version__) >= StrictVersion('0.17.0'):
-    raise VersionException('lyse version %s is incompatible with pandas %s. Please downgrade pandas to 0.16.2.' % (__version__, pandas.__version__))
+try:
+    from labscript_utils import check_version
+except ImportError:
+    raise ImportError('Require labscript_utils > 2.1.0')
+
+# allow pandas v0.15.0 to v0.16.x inclusive
+check_version('pandas', '0.15.0', '0.17')
 
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
