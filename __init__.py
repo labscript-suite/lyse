@@ -55,7 +55,6 @@ def data(filepath=None, host='localhost', timeout=5):
     else:
         port = 42519
         df = zmq_get(port, host, 'get dataframe', timeout)
-        df = df.convert_objects(convert_numeric=True, convert_dates=False)
         try:
             padding = ('',)*(df.columns.nlevels - 1)
             df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)

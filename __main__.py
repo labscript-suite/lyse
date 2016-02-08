@@ -169,7 +169,16 @@ class WebServer(ZMQServer):
         if request_data == 'hello':
             return 'hello'
         elif request_data == 'get dataframe':
-            return app.filebox.shots_model.dataframe
+            # convert_objects() picks fixed datatypes for columns that are
+            # compatible with fixed datatypes, dramatically speeding up
+            # pickling. But we don't impose fixed datatypes earlier than now
+            # because the user is free to use mixed datatypes in a column, and
+            # we won't want to prevent values of a different type being added
+            # in the future. All kwargs False because we don't want to coerce
+            # strings to numbers or anything - just choose the correct
+            # datatype for columns that are already a single datatype:
+            return app.filebox.shots_model.dataframe.convert_objects(
+                       convert_dates=False, convert_numeric=False, convert_timedeltas=False)
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -717,8 +726,8 @@ class RoutineBox(object):
             name_item.setData(new_index, self.ROLE_SORTINDEX)
         self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
         # Apply new order to our list of routines too:
-        self.routines = [self.routines[i] for i in order]
-        
+        self.routines = [self.routines[order.index(i)] for i in range(len(order))]
+
     def update_select_all_checkstate(self):
         with self.select_all_checkbox_state_changed_disconnected:
             all_states = []
