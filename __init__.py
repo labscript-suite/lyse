@@ -35,8 +35,8 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-# allow pandas v0.15.0 to v0.16.x inclusive
-check_version('pandas', '0.15.0', '0.17')
+# require pandas v0.15.0 or later
+check_version('pandas', '0.15.0')
 
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
