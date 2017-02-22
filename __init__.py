@@ -49,7 +49,7 @@ else:
     path = None
 
 
-class _PersistentStorage(object):
+class _RoutineStorage(object):
     """An empty object that analysis routines can store data in. It will
     persist from one run of an analysis routine to the next when the routine
     is being run from within lyse. No attempt is made to store data to disk,
@@ -59,7 +59,7 @@ class _PersistentStorage(object):
     these cases."""
     pass
 
-persistent_storage = _PersistentStorage()
+routine_storage = _RoutineStorage()
 
 
 def data(filepath=None, host='localhost', timeout=5):
