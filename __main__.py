@@ -927,13 +927,26 @@ class EditColumns(object):
         self.ui.treeView.sortByColumn(sort_column, sort_order)
 
     def update_columns(self, column_names, columns_visible):
+
+        # Index/name mapping may have changed. Get a mapping by *name* of
+        # which columns were previously visible, so we can update our by-index
+        # mapping in a moment:
+        old_columns_visible_by_name = {}
+        for old_column_number, visible in self.old_columns_visible.items():
+            column_name = self.column_names[old_column_number]
+            old_columns_visible_by_name[column_name] = visible
+
         self.columns_visible = columns_visible.copy()
         self.column_names = column_names.copy()
-        # If editing is cancelled, any new columns should be set to visible.
-        # So we will add any new columns to our old_columns_visible dict,
-        # with them set to visible.
-        for index in self.columns_visible:
-            if index not in self.old_columns_visible:
+
+        # Update the by-index mapping of which columns were visible before editing:
+        self.old_columns_visible = {}
+        for index, name in self.column_names.items():
+            try:
+                self.old_columns_visible[index] = old_columns_visible_by_name[name]
+            except KeyError:
+                # A new column. If editing is cancelled, any new columns
+                # should be set to visible:
                 self.old_columns_visible[index] = True
         self.populate_model(column_names, self.columns_visible)
 
@@ -1260,6 +1273,25 @@ class DataFrameModel(QtCore.QObject):
             header_item.setToolTip(column_name_as_string)
             self._model.setHorizontalHeaderItem(column_number, header_item)
 
+        # Check and remove any no-longer-needed columns in the Qt model:
+        defunct_column_names = (set(self.column_names.values()) - set(self.dataframe.columns)
+                                - {self.column_names[self.COL_STATUS], self.column_names[self.COL_FILEPATH]})
+        defunct_column_indices = [self.column_indices[column_name] for column_name in defunct_column_names]
+        for column_number in sorted(defunct_column_indices, reverse=True):
+            # Remove columns from the Qt model. In reverse order so that
+            # removals do not change the position of columns yet to be
+            # removed.
+            self._model.removeColumn(column_number)
+            del self.column_names[column_number]
+            del self.columns_visible[column_number]
+
+        if defunct_column_indices:
+            # Renumber the keys of self.columns_visible and self.column_names to reflect deletions:
+            self.column_names = {newindex: name for newindex, (oldindex, name) in enumerate(sorted(self.column_names.items()))}
+            self.columns_visible = {newindex: visible for newindex, (oldindex, visible) in enumerate(sorted(self.columns_visible.items()))}
+            # Update the inverse mapping of self.column_names:
+            self.colum_indices = {name: index for index, name in self.column_names.items()}
+
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
         dataframe_row = dict(self.dataframe.ix[df_row_index])
@@ -1273,7 +1305,6 @@ class DataFrameModel(QtCore.QObject):
                 item = QtGui.QStandardItem('NaN')
                 item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
                 self._model.setItem(model_row_number, column_number, item)
-            # value = self.dataframe[column_name].values[df_row_index][0]
             value = dataframe_row[column_name]
             if isinstance(value, float):
                 value_str = scientific_notation(value)
@@ -1298,7 +1329,7 @@ class DataFrameModel(QtCore.QObject):
             status_item = self._model.item(model_row_number, self.COL_STATUS)
             status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
             
-        if new_column_names:
+        if new_column_names or defunct_column_names:
             self.columns_changed.emit()
 
     def new_row(self, filepath):
