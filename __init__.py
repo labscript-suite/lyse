@@ -49,6 +49,19 @@ else:
     path = None
 
 
+class _RoutineStorage(object):
+    """An empty object that analysis routines can store data in. It will
+    persist from one run of an analysis routine to the next when the routine
+    is being run from within lyse. No attempt is made to store data to disk,
+    so if the routine is run multiple times from the command line instead of
+    from lyse, or the lyse analysis subprocess is restarted, data will not be
+    retained. An alternate method should be used to store data if desired in
+    these cases."""
+    pass
+
+routine_storage = _RoutineStorage()
+
+
 def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
         return _get_singleshot(filepath)
