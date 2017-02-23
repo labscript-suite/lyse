@@ -1290,7 +1290,7 @@ class DataFrameModel(QtCore.QObject):
             self.column_names = {newindex: name for newindex, (oldindex, name) in enumerate(sorted(self.column_names.items()))}
             self.columns_visible = {newindex: visible for newindex, (oldindex, visible) in enumerate(sorted(self.columns_visible.items()))}
             # Update the inverse mapping of self.column_names:
-            self.colum_indices = {name: index for index, name in self.column_names.items()}
+            self.column_indices = {name: index for index, name in self.column_names.items()}
 
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
@@ -1305,7 +1305,11 @@ class DataFrameModel(QtCore.QObject):
                 item = QtGui.QStandardItem('NaN')
                 item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
                 self._model.setItem(model_row_number, column_number, item)
-            value = dataframe_row[column_name]
+            try:
+                value = dataframe_row[column_name]
+            except:
+                import IPython
+                IPython.embed()
             if isinstance(value, float):
                 value_str = scientific_notation(value)
             else:
