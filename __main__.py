@@ -1305,11 +1305,7 @@ class DataFrameModel(QtCore.QObject):
                 item = QtGui.QStandardItem('NaN')
                 item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
                 self._model.setItem(model_row_number, column_number, item)
-            try:
-                value = dataframe_row[column_name]
-            except:
-                import IPython
-                IPython.embed()
+            value = dataframe_row[column_name]
             if isinstance(value, float):
                 value_str = scientific_notation(value)
             else:
