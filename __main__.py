@@ -538,12 +538,12 @@ class RoutineBox(object):
             error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
                          
-    def on_remove_selection(self):
+    def on_remove_selection(self, confirm=True):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         if not selected_rows:
             return
-        if not question_dialog("Remove %d routines?" % len(selected_rows)):
+        if confirm and not question_dialog("Remove %d routines?" % len(selected_rows)):
             return
         name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
         filepaths = [item.data(self.ROLE_FULLPATH) for item in name_items]
@@ -1150,13 +1150,13 @@ class DataFrameModel(QtCore.QObject):
         index = item.index()
         return index.row()
 
-    def on_remove_selection(self):
+    def on_remove_selection(self, confirm=True):
         selection_model = self._view.selectionModel()
         selected_indexes = selection_model.selectedRows()
         selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
         if not selected_name_items:
             return
-        if not question_dialog("Remove %d shots?" % len(selected_name_items)):
+        if confirm and not question_dialog("Remove %d shots?" % len(selected_name_items)):
             return
         # Remove from DataFrame first:
         self.dataframe = self.dataframe.drop(index.row() for index in selected_indexes)
@@ -1650,13 +1650,39 @@ class Lyse(object):
     def connect_signals(self):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
+    
+    def on_keyPress(self, key, modifiers, is_autorepeat):
+        # Keyboard shortcut to delete shots or routines depending on which
+        # treeview/tableview has focus. Shift-delete to skip confirmation.
+        if key == QtCore.Qt.Key_Delete and not is_autorepeat:
+            confirm = modifiers != QtCore.Qt.ShiftModifier 
+            if self.filebox.ui.tableView.hasFocus():
+                self.filebox.shots_model.on_remove_selection(confirm)
+            if self.singleshot_routinebox.ui.treeView.hasFocus():
+                self.singleshot_routinebox.on_remove_selection(confirm)
+            if self.multishot_routinebox.ui.treeView.hasFocus():
+                self.multishot_routinebox.on_remove_selection(confirm)
+                
+                
+class KeyPressQApplication(QtGui.QApplication):
 
+    """A Qapplication that emits a signal keyPress(key) on keypresses"""
+    keyPress = Signal(int, QtCore.Qt.KeyboardModifiers, bool)
+    keyRelease = Signal(int, QtCore.Qt.KeyboardModifiers, bool)
 
+    def notify(self, object, event):
+        if event.type() == QtCore.QEvent.KeyPress and event.key():
+            self.keyPress.emit(event.key(), event.modifiers(), event.isAutoRepeat())
+        elif event.type() == QtCore.QEvent.KeyRelease and event.key():
+            self.keyRelease.emit(event.key(), event.modifiers(), event.isAutoRepeat())
+        return QtGui.QApplication.notify(self, object, event)
+        
+        
 if __name__ == "__main__":
     logger = setup_logging('lyse')
     labscript_utils.excepthook.set_logger(logger)
     logger.info('\n\n===============starting===============\n')
-    qapplication = QtGui.QApplication(sys.argv)
+    qapplication = KeyPressQApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
     app = Lyse()
 
@@ -1672,6 +1698,9 @@ if __name__ == "__main__":
     # Do not run qapplication.exec_() whilst waiting for keyboard input if
     # we hop into interactive mode.
     QtCore.pyqtRemoveInputHook() # TODO remove once updating to pyqt 4.11 or whatever fixes that bug
-
+    
+    # Connect keyboard shortcuts:
+    qapplication.keyPress.connect(app.on_keyPress)
+    
     qapplication.exec_()
     server.shutdown()
