@@ -1142,6 +1142,9 @@ class DataFrameModel(QtCore.QObject):
         self.column_names = {self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath', '')}
         self.columns_visible = {self.COL_STATUS: True, self.COL_FILEPATH: True}
 
+        # Whether or not a deleted column was visible at the time it was deleted (by name):
+        self.deleted_columns_visible = {}
+        
         # Make the actions for the context menu:
         self.action_remove_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
@@ -1267,11 +1270,22 @@ class DataFrameModel(QtCore.QObject):
             column_number = new_columns_start + i
             self.column_names[column_number] = column_name
             self.column_indices[column_name] = column_number
-            self.columns_visible[column_number] = True
+            if column_name in self.deleted_columns_visible:
+                # Restore the former visibility of this column if we've
+                # seen one with its name before:
+                visible = self.deleted_columns_visible[column_name]
+                self.columns_visible[column_number] = visible
+                self._view.setColumnHidden(column_number, not visible)
+            else:
+                # new columns are visible by default:
+                self.columns_visible[column_number] = True
             column_name_as_string = '\n'.join(column_name).strip()
             header_item = QtGui.QStandardItem(column_name_as_string)
             header_item.setToolTip(column_name_as_string)
             self._model.setHorizontalHeaderItem(column_number, header_item)
+        if new_column_names:
+            # Update the visibility state of new columns, in case some new columns are hidden:
+            self.set_columns_visible
 
         # Check and remove any no-longer-needed columns in the Qt model:
         defunct_column_names = (set(self.column_names.values()) - set(self.dataframe.columns)
@@ -1282,6 +1296,9 @@ class DataFrameModel(QtCore.QObject):
             # removals do not change the position of columns yet to be
             # removed.
             self._model.removeColumn(column_number)
+            # Save whether or not the column was visible when it was
+            # removed (so that if it is re-added the visibility will be retained):
+            self.deleted_columns_visible[self.column_names[column_number]] = self.columns_visible[column_number]
             del self.column_names[column_number]
             del self.columns_visible[column_number]
 
