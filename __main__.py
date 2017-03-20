@@ -538,7 +538,10 @@ class RoutineBox(object):
             error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
                          
-    def on_remove_selection(self, confirm=True):
+    def on_remove_selection(self):
+        self.remove_selection()
+
+    def remove_selection(self, confirm=True):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
         if not selected_rows:
@@ -1150,7 +1153,10 @@ class DataFrameModel(QtCore.QObject):
         index = item.index()
         return index.row()
 
-    def on_remove_selection(self, confirm=True):
+    def on_remove_selection(self):
+        self.remove_selection()
+
+    def remove_selection(self, confirm=True):
         selection_model = self._view.selectionModel()
         selected_indexes = selection_model.selectedRows()
         selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
@@ -1657,11 +1663,11 @@ class Lyse(object):
         if key == QtCore.Qt.Key_Delete and not is_autorepeat:
             confirm = modifiers != QtCore.Qt.ShiftModifier 
             if self.filebox.ui.tableView.hasFocus():
-                self.filebox.shots_model.on_remove_selection(confirm)
+                self.filebox.shots_model.remove_selection(confirm)
             if self.singleshot_routinebox.ui.treeView.hasFocus():
-                self.singleshot_routinebox.on_remove_selection(confirm)
+                self.singleshot_routinebox.remove_selection(confirm)
             if self.multishot_routinebox.ui.treeView.hasFocus():
-                self.multishot_routinebox.on_remove_selection(confirm)
+                self.multishot_routinebox.remove_selection(confirm)
                 
                 
 class KeyPressQApplication(QtGui.QApplication):
