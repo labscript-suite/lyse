@@ -53,7 +53,6 @@ import labscript_utils.shared_drive as shared_drive
 
 from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
-                                      get_dataframe_from_shots,
                                       replace_with_padding)
 
 from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
@@ -1086,6 +1085,7 @@ class DataFrameModel(QtCore.QObject):
     COL_FILEPATH = 1
 
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
+    ROLE_DELETED_OFF_DISK = QtCore.Qt.UserRole + 2
     
     columns_changed = Signal()
 
@@ -1194,7 +1194,9 @@ class DataFrameModel(QtCore.QObject):
         selected_rows = set(index.row() for index in selected_indexes)
         for row in selected_rows:
             status_item = self._model.item(row, self.COL_STATUS)
-            status_item.setData(0, self.ROLE_STATUS_PERCENT)
+            # Only mark as not done if it's not deleted off disk:
+            if not status_item.data(self.ROLE_DELETED_OFF_DISK):
+                status_item.setData(0, self.ROLE_STATUS_PERCENT)
         
     def on_view_context_menu_requested(self, point):
         menu = QtGui.QMenu(self._view)
@@ -1250,6 +1252,30 @@ class DataFrameModel(QtCore.QObject):
             self.column_names = column_names
 
     @inmain_decorator()
+    def mark_as_deleted_off_disk(self, filepath):
+        # Confirm the shot hasn't been removed from lyse (we are in the main
+        # thread so there is no race condition in checking first)
+        try:
+            np.where(self.dataframe['filepath'].values == filepath)[0][0]
+        except IndexError:
+            # Shot has been removed from FileBox, nothing to do here:
+            return
+
+        model_row_number = self.get_model_row_by_filepath(filepath)
+        status_item = self._model.item(model_row_number, self.COL_STATUS)
+        already_marked_as_deleted = status_item.data(self.ROLE_DELETED_OFF_DISK)
+        if already_marked_as_deleted:
+            return
+        # Icon only displays if percent completion is 100. This is also
+        # important so that the shot is not picked up as analysis
+        # incomplete and analysis re-attempted on it.
+        status_item.setData(True, self.ROLE_DELETED_OFF_DISK)
+        status_item.setData(100, self.ROLE_STATUS_PERCENT)
+        status_item.setToolTip("Shot has been deleted off disk or is unreadable")
+        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/drive--minus'))
+        app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
+
+    @inmain_decorator()
     def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
@@ -1262,9 +1288,8 @@ class DataFrameModel(QtCore.QObject):
             return
         if not dataframe_already_updated:
             if new_row_data is None:
-                # This can be passed in from the caller as a performace optimisation.
-                # Opening the file can be slow, better not to do it in the GUI thread.
-                new_row_data = get_dataframe_from_shot(filepath)
+                raise ValueError("If dataframe_already_updated is False, then new_row_data, as returned "
+                                 "by dataframe_utils.get_dataframe_from_shot(filepath) must be provided.")
             self.dataframe = replace_with_padding(self.dataframe, new_row_data, df_row_index)
             self.update_column_levels()
 
@@ -1376,11 +1401,15 @@ class DataFrameModel(QtCore.QObject):
             vertical_header_item.setText(vert_header_text)
     
     @inmain_decorator()
-    def add_files(self, filepaths, new_row_data=None):
+    def add_files(self, filepaths, new_row_data):
+        """Add files to the dataframe model. New_row_data should be a
+        dataframe containing the new rows."""
+
         to_add = []
+
+        # Check for duplicates:
         for filepath in filepaths:
-            if filepath in self.dataframe['filepath'].values:
-                # Ignore duplicates:
+            if filepath in self.dataframe['filepath'].values or filepath in to_add:
                 app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
                 if new_row_data is not None:
                     df_row_index = np.where(new_row_data['filepath'].values == filepath)
@@ -1388,24 +1417,22 @@ class DataFrameModel(QtCore.QObject):
                     new_row_data.index = pandas.Index(range(len(new_row_data)))
             else:
                 to_add.append(filepath)
+
+        assert len(new_row_data) == len(to_add)
+
         for filepath in to_add:
-            # Add the new row to the model:
+            # Add the new rows to the model:
             self._model.appendRow(self.new_row(filepath))
             vert_header_item = QtGui.QStandardItem('...loading...')
             self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
             self._view.resizeRowToContents(self._model.rowCount() - 1)
-        # Add the new rows to the dataframe.
-        if new_row_data is None:
-            # This can be passed in from the caller as a performace optimisation.
-            # Opening the file can be slow, better not to do it in the GUI thread:
-            new_row_data = get_dataframe_from_shots(to_add)
-        else:
-            assert len(new_row_data) == len(to_add)
-        self.dataframe = concat_with_padding(self.dataframe, new_row_data)
-        self.update_column_levels()
-        for filepath in to_add:
-            self.update_row(filepath, dataframe_already_updated=True)
-        self.renumber_rows()
+
+        if to_add:
+            self.dataframe = concat_with_padding(self.dataframe, new_row_data)
+            self.update_column_levels()
+            for filepath in to_add:
+                self.update_row(filepath, dataframe_already_updated=True)
+            self.renumber_rows()
 
     @inmain_decorator()
     def get_first_incomplete(self):
@@ -1578,9 +1605,14 @@ class FileBox(object):
                 filepaths = sorted(set(filepaths), key=filepaths.index) # Inefficient but readable
                 # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
                 dataframes = []
+                indices_of_files_not_found = []
                 for i, filepath in enumerate(filepaths):
-                    dataframe = get_dataframe_from_shot(filepath)
-                    dataframes.append(dataframe)
+                    try:
+                        dataframe = get_dataframe_from_shot(filepath)
+                        dataframes.append(dataframe)
+                    except IOError:
+                        app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
+                        indices_of_files_not_found.append(i)
                     n_shots_added += 1
                     shots_remaining = self.incoming_queue.qsize()
                     total_shots = n_shots_added + shots_remaining + len(filepaths) - (i + 1)
@@ -1588,13 +1620,24 @@ class FileBox(object):
                         # Leave the last update until after dataframe concatenation.
                         # Looks more responsive that way:
                         self.set_add_shots_progress(n_shots_added, total_shots)
-                new_row_data = concat_with_padding(*dataframes)
+                if dataframes:
+                    new_row_data = concat_with_padding(*dataframes)
+                else:
+                    new_row_data = None
                 self.set_add_shots_progress(n_shots_added, total_shots)
-                self.shots_model.add_files(filepaths, new_row_data)
+
+                # Do not add the shots that were not found on disk. Reverse
+                # loop so that removing an item doesn't change the indices of
+                # subsequent removals:
+                for i in reversed(indices_of_files_not_found):
+                    del filepaths[i]
+                if filepaths:
+                    self.shots_model.add_files(filepaths, new_row_data)
+                    # Let the analysis loop know to look for new shots:
+                    self.analysis_pending.set()
                 if shots_remaining == 0:
                     n_shots_added = 0 # reset our counter for the next batch
-                # Let the analysis loop know to look for new shots:
-                self.analysis_pending.set()
+                
             except Exception:
                 # Keep this incoming loop running at all costs, but make the
                 # otherwise uncaught exception visible to the user:
@@ -1640,19 +1683,39 @@ class FileBox(object):
         self.ui.pushButton_analysis_running.setChecked(True)
         
     def do_singleshot_analysis(self, filepath):
+        # Check the shot file exists before sending it to the singleshot
+        # routinebox. This does not guarantee it won't have been deleted by
+        # the time the routinebox starts running analysis on it, but by
+        # detecting it now we can most of the time avoid the user code
+        # coughing exceptions due to the file not existing. Which would also
+        # not be a problem, but this way we avoid polluting the outputbox with
+        # more errors than necessary.
+        if not os.path.exists(filepath):
+            self.shots_model.mark_as_deleted_off_disk(filepath)
+            return
         self.to_singleshot.put(filepath)
         while True:
             signal, status_percent = self.from_singleshot.get()
             if signal in ['error', 'progress']:
                 # Do the file reading here outside the GUI thread so as not to hang the GUI:
-                new_row_data = get_dataframe_from_shot(filepath)
-                self.shots_model.update_row(filepath, status_percent=status_percent, new_row_data=new_row_data)
+                try:
+                    new_row_data = get_dataframe_from_shot(filepath)
+                except IOError:
+                    self.shots_model.mark_as_deleted_off_disk(filepath)
+                    new_row_data = None
+                else:
+                    self.shots_model.update_row(filepath, status_percent=status_percent, new_row_data=new_row_data)
             if signal == 'done':
-                # No need to update the dataframa again, that should have been done with the last 'progress' signal:
+                # No need to update the dataframe again, that should have been done with the last 'progress' signal:
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
             if signal == 'error':
-                self.pause_analysis()
+                # If new_row_data is None, that indicates that we got a
+                # ShotFileNotFound error above. Do not pause analysis in this
+                # case, as an error is expected given the shot file doesn't
+                # exist.
+                if new_row_data is not None:
+                    self.pause_analysis()
                 return
                         
     def do_multishot_analysis(self):
