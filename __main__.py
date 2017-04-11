@@ -1187,6 +1187,7 @@ class DataFrameModel(QtCore.QObject):
         for name_item in selected_name_items:
             row = name_item.row()
             self._model.removeRow(row)
+        self.renumber_rows()
 
     def mark_selection_not_done(self):
         selected_indexes = self._view.selectedIndexes()
@@ -1340,8 +1341,6 @@ class DataFrameModel(QtCore.QObject):
                 short_value_str = value_str
             item.setText(short_value_str)
             item.setToolTip(repr(value))
-            vert_header_item = QtGui.QStandardItem(os.path.splitext(os.path.basename(filepath))[0])
-            self._model.setVerticalHeaderItem(model_row_number, vert_header_item)
 
         for i, column_name in enumerate(sorted(new_column_names)):
             # Resize any new columns to fit contents:
@@ -1362,6 +1361,20 @@ class DataFrameModel(QtCore.QObject):
         name_item = QtGui.QStandardItem(filepath)
         return [status_item, name_item]
 
+    def renumber_rows(self):
+        """Add/update row indices - the rows are numbered in simple sequential order
+        for easy comparison with the dataframe"""
+        n_digits = len(str(self._model.rowCount()))
+        print(self._model.rowCount())
+        for row_number in range(self._model.rowCount()):
+            vertical_header_item = self._model.verticalHeaderItem(row_number)
+            filepath_item = self._model.item(row_number, self.COL_FILEPATH)
+            filepath = filepath_item.text()
+            basename = os.path.splitext(os.path.basename(filepath))[0]
+            row_number_str = str(row_number).rjust(n_digits)
+            vert_header_text = '{}. | {}'.format(row_number_str, basename)
+            vertical_header_item.setText(vert_header_text)
+    
     @inmain_decorator()
     def add_files(self, filepaths, new_row_data=None):
         to_add = []
@@ -1378,6 +1391,8 @@ class DataFrameModel(QtCore.QObject):
         for filepath in to_add:
             # Add the new row to the model:
             self._model.appendRow(self.new_row(filepath))
+            vert_header_item = QtGui.QStandardItem('...loading...')
+            self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
             self._view.resizeRowToContents(self._model.rowCount() - 1)
         # Add the new rows to the dataframe.
         if new_row_data is None:
@@ -1390,6 +1405,7 @@ class DataFrameModel(QtCore.QObject):
         self.update_column_levels()
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
+        self.renumber_rows()
 
     @inmain_decorator()
     def get_first_incomplete(self):
