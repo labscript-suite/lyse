@@ -48,7 +48,7 @@ def get_nested_dict_from_shot(filepath):
         row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])
         try:
             row['sequence_index'] = h5_file.attrs['sequence_index']
-        except:
+        except KeyError:
             row['sequence_index'] = None
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
