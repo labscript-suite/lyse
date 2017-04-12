@@ -49,7 +49,7 @@ def get_nested_dict_from_shot(filepath):
         try:
             row['sequence_index'] = h5_file.attrs['sequence_index']
         except:
-            row['sequence_index'] = float('nan')
+            row['sequence_index'] = None
         if 'script' in h5_file: 
             row['labscript'] = h5_file['script'].attrs['name']
         try:
