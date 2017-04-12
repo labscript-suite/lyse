@@ -1710,8 +1710,8 @@ class FileBox(object):
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
             if signal == 'error':
-                # If new_row_data is None, that indicates that we got a
-                # ShotFileNotFound error above. Do not pause analysis in this
+                # If new_row_data is None, that indicates that we got an
+                # IOError error above. Do not pause analysis in this
                 # case, as an error is expected given the shot file doesn't
                 # exist.
                 if new_row_data is not None:
