@@ -104,6 +104,26 @@ def set_win_appusermodel(window_id):
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
     
     
+def copy_figure_to_clipboard(figure=None):
+    """Copy a matplotlib figure to the clipboard as a png. If figure is None,
+    the current figure will be copied."""
+    import matplotlib.pyplot as plt
+    import tempfile
+
+    if figure is None:
+        figure = plt.gcf()
+
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+        tempfile_name = f.name
+    try:
+        plt.savefig(tempfile_name)
+        qapplication.clipboard().setImage(QtGui.QImage(tempfile_name))
+    finally:
+        try:
+            os.unlink(tempfile_name)
+        except Exception:
+            pass
+
 class PlotWindow(QtGui.QWidget):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
@@ -142,6 +162,13 @@ class Plot(object):
         self.lock_action.setCheckable(True)
         self.lock_action.setToolTip('Lock axes')
 
+        self.copy_to_clipboard_action = self.navigation_toolbar.addAction(
+            QtGui.QIcon(':qtutils/fugue/clipboard--arrow'),
+           'Copy to clipboard', self.on_copy_to_clipboard_triggered)
+        self.copy_to_clipboard_action.setToolTip('Copy to clipboard')
+        self.copy_to_clipboard_action.setShortcut(QtGui.QKeySequence.Copy)
+
+
         self.ui.verticalLayout_canvas.addWidget(self.canvas)
         self.ui.verticalLayout_navigation_toolbar.addWidget(self.navigation_toolbar)
 
@@ -159,6 +186,9 @@ class Plot(object):
         else:
             self.lock_axes = False
             self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
+
+    def on_copy_to_clipboard_triggered(self):
+        copy_figure_to_clipboard(self.figure)
 
     @inmain_decorator()
     def save_axis_limits(self):

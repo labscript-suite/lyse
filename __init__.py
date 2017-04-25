@@ -378,3 +378,27 @@ class Sequence(Run):
      
     def get_image(self,*args):
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')     
+
+
+def copy_figure_to_clipboard(figure=None):
+    """Copy a matplotlib figure to the clipboard as a png. If figure is None,
+    the current figure will be copied."""
+    import matplotlib.pyplot as plt
+    import tempfile
+    from PyQt4.QtGui import QApplication, QImage, QClipboard
+
+    app = QApplication.instance()
+
+    if figure is None:
+        figure = plt.gcf()
+
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+        tempfile_name = f.name
+    try:
+        plt.savefig(tempfile_name)
+        app.clipboard().setImage(QImage(tempfile_name))
+    finally:
+        try:
+            os.unlink(tempfile_name)
+        except Exception:
+            pass
