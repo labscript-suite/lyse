@@ -37,6 +37,7 @@ except ImportError:
 
 # require pandas v0.15.0 up to the next major version
 check_version('pandas', '0.15.0', '1.0')
+check_version('zprocess', '2.2', '3.0')
 
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
@@ -380,25 +381,26 @@ class Sequence(Run):
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')     
 
 
-def copy_figure_to_clipboard(figure=None):
+def figure_to_clipboard(figure=None, **kwargs):
     """Copy a matplotlib figure to the clipboard as a png. If figure is None,
-    the current figure will be copied."""
+    the current figure will be copied. Copying the figure is implemented by
+    calling figure.savefig() and then copying the image data from the
+    resulting file. Any keyword arguments will be passed to the call to
+    savefig()"""
     import matplotlib.pyplot as plt
+    from zprocess import start_daemon
     import tempfile
-    from PyQt4.QtGui import QApplication, QImage, QClipboard
-
-    app = QApplication.instance()
+    import pathlib
 
     if figure is None:
         figure = plt.gcf()
 
     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
         tempfile_name = f.name
-    try:
-        plt.savefig(tempfile_name)
-        app.clipboard().setImage(QImage(tempfile_name))
-    finally:
-        try:
-            os.unlink(tempfile_name)
-        except Exception:
-            pass
+
+    figure.savefig(tempfile_name, **kwargs)
+
+    import lyse
+    lyse_dir = os.path.dirname(os.path.abspath(lyse.__file__))
+    tempfile2clipboard = os.path.join(lyse_dir, 'tempfile2clipboard.py')
+    start_daemon([sys.executable, tempfile2clipboard, '--delete', tempfile_name])
