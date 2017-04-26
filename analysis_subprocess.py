@@ -142,6 +142,13 @@ class Plot(object):
         self.lock_action.setCheckable(True)
         self.lock_action.setToolTip('Lock axes')
 
+        self.copy_to_clipboard_action = self.navigation_toolbar.addAction(
+            QtGui.QIcon(':qtutils/fugue/clipboard--arrow'),
+           'Copy to clipboard', self.on_copy_to_clipboard_triggered)
+        self.copy_to_clipboard_action.setToolTip('Copy to clipboard')
+        self.copy_to_clipboard_action.setShortcut(QtGui.QKeySequence.Copy)
+
+
         self.ui.verticalLayout_canvas.addWidget(self.canvas)
         self.ui.verticalLayout_navigation_toolbar.addWidget(self.navigation_toolbar)
 
@@ -159,6 +166,9 @@ class Plot(object):
         else:
             self.lock_axes = False
             self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
+
+    def on_copy_to_clipboard_triggered(self):
+        lyse.figure_to_clipboard(self.figure)
 
     @inmain_decorator()
     def save_axis_limits(self):
