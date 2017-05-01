@@ -386,12 +386,16 @@ def figure_to_clipboard(figure=None, **kwargs):
     the current figure will be copied. Copying the figure is implemented by
     calling figure.savefig() and then copying the image data from the
     resulting file. Any keyword arguments will be passed to the call to
-    savefig()"""
+    savefig(). If bbox_inches keyword arg is not provided,
+    bbox_inches='tight' will be used"""
+    
     import matplotlib.pyplot as plt
     from zprocess import start_daemon
     import tempfile
-    import pathlib
 
+    if not 'bbox_inches' in kwargs:
+        kwargs['bbox_inches'] = 'tight'
+               
     if figure is None:
         figure = plt.gcf()
 
