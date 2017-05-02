@@ -18,7 +18,7 @@ try:
     from PyQt5.QtWidgets import QApplication
     from PyQt5.QtGui import QImage
 except ImportError:
-    from PyQt4.QtWidgets import QApplication, QImage
+    from PyQt4.QtGui import QApplication, QImage
 
 """
 This is a stand-alone script which copies an image to the clipboard and then
