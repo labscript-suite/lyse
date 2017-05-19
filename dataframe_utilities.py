@@ -156,7 +156,7 @@ def replace_with_padding(df,row,index):
     # Wow, replacing a row of a dataframe is a pain in the neck:
     df = df.drop([index])
     df = df.append(row)
-    df = df.sort()
+    df = df.sort_index()
     return df
     
 def dict_diff(dict1, dict2):
