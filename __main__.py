@@ -1255,9 +1255,7 @@ class DataFrameModel(QtCore.QObject):
     def mark_as_deleted_off_disk(self, filepath):
         # Confirm the shot hasn't been removed from lyse (we are in the main
         # thread so there is no race condition in checking first)
-        try:
-            np.where(self.dataframe['filepath'].values == filepath)[0][0]
-        except IndexError:
+        if not filepath in self.dataframe['filepath'].values:
             # Shot has been removed from FileBox, nothing to do here:
             return
 
