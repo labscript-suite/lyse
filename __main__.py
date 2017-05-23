@@ -1194,9 +1194,20 @@ class DataFrameModel(QtCore.QObject):
         selected_rows = set(index.row() for index in selected_indexes)
         for row in selected_rows:
             status_item = self._model.item(row, self.COL_STATUS)
-            # Only mark as not done if it's not deleted off disk:
-            if not status_item.data(self.ROLE_DELETED_OFF_DISK):
-                status_item.setData(0, self.ROLE_STATUS_PERCENT)
+            if status_item.data(self.ROLE_DELETED_OFF_DISK):
+                # If the shot was previously not readable on disk, check to
+                # see if it's readable now. It may have been undeleted or
+                # perhaps it being unreadable before was due to a network
+                # glitch or similar.
+                filepath = self._model.item(row, self.COL_FILEPATH).text()
+                if not os.path.exists(filepath):
+                    continue
+                # Shot file is accesible again:
+                status_item.setData(False, self.ROLE_DELETED_OFF_DISK)
+                status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
+                status_item.setToolTip(None)
+
+            status_item.setData(0, self.ROLE_STATUS_PERCENT)
         
     def on_view_context_menu_requested(self, point):
         menu = QtGui.QMenu(self._view)
