@@ -145,15 +145,18 @@ def concat_with_padding(*dataframes):
             dataframes[i] = pad_columns(df, max_nlevels)
     return pandas.concat(dataframes, ignore_index=True)
     
-def replace_with_padding(df,row,index):
+def replace_with_padding(df, row, index):
     if df.columns.nlevels < row.columns.nlevels:
         df = pad_columns(df, row.columns.nlevels)
     elif df.columns.nlevels > row.columns.nlevels:
         row = pad_columns(row, df.columns.nlevels)
-    # Wow, changing the index of a single row dataframe is a pain in
-    # the neck:
-    row = pandas.DataFrame(row.ix[0],columns=[index]).T
-    # Wow, replacing a row of a dataframe is a pain in the neck:
+
+    # Change the index of the row object to equal that of where it is to be
+    # inserted:
+    row.index = pandas.Int64Index([index])
+
+    # Replace the target row in the dataframe by dropping, appending, then
+    # sorting by index:
     df = df.drop([index])
     df = df.append(row)
     df = df.sort_index()

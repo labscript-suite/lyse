@@ -1352,7 +1352,7 @@ class DataFrameModel(QtCore.QObject):
 
         # Update the data in the Qt model:
         model_row_number = self.get_model_row_by_filepath(filepath)
-        dataframe_row = dict(self.dataframe.ix[df_row_index])
+        dataframe_row = dict(self.dataframe.iloc[df_row_index])
         for column_number, column_name in self.column_names.items():
             if not isinstance(column_name, tuple):
                 # One of our special columns, does not correspond to a column in the dataframe:
