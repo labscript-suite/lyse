@@ -366,10 +366,10 @@ class Sequence(Run):
             self.no_write = True
         
     def get_trace(self,*args):
-        return {path:run.get_trace(*args) for run,path in self.runs.items()}
+        return {path:run.get_trace(*args) for path,run in self.runs.items()}
         
     def get_result_array(self,*args):
-        return {path:run.get_result_array(*args) for run,path in self.runs.items()}
+        return {path:run.get_result_array(*args) for path,run in self.runs.items()}
          
     def get_traces(self,*args):
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')
