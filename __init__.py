@@ -43,6 +43,7 @@ check_version('zprocess', '2.2', '3.0')
 # will be as follows. Otherwise lyse will override them with spinning_top =
 # True and path <name of hdf5 file being analysed>:
 spinning_top = False
+updated_data = {}
 
 if len(sys.argv) > 1:
     path = sys.argv[1]
@@ -159,7 +160,12 @@ class Run(object):
                 raise Exception('Attribute %s exists in group %s. ' \
                                 'Use overwrite=True to overwrite.' % (name, group))                   
             h5_file[group].attrs.modify(name, value)
-        
+            
+        if spinning_top:
+            if self.h5_path not in updated_data:
+                updated_data[self.h5_path] = []
+            updated_data[self.h5_path].append((self.group, name, value))
+            
     def save_result_array(self, name, data, group=None, overwrite=True, keep_attrs=False):
         if self.no_write:
             raise Exception('This run is read-only. '
