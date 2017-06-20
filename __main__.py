@@ -684,6 +684,7 @@ class RoutineBox(object):
             routine.set_status('clear')
         remaining = self.todo()
         error = False
+        updated_data = {}
         while remaining:
             self.logger.debug('%d routines left to do'%remaining)
             for routine in self.routines:
@@ -694,7 +695,7 @@ class RoutineBox(object):
             if routine is not None:
                 self.logger.info('running analysis routine %s'%routine.shortname)
                 routine.set_status('working')
-                success = routine.do_analysis(filepath)
+                success, updated_data = routine.do_analysis(filepath)
                 if success:
                     routine.set_status('done')
                     self.logger.debug('success')
@@ -713,11 +714,11 @@ class RoutineBox(object):
             except ZeroDivisionError:
                 # All routines got deleted mid-analysis, we're done here:
                 status_percent = 100.0
-            self.to_filebox.put(['progress', status_percent])
+            self.to_filebox.put(['progress', status_percent, updated_data])
         if error:
-            self.to_filebox.put(['error', None])
+            self.to_filebox.put(['error', None, updated_data])
         else:
-            self.to_filebox.put(['done', 100.0])
+            self.to_filebox.put(['done', 100.0, updated_data])
         self.logger.debug('completed analysis of %s'%filepath)
             
     def reorder(self, order):
@@ -1703,17 +1704,18 @@ class FileBox(object):
             self.shots_model.mark_as_deleted_off_disk(filepath)
             return
         self.to_singleshot.put(filepath)
+        df = self.shots_model.dataframe
         while True:
             signal, status_percent = self.from_singleshot.get()
-            if signal in ['error', 'progress']:
-                # Do the file reading here outside the GUI thread so as not to hang the GUI:
-                try:
-                    new_row_data = get_dataframe_from_shot(filepath)
-                except IOError:
-                    self.shots_model.mark_as_deleted_off_disk(filepath)
-                    new_row_data = None
-                else:
-                    self.shots_model.update_row(filepath, status_percent=status_percent, new_row_data=new_row_data)
+            if signal in ['error', 'progress', updated_data]:
+                # Do the dataframe updating here outside the GUI thread so as not to hang the GUI:
+                for file, values in updated_data.iteritems():
+                    df_row_index = np.where(df['filepath'].values == file)
+                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
+                    for group, name, value in values:
+                        new_row_data[(group, name)] = value
+                    new_row_data = new_row_data.reset_index()
+                    self.shots_model.update_row(file, new_row_data=new_row_data)
             if signal == 'done':
                 # No need to update the dataframe again, that should have been done with the last 'progress' signal:
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
@@ -1729,10 +1731,18 @@ class FileBox(object):
                         
     def do_multishot_analysis(self):
         self.to_multishot.put(None)
+        df = self.shots_model.dataframe
         while True:
-            signal, _ = self.from_multishot.get()
+            signal, _, updated_data = self.from_multishot.get()
             if signal == 'done':
                 self.multishot_required = False
+                for file, values in updated_data.iteritems():
+                    df_row_index = np.where(df['filepath'].values == file)
+                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
+                    for group, name, value in values:
+                        new_row_data[(group, name)] = value
+                    new_row_data = new_row_data.reset_index()
+                    self.shots_model.update_row(file, new_row_data=new_row_data)
                 return
             elif signal == 'error':
                 self.pause_analysis()
