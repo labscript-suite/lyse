@@ -1707,7 +1707,7 @@ class FileBox(object):
         df = self.shots_model.dataframe
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
-            if signal in ['error', 'progress', updated_data]:
+            if signal in ['error', 'progress']:
                 # Do the dataframe updating here outside the GUI thread so as not to hang the GUI:
                 for file, values in updated_data.iteritems():
                     df_row_index = np.where(df['filepath'].values == file)
