@@ -242,9 +242,9 @@ class AnalysisRoutine(object):
         self.to_worker.put(['analyse', filepath])
         signal, data = self.from_worker.get()
         if signal == 'error':
-            return False
+            return False, data
         elif signal == 'done':
-            return True
+            return True, data
         else:
             raise ValueError('invalid signal %s'%str(signal))
         
@@ -1721,11 +1721,11 @@ class FileBox(object):
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
             if signal == 'error':
-                # If new_row_data is None, that indicates that we got an
-                # IOError error above. Do not pause analysis in this
-                # case, as an error is expected given the shot file doesn't
-                # exist.
-                if new_row_data is not None:
+                if not os.path.exists(filepath):
+                    # Do not pause if the file has been deleted. An error is
+                    # no surprise there:
+                    self.shots_model.mark_as_deleted_off_disk(filepath)
+                else:
                     self.pause_analysis()
                 return
                         
@@ -1733,10 +1733,10 @@ class FileBox(object):
         self.to_multishot.put(None)
         while True:
             signal, _, updated_data = self.from_multishot.get()
+            for file in updated_data:
+                self.shots_model.update_row(file, updated_row_data=updated_data[file])
             if signal == 'done':
                 self.multishot_required = False
-                for file in updated_data:
-                    self.shots_model.update_row(file, updated_row_data=updated_data[file])
                 return
             elif signal == 'error':
                 self.pause_analysis()
