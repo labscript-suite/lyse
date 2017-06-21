@@ -1286,11 +1286,18 @@ class DataFrameModel(QtCore.QObject):
         app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None):
+    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data={}):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # Update the row in the dataframe first:
+        if (new_row_data is None) == (updated_row_data is None) and not dataframe_already_updated:
+            raise ValueError('Exactly one of new_row_data or updated_row_data must be provided')
+
         df_row_index = np.where(self.dataframe['filepath'].values == filepath)
+        if updated_row_data is not None and not dataframe_already_updated:
+            new_row_data = pandas.DataFrame(self.dataframe.ix[df_row_index], columns=self.dataframe.columns)
+            for group, name in updated_row_data:
+                new_row_data[(group, name)] = updated_row_data[group, name]
         try:
             df_row_index = df_row_index[0][0]
         except IndexError:
@@ -1704,18 +1711,12 @@ class FileBox(object):
             self.shots_model.mark_as_deleted_off_disk(filepath)
             return
         self.to_singleshot.put(filepath)
-        df = self.shots_model.dataframe
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
             if signal in ['error', 'progress']:
                 # Do the dataframe updating here outside the GUI thread so as not to hang the GUI:
-                for file, values in updated_data.iteritems():
-                    df_row_index = np.where(df['filepath'].values == file)
-                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
-                    for group, name, value in values:
-                        new_row_data[(group, name)] = value
-                    new_row_data = new_row_data.reset_index()
-                    self.shots_model.update_row(file, new_row_data=new_row_data)
+                for file in updated_data:
+                    self.shots_model.update_row(file, updated_row_data=updated_data[file])
             if signal == 'done':
                 # No need to update the dataframe again, that should have been done with the last 'progress' signal:
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
@@ -1731,18 +1732,12 @@ class FileBox(object):
                         
     def do_multishot_analysis(self):
         self.to_multishot.put(None)
-        df = self.shots_model.dataframe
         while True:
             signal, _, updated_data = self.from_multishot.get()
             if signal == 'done':
                 self.multishot_required = False
-                for file, values in updated_data.iteritems():
-                    df_row_index = np.where(df['filepath'].values == file)
-                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
-                    for group, name, value in values:
-                        new_row_data[(group, name)] = value
-                    new_row_data = new_row_data.reset_index()
-                    self.shots_model.update_row(file, new_row_data=new_row_data)
+                for file in updated_data:
+                    self.shots_model.update_row(file, updated_row_data=updated_data[file])
                 return
             elif signal == 'error':
                 self.pause_analysis()
