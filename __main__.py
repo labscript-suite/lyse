@@ -1714,7 +1714,6 @@ class FileBox(object):
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
             if signal in ['error', 'progress']:
-                # Do the dataframe updating here outside the GUI thread so as not to hang the GUI:
                 for file in updated_data:
                     self.shots_model.update_row(file, updated_row_data=updated_data[file])
             if signal == 'done':
