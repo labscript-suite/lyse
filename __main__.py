@@ -1286,7 +1286,7 @@ class DataFrameModel(QtCore.QObject):
         app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data={}):
+    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data=None):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # Update the row in the dataframe first:
