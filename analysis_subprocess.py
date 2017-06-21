@@ -253,9 +253,9 @@ class AnalysisWorker(object):
                     path = data
                     success = self.do_analysis(path)
                     if success:
-                        self.to_parent.put(['done', lyse.updated_data])
+                        self.to_parent.put(['done', lyse._updated_data])
                     else:
-                        self.to_parent.put(['error', lyse.updated_data])
+                        self.to_parent.put(['error', lyse._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
@@ -280,7 +280,7 @@ class AnalysisWorker(object):
         sandbox.deprecation_messages['path'] = deprecation_message
         # Use lyse.path instead:
         lyse.path = path
-        lyse.updated_data = {}
+        lyse._updated_data = {}
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
