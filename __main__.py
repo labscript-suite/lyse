@@ -12,6 +12,8 @@ import signal
 import subprocess
 import time
 
+import pprint
+import ast
 
 # Turn on our error catching for all subsequent imports
 import labscript_utils.excepthook
@@ -202,7 +204,7 @@ class LyseMainWindow(QtGui.QMainWindow):
         
 class AnalysisRoutine(object):
 
-    def __init__(self, filepath, model, output_box_port):
+    def __init__(self, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
         self.filepath = filepath
         self.shortname = os.path.basename(self.filepath)
         self.model = model
@@ -221,7 +223,7 @@ class AnalysisRoutine(object):
         # Make a row to put into the model:
         active_item =  QtGui.QStandardItem()
         active_item.setCheckable(True)
-        active_item.setCheckState(QtCore.Qt.Checked)
+        active_item.setCheckState(checked)
         info_item = QtGui.QStandardItem()
         name_item = QtGui.QStandardItem(self.shortname)
         name_item.setToolTip(self.filepath)
@@ -503,12 +505,15 @@ class RoutineBox(object):
 
         # Save the containing folder for use next time we open the dialog box:
         self.last_opened_routine_folder = os.path.dirname(routine_files[0])
+        self.add_routines([(routine_file, QtCore.Qt.Checked) for routine_file in routine_files])
+
+    def add_routines(self, routine_files):
         # Queue the files to be opened:
-        for filepath in routine_files:
+        for filepath, checked in routine_files:
             if filepath in [routine.filepath for routine in self.routines]:
                 app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
-            routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
+            routine = AnalysisRoutine(filepath, self.model, self.output_box_port, checked)
             self.routines.append(routine)
         self.update_select_all_checkstate()
         
@@ -1767,6 +1772,14 @@ class Lyse(object):
         self.filebox = FileBox(self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
 
+        self.last_save_config_file = None
+        self.last_save_data = None
+
+        self.ui.actionLoad_configuration.triggered.connect(self.on_load_configuration_triggered)
+        self.ui.actionRevert_configuration.triggered.connect(self.on_revert_configuration_triggered)
+        self.ui.actionSave_configuration.triggered.connect(self.on_save_configuration_triggered)
+        self.ui.actionSave_configuration_as.triggered.connect(self.on_save_configuration_as_triggered)
+
         self.ui.resize(1600, 900)
 
         # Set the splitters to appropriate fractions of their maximum size:
@@ -1774,6 +1787,112 @@ class Lyse(object):
         self.ui.splitter_vertical.setSizes([300, 600])
         self.ui.show()
         # self.ui.showMaximized()
+
+    def on_save_configuration_triggered(self):
+        if self.last_save_config_file is None:
+            self.on_save_configuration_as_triggered()
+            self.ui.actionSave_configuration_as.setEnabled(True)
+            self.ui.actionRevert_configuration.setEnabled(True)
+        else:
+            self.save_configuration(self.last_save_config_file)
+
+    def on_revert_configuration_triggered(self):
+        save_data = self.get_save_data()
+        if self.last_save_data is not None and save_data != self.last_save_data:
+            message = 'Revert configuration to the last saved state in \'%s\'?' % self.last_save_config_file
+            reply = QtGui.QMessageBox.question(self.ui, 'Load configuration', message,
+                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.Cancel)
+            if reply == QtGui.QMessageBox.Cancel:
+                return
+            elif reply == QtGui.QMessageBox.Yes:
+                self.load_configuration(self.last_save_config_file)
+        else:
+            error_dialog('no changes to revert')
+
+    def on_save_configuration_as_triggered(self):
+        if self.last_save_config_file is not None:
+            default = self.last_save_config_file
+        else:
+            default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'lyse.ini')
+        save_file = QtGui.QFileDialog.getSaveFileName(self.ui,
+                                                      'Select  file to save current lyse configuration',
+                                                      default,
+                                                      "config files (*.ini)")
+        if not save_file:
+            # User cancelled
+            return
+        # Convert to standard platform specific path, otherwise Qt likes
+        # forward slashes:
+        save_file = os.path.abspath(save_file)
+        self.save_configuration(save_file)
+
+    def get_save_data(self):
+        save_data = {}
+
+        box = self.singleshot_routinebox
+        save_data['SingleShot'] = zip([routine.filepath for routine in box.routines], [box.model.item(row, box.COL_ACTIVE).checkState()  for row in range(box.model.rowCount())])
+        save_data['LastSingleShotFolder'] = box.last_opened_routine_folder
+        box = self.multishot_routinebox
+        save_data['MultiShot'] = zip([routine.filepath for routine in box.routines], [box.model.item(row, box.COL_ACTIVE).checkState()  for row in range(box.model.rowCount())])
+        save_data['LastMultiShotFolder'] = box.last_opened_routine_folder
+
+        save_data['LastFileBoxFolder'] = self.filebox.last_opened_shots_folder
+        return save_data
+
+    def save_configuration(self, save_file):
+        lyse_config = LabConfig(save_file)
+        save_data = self.get_save_data()
+        self.last_save_config_file = save_file
+        self.last_save_data = save_data
+        for key, value in save_data.items():
+            lyse_config.set('lyse_state', key, pprint.pformat(value))
+
+    def on_load_configuration_triggered(self):
+        save_data = self.get_save_data()
+        if self.last_save_data is not None and save_data != self.last_save_data:
+            message = ('Current configuration (which groups are active/open and other GUI state) '
+                       'has changed: save config file \'%s\'?' % self.last_save_config_file)
+            reply = QtGui.QMessageBox.question(self.ui, 'Load configuration', message,
+                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
+            if reply == QtGui.QMessageBox.Cancel:
+                return
+            if reply == QtGui.QMessageBox.Yes:
+                self.save_configuration(self.last_save_config_file)
+
+        if self.last_save_config_file is not None:
+            default = self.last_save_config_file
+        else:
+            default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'lyse.ini')
+
+        file = QtGui.QFileDialog.getOpenFileName(self.ui,
+                                                 'Select lyse configuration file to load',
+                                                 default,
+                                                 "config files (*.ini)")
+        if not file:
+            # User cancelled
+            return
+        # Convert to standard platform specific path, otherwise Qt likes
+        # forward slashes:
+        file = os.path.abspath(file)
+        self.load_configuration(file)
+
+    def load_configuration(self, filename):
+        self.last_save_config_file = filename
+        self.ui.actionSave_configuration.setText('Save configuration %s'%filename)
+        lyse_config = LabConfig(filename)
+
+        self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')))
+        self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
+        self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')))
+        self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
+        self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
+
+
+        # Set as self.last_save_data:
+        save_data = self.get_save_data()
+        self.last_save_data = save_data
+        self.ui.actionSave_configuration_as.setEnabled(True)
+        self.ui.actionRevert_configuration.setEnabled(True)
 
     def setup_config(self):
         config_path = os.path.join(config_prefix, '%s.ini' % socket.gethostname())
