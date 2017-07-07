@@ -1835,9 +1835,9 @@ class Lyse(object):
     def on_close_event(self):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
-            message = ('Current configuration (which groups are active/open and other GUI state) '
+            message = ('Current configuration (which scripts are loaded and other GUI state) '
                        'has changed: save config file \'%s\'?' % self.last_save_config_file)
-            reply = QtGui.QMessageBox.question(self.ui, 'Quit runmanager', message,
+            reply = QtGui.QMessageBox.question(self.ui, 'Quit lyse', message,
                                                QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
             if reply == QtGui.QMessageBox.Cancel:
                 return False
