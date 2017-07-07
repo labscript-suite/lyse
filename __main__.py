@@ -192,8 +192,20 @@ class WebServer(ZMQServer):
 
 
 class LyseMainWindow(QtGui.QMainWindow):
+    # A signal to show that the window is shown and painted.
+    firstPaint = Signal()
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
+
+    def __init__(self, *args, **kwargs):
+        QtGui.QMainWindow.__init__(self, *args, **kwargs)
+        self._previously_painted = False
+
+    def closeEvent(self, event):
+        if app.on_close_event():
+            return QtGui.QMainWindow.closeEvent(self, event)
+        else:
+            event.ignore()
 
     def event(self, event):
         result = QtGui.QMainWindow.event(self, event)
@@ -201,7 +213,14 @@ class LyseMainWindow(QtGui.QMainWindow):
             self.newWindow.emit(self.effectiveWinId())
         return result
 
-        
+    def paintEvent(self, event):
+        result = QtGui.QMainWindow.paintEvent(self, event)
+        if not self._previously_painted:
+            self._previously_painted = True
+            self.firstPaint.emit()
+        return result
+
+
 class AnalysisRoutine(object):
 
     def __init__(self, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
@@ -1785,8 +1804,46 @@ class Lyse(object):
         # Set the splitters to appropriate fractions of their maximum size:
         self.ui.splitter_horizontal.setSizes([1000, 600])
         self.ui.splitter_vertical.setSizes([300, 600])
+
+        # autoload a config file, if labconfig is set to do so:
+        try:
+            autoload_config_file = self.exp_config.get('lyse', 'autoload_config_file')
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+            self.output_box.output('Ready.\n\n')
+        else:
+            self.ui.setEnabled(False)
+            self.output_box.output('Loading default config file %s...' % autoload_config_file)
+
+            def load_the_config_file():
+                try:
+                    self.load_configuration(autoload_config_file)
+                    self.output_box.output('done.\n')
+                except Exception as e:
+                    self.output_box.output('\nCould not load config file: %s: %s\n\n' %
+                                           (e.__class__.__name__, str(e)), red=True)
+                else:
+                    self.output_box.output('Ready.\n\n')
+                finally:
+                    self.ui.setEnabled(True)
+            # Defer this until 50ms after the window has shown,
+            # so that the GUI pops up faster in the meantime
+            self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
+
         self.ui.show()
         # self.ui.showMaximized()
+
+    def on_close_event(self):
+        save_data = self.get_save_data()
+        if self.last_save_data is not None and save_data != self.last_save_data:
+            message = ('Current configuration (which groups are active/open and other GUI state) '
+                       'has changed: save config file \'%s\'?' % self.last_save_config_file)
+            reply = QtGui.QMessageBox.question(self.ui, 'Quit runmanager', message,
+                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
+            if reply == QtGui.QMessageBox.Cancel:
+                return False
+            if reply == QtGui.QMessageBox.Yes:
+                self.save_configuration(self.last_save_config_file)
+        return True
 
     def on_save_configuration_triggered(self):
         if self.last_save_config_file is None:
