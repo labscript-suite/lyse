@@ -1294,15 +1294,17 @@ class DataFrameModel(QtCore.QObject):
             raise ValueError('Exactly one of new_row_data or updated_row_data must be provided')
 
         df_row_index = np.where(self.dataframe['filepath'].values == filepath)
-        if updated_row_data is not None and not dataframe_already_updated:
-            new_row_data = pandas.DataFrame(self.dataframe.ix[df_row_index], columns=self.dataframe.columns)
-            for group, name in updated_row_data:
-                new_row_data[(group, name)] = updated_row_data[group, name]
         try:
             df_row_index = df_row_index[0][0]
         except IndexError:
             # Row has been deleted, nothing to do here:
             return
+
+        if updated_row_data is not None and not dataframe_already_updated:
+            for group, name in updated_row_data:
+                self.dataframe.loc[df_row_index,(group, name)] = updated_row_data[group, name]
+            dataframe_already_updated = True
+
         if not dataframe_already_updated:
             if new_row_data is None:
                 raise ValueError("If dataframe_already_updated is False, then new_row_data, as returned "
