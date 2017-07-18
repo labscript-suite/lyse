@@ -842,6 +842,8 @@ class EditColumns(object):
             if not isinstance(name, tuple):
                 # one of our special columns, ignore:
                 continue
+            if updated_row_data is not None and column_name not in updated_row_data:
+                continue
             visible = columns_visible[column_index]
             visible_item = QtGui.QStandardItem()
             visible_item.setCheckable(True)
