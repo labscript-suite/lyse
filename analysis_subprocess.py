@@ -285,7 +285,7 @@ class AnalysisWorker(object):
         try:
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
-                execfile(self.filepath.encode('utf8'), sandbox, sandbox)
+                execfile(self.filepath, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
