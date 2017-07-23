@@ -13,7 +13,7 @@
 
 import labscript_utils.excepthook
 import zprocess
-to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
+to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock=True)
 
 import sys
 import os
@@ -21,29 +21,31 @@ import threading
 import traceback
 import time
 
-import sip
-# Have to set PyQt API via sip before importing PyQt:
-API_NAMES = ["QDate", "QDateTime", "QString", "QTextStream", "QTime", "QUrl", "QVariant"]
-API_VERSION = 2
-for name in API_NAMES:
-    sip.setapi(name, API_VERSION)
-
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import pyqtSignal as Signal
-from PyQt4.QtCore import pyqtSlot as Slot
+from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV, PYQT5
+from qtutils.qt.QtCore import pyqtSignal as Signal
+from qtutils.qt.QtCore import pyqtSlot as Slot
 
 import matplotlib
-matplotlib.use("QT4Agg")
+if QT_ENV == PYQT5:
+    matplotlib.use("QT5Agg")
+else:
+    matplotlib.use("QT4Agg")
 
 import lyse
 lyse.spinning_top = True
 import lyse.figure_manager
 lyse.figure_manager.install()
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+if QT_ENV == PYQT5:
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+else:
+    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
-import zprocess.locking, labscript_utils.h5_lock, h5py
+import zprocess.locking
+import labscript_utils.h5_lock
+import h5py
 
 import zprocess
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
@@ -51,11 +53,13 @@ import qtutils.icons
 
 from labscript_utils.modulewatcher import ModuleWatcher
 
+
 class _DeprecationDict(dict):
     """Dictionary that spouts deprecation warnings when you try to access some
     keys."""
+
     def __init__(self, *args, **kwargs):
-        self.deprecation_messages = {} # To be added to after the deprecated items are added to the dict.
+        self.deprecation_messages = {}  # To be added to after the deprecated items are added to the dict.
         dict.__init__(self, *args, **kwargs)
 
     def __getitem__(self, key):
@@ -102,15 +106,15 @@ def set_win_appusermodel(window_id):
     relaunch_command = executable + ' ' + os.path.abspath(__file__.replace('.pyc', '.py'))
     relaunch_display_name = app_descriptions['lyse']
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
-    
-    
-class PlotWindow(QtGui.QWidget):
+
+
+class PlotWindow(QtWidgets.QWidget):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
     close_signal = Signal()
 
     def event(self, event):
-        result = QtGui.QWidget.event(self, event)
+        result = QtWidgets.QWidget.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
             self.newWindow.emit(self.effectiveWinId())
         return result
@@ -118,7 +122,7 @@ class PlotWindow(QtGui.QWidget):
     def closeEvent(self, event):
         self.hide()
         event.ignore()
-        
+
 
 class Plot(object):
     def __init__(self, figure, identifier, filepath):
@@ -138,16 +142,15 @@ class Plot(object):
 
         self.lock_action = self.navigation_toolbar.addAction(
             QtGui.QIcon(':qtutils/fugue/lock-unlock'),
-           'Lock axes', self.on_lock_axes_triggered)
+            'Lock axes', self.on_lock_axes_triggered)
         self.lock_action.setCheckable(True)
         self.lock_action.setToolTip('Lock axes')
 
         self.copy_to_clipboard_action = self.navigation_toolbar.addAction(
             QtGui.QIcon(':qtutils/fugue/clipboard--arrow'),
-           'Copy to clipboard', self.on_copy_to_clipboard_triggered)
+            'Copy to clipboard', self.on_copy_to_clipboard_triggered)
         self.copy_to_clipboard_action.setToolTip('Copy to clipboard')
         self.copy_to_clipboard_action.setShortcut(QtGui.QKeySequence.Copy)
-
 
         self.ui.verticalLayout_canvas.addWidget(self.canvas)
         self.ui.verticalLayout_navigation_toolbar.addWidget(self.navigation_toolbar)
@@ -201,7 +204,7 @@ class Plot(object):
     def update_window_size(self):
         l, w = self.figure.get_size_inches()
         dpi = self.figure.get_dpi()
-        self.canvas.resize(int(l*dpi),int(w*dpi))
+        self.canvas.resize(int(l * dpi), int(w * dpi))
         self.ui.adjustSize()
 
     @inmain_decorator()
@@ -221,23 +224,23 @@ class AnalysisWorker(object):
         self.to_parent = to_parent
         self.from_parent = from_parent
         self.filepath = filepath
-        
+
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
-        
+
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
 
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
-        
+
         # Start the thread that listens for instructions from the
         # parent process:
         self.mainloop_thread = threading.Thread(target=self.mainloop)
         self.mainloop_thread.daemon = True
         self.mainloop_thread.start()
-        
+
     def mainloop(self):
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
@@ -257,22 +260,22 @@ class AnalysisWorker(object):
                     else:
                         self.to_parent.put(['error', None])
                 else:
-                    self.to_parent.put(['error','invalid task %s'%str(task)])
-        
+                    self.to_parent.put(['error', 'invalid task %s' % str(task)])
+
     @inmain_decorator()
     def do_analysis(self, path):
         now = time.strftime('[%x %X]')
         if path is not None:
-            print('%s %s %s ' %(now, os.path.basename(self.filepath), os.path.basename(path)))
+            print('%s %s %s ' % (now, os.path.basename(self.filepath), os.path.basename(path)))
         else:
-            print('%s %s' %(now, os.path.basename(self.filepath)))
+            print('%s %s' % (now, os.path.basename(self.filepath)))
 
         self.pre_analysis_plot_actions()
 
         # The namespace the routine will run in:
         sandbox = _DeprecationDict(path=path,
                                    __name__='__main__',
-                                   __file__= self.filepath)
+                                   __file__=self.filepath)
         # path global variable is deprecated:
         deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
                                "in a future version of lyse.  Please use lyse.path, which defaults " +
@@ -297,7 +300,7 @@ class AnalysisWorker(object):
         finally:
             print('')
             self.post_analysis_plot_actions()
-        
+
     def pre_analysis_plot_actions(self):
         for plot in self.plots.values():
             plot.save_axis_limits()
@@ -325,21 +328,19 @@ class AnalysisWorker(object):
                     plot.restore_axis_limits()
                 plot.draw()
 
-
     def new_figure(self, fig, identifier):
         self.plots[fig] = Plot(fig, identifier, self.filepath)
 
     def reset_figs(self):
         pass
-        
-        
+
+
 if __name__ == '__main__':
     filepath = from_parent.get()
-    
+
     # Set a meaningful client id for zprocess.locking:
-    zprocess.locking.set_client_process_name('lyse-'+os.path.basename(filepath))
-    
-    qapplication = QtGui.QApplication(sys.argv)
+    zprocess.locking.set_client_process_name('lyse-' + os.path.basename(filepath))
+
+    qapplication = QtWidgets.QApplication(sys.argv)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec_()
-        
