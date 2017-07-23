@@ -165,8 +165,8 @@ class Run(object):
         if spinning_top:
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
-            _updated_data[self.h5_path][self.group, name] = value
-            
+            _updated_data[self.h5_path][str(self.group), name] = value
+
     def save_result_array(self, name, data, group=None, overwrite=True, keep_attrs=False):
         if self.no_write:
             raise Exception('This run is read-only. '
