@@ -526,7 +526,16 @@ class RoutineBox(object):
         self.last_opened_routine_folder = os.path.dirname(routine_files[0])
         self.add_routines([(routine_file, QtCore.Qt.Checked) for routine_file in routine_files])
 
-    def add_routines(self, routine_files):
+    def add_routines(self, routine_files, clear_existing=False):
+        """Add routines to the routine box, where routine_files is a list of
+        tuples containing the filepath and whether the routine is enabled or
+        not when it is added. if clear_existing == True, then any existing
+        analysis routines will be cleared before the new ones are added."""
+        if clear_existing:
+            for routine in self.routines[:]:
+                routine.remove()
+                self.routines.remove(routine)
+
         # Queue the files to be opened:
         for filepath, checked in routine_files:
             if filepath in [routine.filepath for routine in self.routines]:
@@ -1935,15 +1944,30 @@ class Lyse(object):
 
     def load_configuration(self, filename):
         self.last_save_config_file = filename
-        self.ui.actionSave_configuration.setText('Save configuration %s'%filename)
+        self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
         lyse_config = LabConfig(filename)
 
-        self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')))
-        self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
-        self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')))
-        self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
-        self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
-
+        from configparser import NoOptionError
+        try:
+            self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')), clear_existing=True)
+        except NoOptionError:
+            pass
+        try:
+            self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
+        except NoOptionError:
+            pass
+        try:
+            self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')), clear_existing=True)
+        except NoOptionError:
+            pass
+        try:
+            self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
+        except NoOptionError:
+            pass
+        try:
+            self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
+        except NoOptionError:
+            pass
 
         # Set as self.last_save_data:
         save_data = self.get_save_data()
