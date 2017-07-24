@@ -1302,7 +1302,7 @@ class DataFrameModel(QtCore.QObject):
 
         if updated_row_data is not None and not dataframe_already_updated:
             for group, name in updated_row_data:
-                self.dataframe.loc[df_row_index,(group, name)] = updated_row_data[group, name]
+                self.dataframe.loc[df_row_index, (group, name) + ('',) * (self.nlevels - 2)] = updated_row_data[group, name]
             dataframe_already_updated = True
 
         if not dataframe_already_updated:
