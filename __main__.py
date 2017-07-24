@@ -842,8 +842,6 @@ class EditColumns(object):
             if not isinstance(name, tuple):
                 # one of our special columns, ignore:
                 continue
-            if updated_row_data is not None and column_name not in updated_row_data:
-                continue
             visible = columns_visible[column_index]
             visible_item = QtGui.QStandardItem()
             visible_item.setCheckable(True)
@@ -1368,6 +1366,8 @@ class DataFrameModel(QtCore.QObject):
         for column_number, column_name in self.column_names.items():
             if not isinstance(column_name, tuple):
                 # One of our special columns, does not correspond to a column in the dataframe:
+                continue
+            if updated_row_data is not None and column_name not in updated_row_data:
                 continue
             item = self._model.item(model_row_number, column_number)
             if item is None:
