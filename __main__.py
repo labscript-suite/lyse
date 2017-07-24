@@ -23,6 +23,16 @@ import numpy as np
 import labscript_utils.h5_lock
 import h5py
 import pandas
+import sip
+
+# Have to set PyQt API via sip before importing PyQt:
+API_NAMES = ["QDate", "QDateTime", "QString", "QTextStream", "QTime", "QUrl", "QVariant"]
+API_VERSION = 2
+for name in API_NAMES:
+    sip.setapi(name, API_VERSION)
+
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import pyqtSignal as Signal
 
 try:
     from labscript_utils import check_version
@@ -45,8 +55,6 @@ from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
                                       replace_with_padding)
 
-from qtutils.qt import QtCore, QtGui, QtWidgets
-from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
@@ -73,14 +81,14 @@ def set_win_appusermodel(window_id):
 
 @inmain_decorator()
 def error_dialog(message):
-    QtWidgets.QMessageBox.warning(app.ui, 'lyse', message)
+    QtGui.QMessageBox.warning(app.ui, 'lyse', message)
 
 
 @inmain_decorator()
 def question_dialog(message):
-    reply = QtWidgets.QMessageBox.question(app.ui, 'lyse', message,
-                                       QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-    return (reply == QtWidgets.QMessageBox.Yes)
+    reply = QtGui.QMessageBox.question(app.ui, 'lyse', message,
+                                       QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+    return (reply == QtGui.QMessageBox.Yes)
 
 
 def scientific_notation(x, sigfigs=4, mode='eng'):
@@ -181,17 +189,17 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
 
-class LyseMainWindow(QtWidgets.QMainWindow):
+class LyseMainWindow(QtGui.QMainWindow):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
 
     def event(self, event):
-        result = QtWidgets.QMainWindow.event(self, event)
+        result = QtGui.QMainWindow.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
             self.newWindow.emit(self.effectiveWinId())
         return result
 
-
+        
 class AnalysisRoutine(object):
 
     def __init__(self, filepath, model, output_box_port):
@@ -199,17 +207,17 @@ class AnalysisRoutine(object):
         self.shortname = os.path.basename(self.filepath)
         self.model = model
         self.output_box_port = output_box_port
-
+        
         self.COL_ACTIVE = RoutineBox.COL_ACTIVE
         self.COL_STATUS = RoutineBox.COL_STATUS
         self.COL_NAME = RoutineBox.COL_NAME
         self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
-
+        
         self.error = False
         self.done = False
-
+        
         self.to_worker, self.from_worker, self.worker = self.start_worker()
-
+        
         # Make a row to put into the model:
         active_item =  QtGui.QStandardItem()
         active_item.setCheckable(True)
@@ -219,9 +227,9 @@ class AnalysisRoutine(object):
         name_item.setToolTip(self.filepath)
         name_item.setData(self.filepath, self.ROLE_FULLPATH)
         self.model.appendRow([active_item, info_item, name_item])
-
+            
         self.exiting = False
-
+        
     def start_worker(self):
         # Start a worker process for this analysis routine:
         child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', self.output_box_port)
@@ -229,7 +237,7 @@ class AnalysisRoutine(object):
         # Tell the worker what script it with be executing:
         to_worker.put(self.filepath)
         return to_worker, from_worker, worker
-
+        
     def do_analysis(self, filepath):
         self.to_worker.put(['analyse', filepath])
         signal, data = self.from_worker.get()
@@ -239,7 +247,7 @@ class AnalysisRoutine(object):
             return True
         else:
             raise ValueError('invalid signal %s'%str(signal))
-
+        
     @inmain_decorator()
     def set_status(self, status):
         index = self.get_row_index()
@@ -265,7 +273,7 @@ class AnalysisRoutine(object):
             self.error = False
         else:
             raise ValueError(status)
-
+        
     @inmain_decorator()
     def enabled(self):
         index = self.get_row_index()
@@ -274,7 +282,7 @@ class AnalysisRoutine(object):
             return False
         enabled_item = self.model.item(index, self.COL_ACTIVE)
         return (enabled_item.checkState() == QtCore.Qt.Checked)
-
+        
     def get_row_index(self):
         """Returns the row index for this routine's row in the model"""
         for row in range(self.model.rowCount()):
@@ -286,7 +294,7 @@ class AnalysisRoutine(object):
     def restart(self):
         # TODO set status to 'restarting' or an icon or something, and gray out the item?
         self.end_child(restart=True)
-
+        
     def remove(self):
         """End the child process and remove from the treeview"""
         self.end_child()
@@ -295,7 +303,7 @@ class AnalysisRoutine(object):
             # Already gone
             return
         self.model.removeRow(index)
-
+         
     def end_child(self, restart=False):
         self.to_worker.put(['quit',None])
         timeout_time = time.time() + 2
@@ -324,14 +332,14 @@ class AnalysisRoutine(object):
             app.output_box.output('%s worker terminated\n'%self.shortname, red=True)
         else:
             app.output_box.output('%s worker exited cleanly\n'%self.shortname)
-
+        
         if restart:
             self.to_worker, self.from_worker, self.worker = self.start_worker()
             app.output_box.output('%s worker restarted\n'%self.shortname)
         self.exiting = False
+        
 
-
-class TreeView(QtWidgets.QTreeView):
+class TreeView(QtGui.QTreeView):
     leftClicked = Signal(QtCore.QModelIndex)
     doubleLeftClicked = Signal(QtCore.QModelIndex)
     """A QTreeView that emits a custom signal leftClicked(index) after a left
@@ -339,19 +347,19 @@ class TreeView(QtWidgets.QTreeView):
     double click."""
 
     def __init__(self, *args):
-        QtWidgets.QTreeView.__init__(self, *args)
+        QtGui.QTreeView.__init__(self, *args)
         self._pressed_index = None
         self._double_click = False
 
     def mousePressEvent(self, event):
-        result = QtWidgets.QTreeView.mousePressEvent(self, event)
+        result = QtGui.QTreeView.mousePressEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid():
             self._pressed_index = self.indexAt(event.pos())
         return result
 
     def leaveEvent(self, event):
-        result = QtWidgets.QTreeView.leaveEvent(self, event)
+        result = QtGui.QTreeView.leaveEvent(self, event)
         self._pressed_index = None
         self._double_click = False
         return result
@@ -359,7 +367,7 @@ class TreeView(QtWidgets.QTreeView):
     def mouseDoubleClickEvent(self, event):
         # Ensure our left click event occurs regardless of whether it is the
         # second click in a double click or not
-        result = QtWidgets.QTreeView.mouseDoubleClickEvent(self, event)
+        result = QtGui.QTreeView.mouseDoubleClickEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid():
             self._pressed_index = self.indexAt(event.pos())
@@ -367,7 +375,7 @@ class TreeView(QtWidgets.QTreeView):
         return result
 
     def mouseReleaseEvent(self, event):
-        result = QtWidgets.QTreeView.mouseReleaseEvent(self, event)
+        result = QtGui.QTreeView.mouseReleaseEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid() and index == self._pressed_index:
             self.leftClicked.emit(index)
@@ -377,9 +385,9 @@ class TreeView(QtWidgets.QTreeView):
         self._double_click = False
         return result
 
-
+        
 class RoutineBox(object):
-
+    
     COL_ACTIVE = 0
     COL_STATUS = 1
     COL_NAME = 2
@@ -390,7 +398,7 @@ class RoutineBox(object):
     # This is how we will reorder the model's rows instead of
     # using remove/insert.
     ROLE_SORTINDEX = QtCore.Qt.UserRole + 2
-
+    
     def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
         self.multishot = multishot
         self.filebox = filebox
@@ -398,9 +406,9 @@ class RoutineBox(object):
         self.from_filebox = from_filebox
         self.to_filebox = to_filebox
         self.output_box_port = output_box_port
-
-        self.logger = logging.getLogger('lyse.RoutineBox.%s'%('multishot' if multishot else 'singleshot'))
-
+        
+        self.logger = logging.getLogger('lyse.RoutineBox.%s'%('multishot' if multishot else 'singleshot'))  
+        
         loader = UiLoader()
         loader.registerCustomWidget(TreeView)
         self.ui = loader.load('routinebox.ui')
@@ -415,7 +423,7 @@ class RoutineBox(object):
         self.header = HorizontalHeaderViewWithWidgets(self.model)
         self.ui.treeView.setHeader(self.header)
         self.ui.treeView.setModel(self.model)
-
+        
         active_item = QtGui.QStandardItem()
         active_item.setToolTip('Whether the analysis routine should run')
         status_item = QtGui.QStandardItem()
@@ -423,42 +431,42 @@ class RoutineBox(object):
         status_item.setToolTip('The status of this analyis routine\'s execution')
         name_item = QtGui.QStandardItem('name')
         name_item.setToolTip('The name of the python script for the analysis routine')
-
-        self.select_all_checkbox = QtWidgets.QCheckBox()
+        
+        self.select_all_checkbox = QtGui.QCheckBox()
         self.select_all_checkbox.setToolTip('whether the analysis routine should run')
         self.header.setWidget(self.COL_ACTIVE, self.select_all_checkbox)
         self.header.setStretchLastSection(True)
         self.select_all_checkbox.setTristate(False)
-
+        
         self.model.setHorizontalHeaderItem(self.COL_ACTIVE, active_item)
         self.model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
         self.model.setSortRole(self.ROLE_SORTINDEX)
-
+        
         self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
         self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
         self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
-
+        
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
-        self.action_set_selected_active = QtWidgets.QAction(
+        self.action_set_selected_active = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
-        self.action_set_selected_inactive = QtWidgets.QAction(
+        self.action_set_selected_inactive = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
-        self.action_restart_selected = QtWidgets.QAction(
+        self.action_restart_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/arrow-circle'), 'restart worker process for selected routines',  self.ui)
-        self.action_remove_selected = QtWidgets.QAction(
+        self.action_remove_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected routines',  self.ui)
         self.last_opened_routine_folder = self.exp_config.get('paths', 'analysislib')
-
+        
         self.routines = []
-
+        
         self.connect_signals()
 
         self.analysis = threading.Thread(target = self.analysis_loop)
         self.analysis.daemon = True
         self.analysis.start()
-
+        
     def connect_signals(self):
         self.ui.toolButton_add_routines.clicked.connect(self.on_add_routines_clicked)
         self.ui.toolButton_remove_routines.clicked.connect(self.on_remove_selection)
@@ -483,15 +491,13 @@ class RoutineBox(object):
         self.ui.toolButton_move_to_bottom.clicked.connect(self.on_move_to_bottom_clicked)
 
     def on_add_routines_clicked(self):
-        routine_files = QtWidgets.QFileDialog.getOpenFileNames(self.ui,
+        routine_files = QtGui.QFileDialog.getOpenFileNames(self.ui,
                                                            'Select analysis routines',
                                                            self.last_opened_routine_folder,
                                                            "Python scripts (*.py)")
         if not routine_files:
             # User cancelled selection
             return
-        if type(routine_files) is tuple:
-            routine_files, _ = routine_files
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
         routine_files = [os.path.abspath(routine_file) for routine_file in routine_files]
 
@@ -505,7 +511,7 @@ class RoutineBox(object):
             routine = AnalysisRoutine(filepath, self.model, self.output_box_port)
             self.routines.append(routine)
         self.update_select_all_checkstate()
-
+        
     def on_treeview_double_left_clicked(self, index):
         # If double clicking on the the name item, open
         # the routine in the specified text editor:
@@ -530,7 +536,7 @@ class RoutineBox(object):
         except Exception as e:
             error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
-
+                         
     def on_remove_selection(self):
         self.remove_selection()
 
@@ -548,11 +554,11 @@ class RoutineBox(object):
                 routine.remove()
                 self.routines.remove(routine)
         self.update_select_all_checkstate()
-
+        
     def on_model_item_changed(self, item):
         if item.column() == self.COL_ACTIVE:
             self.update_select_all_checkstate()
-
+        
     def on_select_all_state_changed(self, state):
         with self.select_all_checkbox_state_changed_disconnected:
             # Do not allow a switch *to* a partially checked state:
@@ -562,7 +568,7 @@ class RoutineBox(object):
             for row in range(self.model.rowCount()):
                 active_item = self.model.item(row, self.COL_ACTIVE)
                 active_item.setCheckState(state)
-
+        
     def on_treeView_context_menu_requested(self, point):
         menu = QtGui.QMenu(self.ui.treeView)
         menu.addAction(self.action_set_selected_active)
@@ -570,7 +576,7 @@ class RoutineBox(object):
         menu.addAction(self.action_restart_selected)
         menu.addAction(self.action_remove_selected)
         menu.exec_(QtGui.QCursor.pos())
-
+        
     def on_set_selected_triggered(self, active):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -594,7 +600,7 @@ class RoutineBox(object):
                 order.append(i_unselected)
                 i_unselected += 1
         self.reorder(order)
-
+        
     def on_move_up_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -612,7 +618,7 @@ class RoutineBox(object):
                 last_unselected_index = i
                 order.append(i)
         self.reorder(order)
-
+        
     def on_move_down_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -630,7 +636,7 @@ class RoutineBox(object):
                 last_unselected_index = i
                 order.insert(0, i)
         self.reorder(order)
-
+        
     def on_move_to_bottom_clicked(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -646,7 +652,7 @@ class RoutineBox(object):
                 order.append(i_unselected)
                 i_unselected += 1
         self.reorder(order)
-
+        
     def on_restart_selected_triggered(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -656,21 +662,21 @@ class RoutineBox(object):
             if routine.filepath in filepaths:
                 routine.restart()
         self.update_select_all_checkstate()
-
+       
     def analysis_loop(self):
         while True:
             filepath = self.from_filebox.get()
             if self.multishot:
                 assert filepath is None
-                # TODO: get the filepath of the output h5 file:
+                # TODO: get the filepath of the output h5 file: 
                 # filepath = self.filechooserentry.get_text()
             self.logger.info('got a file to process: %s'%filepath)
             self.do_analysis(filepath)
-
+    
     def todo(self):
         """How many analysis routines are not done?"""
         return len([r for r in self.routines if r.enabled() and not r.done])
-
+        
     def do_analysis(self, filepath):
         """Run all analysis routines once on the given filepath,
         which is a shot file if we are a singleshot routine box"""
@@ -713,7 +719,7 @@ class RoutineBox(object):
         else:
             self.to_filebox.put(['done', 100.0])
         self.logger.debug('completed analysis of %s'%filepath)
-
+            
     def reorder(self, order):
         assert len(order) == len(set(order)), 'ordering contains non-unique elements'
         # Apply the reordering to the liststore:
@@ -736,7 +742,7 @@ class RoutineBox(object):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
             else:
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
-
+                
    # TESTING ONLY REMOVE IN PRODUCTION
     def queue_dummy_routines(self):
         folder = os.path.abspath('test_routines')
@@ -744,18 +750,18 @@ class RoutineBox(object):
             routine = AnalysisRoutine(os.path.join(folder, filepath), self.model, self.output_box_port)
             self.routines.append(routine)
         self.update_select_all_checkstate()
-
-
-class EditColumnsDialog(QtWidgets.QDialog):
+            
+            
+class EditColumnsDialog(QtGui.QDialog):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
     close_signal = Signal()
 
     def __init__(self):
-        QtWidgets.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
+        QtGui.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
 
     def event(self, event):
-        result = QtWidgets.QDialog.event(self, event)
+        result = QtGui.QDialog.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
             self.newWindow.emit(self.effectiveWinId())
         return result
@@ -781,10 +787,10 @@ class EditColumns(object):
 
         self.model = UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
-        self.select_all_checkbox = QtWidgets.QCheckBox()
+        self.select_all_checkbox = QtGui.QCheckBox()
         self.select_all_checkbox.setTristate(False)
         self.ui.treeView.setHeader(self.header)
-        self.proxy_model = QtCore.QSortFilterProxyModel()
+        self.proxy_model = QtGui.QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.model)
         self.proxy_model.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
         self.proxy_model.setFilterKeyColumn(self.COL_NAME)
@@ -796,9 +802,9 @@ class EditColumns(object):
 
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
-        self.action_set_selected_visible = QtWidgets.QAction(
+        self.action_set_selected_visible = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'Show selected columns',  self.ui)
-        self.action_set_selected_hidden = QtWidgets.QAction(
+        self.action_set_selected_hidden = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'Hide selected columns',  self.ui)
 
         self.connect_signals()
@@ -882,7 +888,7 @@ class EditColumns(object):
             visible_item = self.model.item(row, self.COL_VISIBLE)
             self.update_visible_state(visible_item, state)
         self.do_sort()
-
+        
         self.filebox.set_columns_visible(self.columns_visible)
 
     def update_visible_state(self, item, state):
@@ -963,7 +969,7 @@ class EditColumns(object):
         self.ui.hide()
 
 
-class ItemDelegate(QtWidgets.QStyledItemDelegate):
+class ItemDelegate(QtGui.QStyledItemDelegate):
 
     """An item delegate with a fixed height and a progress bar in one column"""
     EXTRA_ROW_HEIGHT = 2
@@ -973,13 +979,13 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
         self.model = model
         self.COL_STATUS = col_status
         self.ROLE_STATUS_PERCENT = role_status_percent
-        QtWidgets.QStyledItemDelegate.__init__(self)
+        QtGui.QStyledItemDelegate.__init__(self)
 
     def sizeHint(self, *args):
         fontmetrics = QtGui.QFontMetrics(self.view.font())
         text_height = fontmetrics.height()
         row_height = text_height + self.EXTRA_ROW_HEIGHT
-        size = QtWidgets.QStyledItemDelegate.sizeHint(self, *args)
+        size = QtGui.QStyledItemDelegate.sizeHint(self, *args)
         return QtCore.QSize(size.width(), row_height)
 
     def paint(self, painter, option, index):
@@ -987,7 +993,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
             status_percent = self.model.data(index, self.ROLE_STATUS_PERCENT)
             if status_percent == 100:
                 # Render as a normal item - this shows whatever icon is set instead of a progress bar.
-                return QtWidgets.QStyledItemDelegate.paint(self, painter, option, index)
+                return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
             else:
                 # Method of rendering a progress bar into the view copied from
                 # Qt's 'network-torrent' example:
@@ -995,8 +1001,8 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
 
                 # Set up a QStyleOptionProgressBar to precisely mimic the
                 # environment of a progress bar.
-                progress_bar_option = QtWidgets.QStyleOptionProgressBar()
-                progress_bar_option.state = QtWidgets.QStyle.State_Enabled
+                progress_bar_option = QtGui.QStyleOptionProgressBarV2()
+                progress_bar_option.state = QtGui.QStyle.State_Enabled
                 progress_bar_option.direction = qapplication.layoutDirection()
                 progress_bar_option.rect = option.rect
                 progress_bar_option.fontMetrics = qapplication.fontMetrics()
@@ -1010,9 +1016,9 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 progress_bar_option.text = '%d%%' % status_percent
 
                 # Draw the progress bar onto the view.
-                qapplication.style().drawControl(QtWidgets.QStyle.CE_ProgressBar, progress_bar_option, painter)
+                qapplication.style().drawControl(QtGui.QStyle.CE_ProgressBar, progress_bar_option, painter)
         else:
-            return QtWidgets.QStyledItemDelegate.paint(self, painter, option, index)
+            return QtGui.QStyledItemDelegate.paint(self, painter, option, index)
 
 
 class UneditableModel(QtGui.QStandardItemModel):
@@ -1024,7 +1030,7 @@ class UneditableModel(QtGui.QStandardItemModel):
         return result & ~QtCore.Qt.ItemIsEditable
 
 
-class TableView(QtWidgets.QTableView):
+class TableView(QtGui.QTableView):
     leftClicked = Signal(QtCore.QModelIndex)
     doubleLeftClicked = Signal(QtCore.QModelIndex)
     """A QTableView that emits a custom signal leftClicked(index) after a left
@@ -1034,19 +1040,19 @@ class TableView(QtWidgets.QTableView):
     similar TreeView class in this module"""
 
     def __init__(self, *args):
-        QtWidgets.QTableView.__init__(self, *args)
+        QtGui.QTableView.__init__(self, *args)
         self._pressed_index = None
         self._double_click = False
 
     def mousePressEvent(self, event):
-        result = QtWidgets.QTableView.mousePressEvent(self, event)
+        result = QtGui.QTableView.mousePressEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid():
             self._pressed_index = self.indexAt(event.pos())
         return result
 
     def leaveEvent(self, event):
-        result = QtWidgets.QTableView.leaveEvent(self, event)
+        result = QtGui.QTableView.leaveEvent(self, event)
         self._pressed_index = None
         self._double_click = False
         return result
@@ -1054,7 +1060,7 @@ class TableView(QtWidgets.QTableView):
     def mouseDoubleClickEvent(self, event):
         # Ensure our left click event occurs regardless of whether it is the
         # second click in a double click or not
-        result = QtWidgets.QTableView.mouseDoubleClickEvent(self, event)
+        result = QtGui.QTableView.mouseDoubleClickEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid():
             self._pressed_index = self.indexAt(event.pos())
@@ -1062,7 +1068,7 @@ class TableView(QtWidgets.QTableView):
         return result
 
     def mouseReleaseEvent(self, event):
-        result = QtWidgets.QTableView.mouseReleaseEvent(self, event)
+        result = QtGui.QTableView.mouseReleaseEvent(self, event)
         index = self.indexAt(event.pos())
         if event.button() == QtCore.Qt.LeftButton and index.isValid() and index == self._pressed_index:
             self.leftClicked.emit(index)
@@ -1071,8 +1077,8 @@ class TableView(QtWidgets.QTableView):
         self._pressed_index = None
         self._double_click = False
         return result
-
-
+        
+        
 class DataFrameModel(QtCore.QObject):
 
     COL_STATUS = 0
@@ -1080,7 +1086,7 @@ class DataFrameModel(QtCore.QObject):
 
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
     ROLE_DELETED_OFF_DISK = QtCore.Qt.UserRole + 2
-
+    
     columns_changed = Signal()
 
     def __init__(self, view, exp_config):
@@ -1099,20 +1105,20 @@ class DataFrameModel(QtCore.QObject):
                              color: black;
                            }
                            """
-
+                           
         self._header = HorizontalHeaderViewWithWidgets(self._model)
-        self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
-        self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self._vertheader = QtGui.QHeaderView(QtCore.Qt.Vertical)
+        self._vertheader.setResizeMode(QtGui.QHeaderView.Fixed)
         self._vertheader.setStyleSheet(headerview_style)
         self._header.setStyleSheet(headerview_style)
         self._vertheader.setHighlightSections(True)
-        self._vertheader.setSectionsClickable(True)
+        self._vertheader.setClickable(True)
         self._view.setModel(self._model)
         self._view.setHorizontalHeader(self._header)
         self._view.setVerticalHeader(self._vertheader)
         self._delegate = ItemDelegate(self._view, self._model, self.COL_STATUS, self.ROLE_STATUS_PERCENT)
         self._view.setItemDelegate(self._delegate)
-        self._view.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
+        self._view.setSelectionBehavior(QtGui.QTableView.SelectRows)
         self._view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
         # This dataframe will contain all the scalar data
@@ -1141,9 +1147,9 @@ class DataFrameModel(QtCore.QObject):
 
         # Whether or not a deleted column was visible at the time it was deleted (by name):
         self.deleted_columns_visible = {}
-
+        
         # Make the actions for the context menu:
-        self.action_remove_selected = QtWidgets.QAction(
+        self.action_remove_selected = QtGui.QAction(
             QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
 
         self.connect_signals()
@@ -1202,7 +1208,7 @@ class DataFrameModel(QtCore.QObject):
                 status_item.setToolTip(None)
 
             status_item.setData(0, self.ROLE_STATUS_PERCENT)
-
+        
     def on_view_context_menu_requested(self, point):
         menu = QtGui.QMenu(self._view)
         menu.addAction(self.action_remove_selected)
@@ -1211,7 +1217,7 @@ class DataFrameModel(QtCore.QObject):
     def on_double_click(self, index):
         filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
         shot_filepath = filepath_item.text()
-
+        
         # get path to text editor
         viewer_path = self.exp_config.get('programs', 'hdf5_viewer')
         viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
@@ -1229,7 +1235,7 @@ class DataFrameModel(QtCore.QObject):
         except Exception as e:
             error_dialog("Unable to launch hdf5 viewer specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
-
+        
     def set_columns_visible(self, columns_visible):
         self.columns_visible = columns_visible
         for column_index, visible in columns_visible.items():
@@ -1378,7 +1384,7 @@ class DataFrameModel(QtCore.QObject):
         if status_percent is not None:
             status_item = self._model.item(model_row_number, self.COL_STATUS)
             status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
-
+            
         if new_column_names or defunct_column_names:
             self.columns_changed.emit()
 
@@ -1402,7 +1408,7 @@ class DataFrameModel(QtCore.QObject):
             row_number_str = str(row_number).rjust(n_digits)
             vert_header_text = '{}. | {}'.format(row_number_str, basename)
             vertical_header_item.setText(vert_header_text)
-
+    
     @inmain_decorator()
     def add_files(self, filepaths, new_row_data):
         """Add files to the dataframe model. New_row_data should be a
@@ -1446,8 +1452,8 @@ class DataFrameModel(QtCore.QObject):
             if status_item.data(self.ROLE_STATUS_PERCENT) != 100:
                 filepath_item = self._model.item(row, self.COL_FILEPATH)
                 return filepath_item.text()
-
-
+        
+        
 class FileBox(object):
 
     def __init__(self, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
@@ -1476,7 +1482,7 @@ class FileBox(object):
 
         self.analysis_paused = False
         self.multishot_required = False
-
+        
         # An Event to let the analysis thread know to check for shots that
         # need analysing, rather than using a time.sleep:
         self.analysis_pending = threading.Event()
@@ -1508,7 +1514,7 @@ class FileBox(object):
         self.ui.pushButton_analysis_running.toggled.connect(self.on_analysis_running_toggled)
         self.ui.pushButton_mark_as_not_done.clicked.connect(self.on_mark_selection_not_done_clicked)
         self.ui.pushButton_run_multishot_analysis.clicked.connect(self.on_run_multishot_analysis_clicked)
-
+        
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
 
@@ -1518,16 +1524,13 @@ class FileBox(object):
         self.edit_columns_dialog.update_columns(column_names, columns_visible)
 
     def on_add_shot_files_clicked(self):
-        shot_files = QtWidgets.QFileDialog.getOpenFileNames(self.ui,
+        shot_files = QtGui.QFileDialog.getOpenFileNames(self.ui,
                                                         'Select shot files',
                                                         self.last_opened_shots_folder,
                                                         "HDF5 files (*.h5)")
         if not shot_files:
             # User cancelled selection
             return
-
-        if type(shot_files) is tuple:
-            shot_files, _ = shot_files
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
         shot_files = [os.path.abspath(shot_file) for shot_file in shot_files]
 
@@ -1547,16 +1550,16 @@ class FileBox(object):
             self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
             self.ui.pushButton_analysis_running.setText('Analysis running')
             self.analysis_pending.set()
-
+     
     def on_mark_selection_not_done_clicked(self):
         self.shots_model.mark_selection_not_done()
         # Let the analysis loop know to look for these shots:
         self.analysis_pending.set()
-
+        
     def on_run_multishot_analysis_clicked(self):
          self.multishot_required = True
          self.analysis_pending.set()
-
+        
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
 
@@ -1643,7 +1646,7 @@ class FileBox(object):
                     self.analysis_pending.set()
                 if shots_remaining == 0:
                     n_shots_added = 0 # reset our counter for the next batch
-
+                
             except Exception:
                 # Keep this incoming loop running at all costs, but make the
                 # otherwise uncaught exception visible to the user:
@@ -1681,13 +1684,13 @@ class FileBox(object):
             if self.multishot_required:
                 logger.info('doing multishot analysis')
                 self.do_multishot_analysis()
-
-
+            
+   
     @inmain_decorator()
     def pause_analysis(self):
         # This automatically triggers the slot that sets self.analysis_paused
         self.ui.pushButton_analysis_running.setChecked(True)
-
+        
     def do_singleshot_analysis(self, filepath):
         # Check the shot file exists before sending it to the singleshot
         # routinebox. This does not guarantee it won't have been deleted by
@@ -1723,7 +1726,7 @@ class FileBox(object):
                 if new_row_data is not None:
                     self.pause_analysis()
                 return
-
+                        
     def do_multishot_analysis(self):
         self.to_multishot.put(None)
         while True:
@@ -1734,8 +1737,8 @@ class FileBox(object):
             elif signal == 'error':
                 self.pause_analysis()
                 return
-
-
+        
+        
 class Lyse(object):
 
     def __init__(self):
@@ -1789,21 +1792,21 @@ class Lyse(object):
     def connect_signals(self):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
-
+    
     def on_keyPress(self, key, modifiers, is_autorepeat):
         # Keyboard shortcut to delete shots or routines depending on which
         # treeview/tableview has focus. Shift-delete to skip confirmation.
         if key == QtCore.Qt.Key_Delete and not is_autorepeat:
-            confirm = modifiers != QtCore.Qt.ShiftModifier
+            confirm = modifiers != QtCore.Qt.ShiftModifier 
             if self.filebox.ui.tableView.hasFocus():
                 self.filebox.shots_model.remove_selection(confirm)
             if self.singleshot_routinebox.ui.treeView.hasFocus():
                 self.singleshot_routinebox.remove_selection(confirm)
             if self.multishot_routinebox.ui.treeView.hasFocus():
                 self.multishot_routinebox.remove_selection(confirm)
-
-
-class KeyPressQApplication(QtWidgets.QApplication):
+                
+                
+class KeyPressQApplication(QtGui.QApplication):
 
     """A Qapplication that emits a signal keyPress(key) on keypresses"""
     keyPress = Signal(int, QtCore.Qt.KeyboardModifiers, bool)
@@ -1814,9 +1817,9 @@ class KeyPressQApplication(QtWidgets.QApplication):
             self.keyPress.emit(event.key(), event.modifiers(), event.isAutoRepeat())
         elif event.type() == QtCore.QEvent.KeyRelease and event.key():
             self.keyRelease.emit(event.key(), event.modifiers(), event.isAutoRepeat())
-        return QtWidgets.QApplication.notify(self, object, event)
-
-
+        return QtGui.QApplication.notify(self, object, event)
+        
+        
 if __name__ == "__main__":
     logger = setup_logging('lyse')
     labscript_utils.excepthook.set_logger(logger)
@@ -1837,9 +1840,9 @@ if __name__ == "__main__":
     # Do not run qapplication.exec_() whilst waiting for keyboard input if
     # we hop into interactive mode.
     QtCore.pyqtRemoveInputHook() # TODO remove once updating to pyqt 4.11 or whatever fixes that bug
-
+    
     # Connect keyboard shortcuts:
     qapplication.keyPress.connect(app.on_keyPress)
-
+    
     qapplication.exec_()
     server.shutdown()

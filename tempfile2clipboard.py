@@ -14,9 +14,11 @@
 import sys
 import os
 
-from qtutils.qt.QtWidgets import QApplication
-from qtutils.qt.QtGui import QImage
-
+try:
+    from PyQt5.QtWidgets import QApplication
+    from PyQt5.QtGui import QImage
+except ImportError:
+    from PyQt4.QtGui import QApplication, QImage
 
 """
 This is a stand-alone script which copies an image to the clipboard and then
@@ -39,7 +41,6 @@ this way we avoid corner-cases of how this may interfere with any use of Qt in
 the calling program.
 
 """
-
 
 def main():
     USAGE = 'Usage:\n    python tempfile2clipboard.py [--delete] image_filepath\n'
