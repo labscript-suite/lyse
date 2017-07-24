@@ -1947,26 +1947,25 @@ class Lyse(object):
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
         lyse_config = LabConfig(filename)
 
-        from configparser import NoOptionError
         try:
             self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')), clear_existing=True)
-        except NoOptionError:
+        except LabConfig.NoOptionError:
             pass
         try:
             self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
-        except NoOptionError:
+        except LabConfig.NoOptionError:
             pass
         try:
             self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')), clear_existing=True)
-        except NoOptionError:
+        except LabConfig.NoOptionError:
             pass
         try:
             self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
-        except NoOptionError:
+        except LabConfig.NoOptionError:
             pass
         try:
             self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
-        except NoOptionError:
+        except LabConfig.NoOptionError:
             pass
 
         # Set as self.last_save_data:
