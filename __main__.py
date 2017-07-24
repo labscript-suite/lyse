@@ -487,11 +487,12 @@ class RoutineBox(object):
                                                            'Select analysis routines',
                                                            self.last_opened_routine_folder,
                                                            "Python scripts (*.py)")
+        if type(routine_files) is tuple:
+            routine_files, _ = routine_files
+
         if not routine_files:
             # User cancelled selection
             return
-        if type(routine_files) is tuple:
-            routine_files, _ = routine_files
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
         routine_files = [os.path.abspath(routine_file) for routine_file in routine_files]
 
@@ -1522,12 +1523,12 @@ class FileBox(object):
                                                         'Select shot files',
                                                         self.last_opened_shots_folder,
                                                         "HDF5 files (*.h5)")
+        if type(shot_files) is tuple:
+            shot_files, _ = shot_files
+
         if not shot_files:
             # User cancelled selection
             return
-
-        if type(shot_files) is tuple:
-            shot_files, _ = shot_files
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
         shot_files = [os.path.abspath(shot_file) for shot_file in shot_files]
 
