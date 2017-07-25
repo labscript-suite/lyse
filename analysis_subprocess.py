@@ -291,12 +291,12 @@ class AnalysisWorker(object):
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(f.read(), os.path.basename(self.filepath), 'exec')
+                    code = compile(f.read(), self.filepath.encode('utf8'), 'exec')
                     exec(code, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
-            message = ''.join(traceback_lines)
+            message = ''.join(line.decode('utf8') for line in traceback_lines)
             sys.stderr.write(message)
             return False
         else:
