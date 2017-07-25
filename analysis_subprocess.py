@@ -228,7 +228,7 @@ class AnalysisWorker(object):
         self.filepath = filepath
         
         # Add user script directory to the pythonpath:
-        sys.path.insert(0, os.path.dirname(self.filepath))
+        sys.path.insert(0, os.path.dirname(self.filepath).encode('utf8'))
         
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
@@ -277,7 +277,7 @@ class AnalysisWorker(object):
         # The namespace the routine will run in:
         sandbox = _DeprecationDict(path=path,
                                    __name__='__main__',
-                                   __file__= self.filepath)
+                                   __file__= os.path.basename(self.filepath).encode('utf8'))
         # path global variable is deprecated:
         deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
                                "in a future version of lyse.  Please use lyse.path, which defaults " +
@@ -286,12 +286,15 @@ class AnalysisWorker(object):
         # Use lyse.path instead:
         lyse.path = path
 
+        # Change working directory to the location of the user's script:
+        os.chdir(os.path.dirname(self.filepath))
+
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(f.read(), self.filepath.encode('utf8'), 'exec')
+                    code = compile(f.read(), os.path.basename(self.filepath).encode('utf8'), 'exec')
                     exec(code, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
