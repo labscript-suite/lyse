@@ -1,4 +1,7 @@
 from __future__ import division, unicode_literals, print_function, absolute_import  # Ease the transition to Python 3
+import six
+if six.PY2:
+    str = unicode
 
 # stdlib imports
 
@@ -41,7 +44,7 @@ except ImportError:
 
 check_version('labscript_utils', '2.1', '3.0')
 check_version('qtutils', '1.5.4', '2.0')
-check_version('zprocess', '1.1.7', '3.0')
+check_version('zprocess', '2.2.2', '3.0')
 
 import zprocess.locking
 from zprocess import ZMQServer

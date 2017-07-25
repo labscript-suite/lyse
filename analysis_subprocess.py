@@ -11,6 +11,11 @@
 #                                                                   #
 #####################################################################
 
+from __future__ import division, unicode_literals, print_function, absolute_import
+import six
+if six.PY2:
+    str = unicode
+
 import labscript_utils.excepthook
 import zprocess
 to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
@@ -285,7 +290,9 @@ class AnalysisWorker(object):
         try:
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
-                execfile(self.filepath, sandbox, sandbox)
+                with open(self.filepath) as f:
+                    code = compile(f.read(), os.path.basename(self.filepath), 'exec')
+                    exec(code, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]

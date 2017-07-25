@@ -11,6 +11,11 @@
 #                                                                   #
 #####################################################################
 
+from __future__ import division, unicode_literals, print_function, absolute_import
+import six
+if six.PY2:
+    str = unicode
+    
 import lyse
 import sys
 

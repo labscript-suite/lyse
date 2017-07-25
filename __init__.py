@@ -11,8 +11,13 @@
 #                                                                   #
 #####################################################################
 
-from dataframe_utilities import get_series_from_shot as _get_singleshot
-from dataframe_utilities import dict_diff
+from __future__ import division, unicode_literals, print_function, absolute_import
+import six
+if six.PY2:
+    str = unicode
+    
+from .dataframe_utilities import get_series_from_shot as _get_singleshot
+from .dataframe_utilities import dict_diff
 import os
 import urllib
 import urllib2
@@ -204,7 +209,7 @@ class Run(object):
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
-            print 'saving %s ='%name, value
+            print('saving %s =' % (name, value))
             self.save_result(name, value)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):

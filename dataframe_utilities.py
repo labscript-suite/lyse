@@ -11,6 +11,11 @@
 #                                                                   #
 #####################################################################
 
+from __future__ import division, unicode_literals, print_function, absolute_import
+import six
+if six.PY2:
+    str = unicode
+    
 import labscript_utils.h5_lock, h5py
 import pandas
 import os
@@ -75,10 +80,10 @@ def flatten_dict(dictionary, keys=tuple()):
     result = {}
     for name in dictionary:
         if isinstance(dictionary[name],dict):
-            flat = flatten_dict(dictionary[name],keys=keys + (str(name),))
+            flat = flatten_dict(dictionary[name],keys=keys + (name,))
             result.update(flat)
         else:
-            result[keys + (str(name),)] = dictionary[name]
+            result[keys + (name,)] = dictionary[name]
     return result
             
 def flat_dict_to_hierarchical_dataframe(dictionary):
