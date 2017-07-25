@@ -226,9 +226,17 @@ class AnalysisWorker(object):
         self.to_parent = to_parent
         self.from_parent = from_parent
         self.filepath = filepath
+
+        # Filepath as a unicode string on py3 and a bytestring on py2,
+        # so that the right string type can be passed to functions that
+        # require the 'native' string type for that python version:
+        if six.PY2:
+            self.filepath_native_string = self.filepath.encode('utf8')
+        else:
+            self.filepath_native_string = self.filepath
         
         # Add user script directory to the pythonpath:
-        sys.path.insert(0, os.path.dirname(self.filepath).encode('utf8'))
+        sys.path.insert(0, os.path.dirname(self.filepath_native_string))
         
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
@@ -277,7 +285,7 @@ class AnalysisWorker(object):
         # The namespace the routine will run in:
         sandbox = _DeprecationDict(path=path,
                                    __name__='__main__',
-                                   __file__= os.path.basename(self.filepath).encode('utf8'))
+                                   __file__= os.path.basename(self.filepath_native_string))
         # path global variable is deprecated:
         deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
                                "in a future version of lyse.  Please use lyse.path, which defaults " +
@@ -294,12 +302,12 @@ class AnalysisWorker(object):
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(f.read(), os.path.basename(self.filepath).encode('utf8'), 'exec')
+                    code = compile(f.read(), os.path.basename(self.filepath_native_string), 'exec')
                     exec(code, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
-            message = ''.join(line.decode('utf8') for line in traceback_lines)
+            message = ''.join(line.decode('utf8') if six.PY2 else line for line in traceback_lines)
             sys.stderr.write(message)
             return False
         else:
