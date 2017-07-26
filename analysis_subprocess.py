@@ -308,25 +308,24 @@ class AnalysisWorker(object):
                 with open(self.filepath) as f:
                     code = compile(f.read(), os.path.basename(self.filepath_native_string),
                                    'exec', dont_inherit=True)
-                    six.exec_(code, sandbox)
+                    exec(code, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
-            # Delete our frame from the traceback as well as frames within
-            # six._exec(). six.exec_() adds two frames in Python 2 but only
-            # one in Python 3.
+            del traceback_lines[1]
+            # Avoiding a list comprehension here so as to avoid this
+            # python bug in earlier versions of 2.7 (fixed in 2.7.9):
+            # https://bugs.python.org/issue21591
+            message = ''
             for line in traceback_lines:
-                print(repr(line))
-            if six.PY2:
-                traceback_lines = traceback_lines[0:1] + traceback_lines[4:]
-            else:
-                traceback_lines = traceback_lines[0:1] + traceback_lines[3:]
-            # errors='replace' is for Windows filenames present in the
-            # traceback that are not UTF8. They will not display correctly,
-            # but that's the best we can do - the traceback may contain code
-            # from the file in a different encoding, so we could have a mixed
-            # encoding string. We will deal with this better in Python 3.
-            message = ''.join(line.decode('utf8', errors='replace') if six.PY2
-                              else line for line in traceback_lines)
+                if six.PY2:
+                    # errors='replace' is for Windows filenames present in the
+                    # traceback that are not UTF8. They will not display
+                    # correctly, but that's the best we can do - the traceback
+                    # may contain code from the file in a different encoding,
+                    # so we could have a mixed encoding string. This is only
+                    # a problem for Python 2.
+                    line = line.decode('utf8', errors='replace')
+                message += line
             sys.stderr.write(message)
             return False
         else:
