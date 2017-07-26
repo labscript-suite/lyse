@@ -1903,6 +1903,16 @@ class Lyse(object):
         save_data['LastMultiShotFolder'] = box.last_opened_routine_folder
 
         save_data['LastFileBoxFolder'] = self.filebox.last_opened_shots_folder
+
+        save_data['analysis_paused'] = self.filebox.analysis_paused
+        window_size = self.ui.size()
+        save_data['window_size'] = (window_size.width(), window_size.height())
+        window_pos = self.ui.pos()
+        save_data['window_pos'] = (window_pos.x(), window_pos.y())
+
+        save_data['splitter'] = self.ui.splitter.sizes()
+        save_data['splitter_vertical'] = self.ui.splitter_vertical.sizes()
+        save_data['splitter_horizontal'] = self.ui.splitter_horizontal.sizes()
         return save_data
 
     def save_configuration(self, save_file):
@@ -1965,6 +1975,31 @@ class Lyse(object):
             pass
         try:
             self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            self.ui.resize(*ast.literal_eval(lyse_config.get('lyse_state', 'window_size')))
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            self.ui.move(*ast.literal_eval(lyse_config.get('lyse_state', 'window_pos')))
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            if ast.literal_eval(lyse_config.get('lyse_state', 'analysis_paused')):
+                self.filebox.pause_analysis()
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            self.ui.splitter.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter')))
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            self.ui.splitter_vertical.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_vertical')))
+        except LabConfig.NoOptionError:
+            pass
+        try:
+            self.ui.splitter_horizontal.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_horizontal')))
         except LabConfig.NoOptionError:
             pass
 
