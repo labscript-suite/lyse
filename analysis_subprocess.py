@@ -229,9 +229,10 @@ class AnalysisWorker(object):
 
         # Filepath as a unicode string on py3 and a bytestring on py2,
         # so that the right string type can be passed to functions that
-        # require the 'native' string type for that python version:
+        # require the 'native' string type for that python version. On
+        # Python 2, encode it with the filesystem encoding.
         if six.PY2:
-            self.filepath_native_string = self.filepath.encode('utf8')
+            self.filepath_native_string = self.filepath.encode(sys.getfilesystemencoding())
         else:
             self.filepath_native_string = self.filepath
         
@@ -302,12 +303,18 @@ class AnalysisWorker(object):
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(f.read(), os.path.basename(self.filepath_native_string), 'exec')
+                    code = compile(f.read(), os.path.basename(self.filepath_native_string),
+                                   'exec', dont_inherit=True)
                     exec(code, sandbox, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
-            message = ''.join(line.decode('utf8') if six.PY2 else line for line in traceback_lines)
+            # errors='replace' is for Windows filenames present in the
+            # traceback that are not UTF8. They will not display correctly,
+            # but that's the best we can do - the traceback may contain code
+            # from
+            message = ''.join(line.decode('utf8', errors='replace') if six.PY2
+                              else line for line in traceback_lines)
             sys.stderr.write(message)
             return False
         else:
