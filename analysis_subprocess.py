@@ -305,7 +305,7 @@ class AnalysisWorker(object):
                 with open(self.filepath) as f:
                     code = compile(f.read(), os.path.basename(self.filepath_native_string),
                                    'exec', dont_inherit=True)
-                    exec(code, sandbox, sandbox)
+                    six.exec_(code, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
