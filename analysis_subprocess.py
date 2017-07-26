@@ -312,7 +312,8 @@ class AnalysisWorker(object):
             # errors='replace' is for Windows filenames present in the
             # traceback that are not UTF8. They will not display correctly,
             # but that's the best we can do - the traceback may contain code
-            # from
+            # from the file in a different encoding, so we could have a mixed
+            # encoding string. We will deal with this better in Python 3.
             message = ''.join(line.decode('utf8', errors='replace') if six.PY2
                               else line for line in traceback_lines)
             sys.stderr.write(message)
