@@ -295,7 +295,10 @@ class AnalysisWorker(object):
         # Use lyse.path instead:
         lyse.path = path
 
-        # Change working directory to the location of the user's script:
+
+        # Save the current working directory before changing it to the
+        # location of the user's script:
+        cwd = os.getcwd()
         os.chdir(os.path.dirname(self.filepath))
 
         # Do not let the modulewatcher unload any modules whilst we're working:
@@ -308,7 +311,15 @@ class AnalysisWorker(object):
                     six.exec_(code, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
-            del traceback_lines[1]
+            # Delete our frame from the traceback as well as frames within
+            # six._exec(). six.exec_() adds two frames in Python 2 but only
+            # one in Python 3.
+            for line in traceback_lines:
+                print(repr(line))
+            if six.PY2:
+                traceback_lines = traceback_lines[0:1] + traceback_lines[4:]
+            else:
+                traceback_lines = traceback_lines[0:1] + traceback_lines[3:]
             # errors='replace' is for Windows filenames present in the
             # traceback that are not UTF8. They will not display correctly,
             # but that's the best we can do - the traceback may contain code
@@ -321,6 +332,7 @@ class AnalysisWorker(object):
         else:
             return True
         finally:
+            os.chdir(cwd)
             print('')
             self.post_analysis_plot_actions()
         
