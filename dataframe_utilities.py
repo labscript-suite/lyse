@@ -25,6 +25,50 @@ import labscript_utils.shared_drive
 
 import runmanager
 
+# Monkey patch a bugfix onto older versions of pandas on Python 2. This code
+# can be removed once lyse otherwise depends on pandas >= 0.21.0.
+# https://github.com/pandas-dev/pandas/pull/17099
+if six.PY2:
+    try:
+        from labscript_utils import check_version, VersionException
+        check_version('pandas', '0.21.0', '2.0')
+    except VersionException:
+        
+        import numpy as np
+        from pandas import Series, Index
+        from pandas.core.indexing import maybe_droplevels
+        def _getitem_multilevel(self, key):
+            loc = self.columns.get_loc(key)
+            if isinstance(loc, (slice, Series, np.ndarray, Index)):
+                new_columns = self.columns[loc]
+                result_columns = maybe_droplevels(new_columns, key)
+                if self._is_mixed_type:
+                    result = self.reindex(columns=new_columns)
+                    result.columns = result_columns
+                else:
+                    new_values = self.values[:, loc]
+                    result = self._constructor(new_values, index=self.index,
+                                               columns=result_columns)
+                    result = result.__finalize__(self)
+                if len(result.columns) == 1:
+                    top = result.columns[0]
+                    if isinstance(top, tuple):
+                        top = top[0]
+                    if top == '':
+                        result = result['']
+                        if isinstance(result, Series):
+                            result = self._constructor_sliced(result,
+                                                              index=self.index,
+                                                              name=key)
+
+                result._set_is_copy(self)
+                return result
+            else:
+                return self._get_item_cache(key)
+
+        pandas.DataFrame._getitem_multilevel = _getitem_multilevel
+
+
 def asdatetime(timestr):
     tz = tzlocal.get_localzone().zone
     return pandas.Timestamp(timestr, tz=tz)
