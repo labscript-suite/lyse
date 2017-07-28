@@ -2,6 +2,9 @@ from __future__ import division, unicode_literals, print_function, absolute_impo
 import six
 if six.PY2:
     str = unicode
+    import Queue as queue
+else:
+    import queue
 
 # stdlib imports
 
@@ -1496,7 +1499,7 @@ class FileBox(object):
         # A queue for storing incoming files from the ZMQ server so
         # the server can keep receiving files even if analysis is slow
         # or paused:
-        self.incoming_queue = Queue.Queue()
+        self.incoming_queue = queue.Queue()
 
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
@@ -1601,7 +1604,7 @@ class FileBox(object):
                 while True:
                     try:
                         filepath = self.incoming_queue.get(False)
-                    except Queue.Empty:
+                    except queue.Empty:
                         break
                     else:
                         filepaths.append(filepath)
@@ -1755,12 +1758,12 @@ class Lyse(object):
 
         # The singleshot routinebox will be connected to the filebox
         # by queues:
-        to_singleshot = Queue.Queue()
-        from_singleshot = Queue.Queue()
+        to_singleshot = queue.Queue()
+        from_singleshot = queue.Queue()
 
         # So will the multishot routinebox:
-        to_multishot = Queue.Queue()
-        from_multishot = Queue.Queue()
+        to_multishot = queue.Queue()
+        from_multishot = queue.Queue()
 
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
         self.singleshot_routinebox = RoutineBox(self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
