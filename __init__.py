@@ -16,11 +16,8 @@ import six
 if six.PY2:
     str = unicode
     
-from .dataframe_utilities import get_series_from_shot as _get_singleshot
-from .dataframe_utilities import dict_diff
+from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot, dict_diff
 import os
-import urllib
-import urllib2
 import socket
 import pickle as pickle
 import inspect
