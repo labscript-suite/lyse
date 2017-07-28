@@ -102,7 +102,8 @@ class Run(object):
                 frame = inspect.currentframe()
                 __file__ = frame.f_back.f_locals['__file__']
                 if six.PY2:
-                    __file__ == __file__.decode(sys.getfilesystemencoding())
+                    __file__ = __file__.decode(sys.getfilesystemencoding())
+                    print(repr(__file__))
                 self.group = os.path.basename(__file__).split('.py')[0]
                 with h5py.File(h5_path) as h5_file:
                     if not self.group in h5_file['results']:
@@ -357,7 +358,7 @@ class Sequence(Run):
         try:
             __file__ = frame.f_back.f_locals['__file__']
             if six.PY2:
-                __file__ == __file__.decode(sys.getfilesystemencoding())
+                __file__ = __file__.decode(sys.getfilesystemencoding())
             self.group = os.path.basename(__file__).split('.py')[0]
             with h5py.File(h5_path) as h5_file:
                 if not self.group in h5_file['results']:
