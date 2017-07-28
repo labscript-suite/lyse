@@ -70,6 +70,8 @@ if six.PY2:
 
 
 def asdatetime(timestr):
+    if isinstance(timestr, bytes):
+        timestr = timestr.decode('utf-8')
     tz = tzlocal.get_localzone().zone
     return pandas.Timestamp(timestr, tz=tz)
 
