@@ -843,10 +843,14 @@ class EditColumns(object):
         self.ui.treeView.resizeColumnToContents(self.COL_VISIBLE)
         # Which indices in self.columns_visible the row numbers correspond to
         self.column_indices = {}
-        for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
-            if not isinstance(name, tuple):
-                # one of our special columns, ignore:
-                continue
+
+        # Remove our special columns from the dict of column names by keeping only tuples:
+        column_names = {i: name for i, name in column_names.items() if isinstance(name, tuple)}
+
+        # Sort the column names as comma separated values, converting to lower case:
+        sortkey = lambda item: ', '.join(item[1]).lower().strip(', ')
+
+        for column_index, name in sorted(column_names.items(), key=sortkey):
             visible = columns_visible[column_index]
             visible_item = QtGui.QStandardItem()
             visible_item.setCheckable(True)
@@ -858,7 +862,7 @@ class EditColumns(object):
                 visible_item.setData(QtCore.Qt.Unchecked, self.ROLE_SORT_DATA)
             name_as_string = ', '.join(name).strip(', ')
             name_item = QtGui.QStandardItem(name_as_string)
-            name_item.setData(name_as_string, self.ROLE_SORT_DATA)
+            name_item.setData(sortkey((column_index, name)), self.ROLE_SORT_DATA)
             self.model.appendRow([visible_item, name_item])
             self.column_indices[self.model.rowCount() - 1] = column_index
 
