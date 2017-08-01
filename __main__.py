@@ -242,9 +242,9 @@ class AnalysisRoutine(object):
         self.to_worker.put(['analyse', filepath])
         signal, data = self.from_worker.get()
         if signal == 'error':
-            return False
+            return False, data
         elif signal == 'done':
-            return True
+            return True, data
         else:
             raise ValueError('invalid signal %s'%str(signal))
         
@@ -718,7 +718,7 @@ class RoutineBox(object):
         if error:
             self.to_filebox.put(['error', None, updated_data])
         else:
-            self.to_filebox.put(['done', 100.0, updated_data])
+            self.to_filebox.put(['done', 100.0, {}])
         self.logger.debug('completed analysis of %s'%filepath)
             
     def reorder(self, order):
@@ -1286,16 +1286,25 @@ class DataFrameModel(QtCore.QObject):
         app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None):
+    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data=None):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # Update the row in the dataframe first:
+        if (new_row_data is None) == (updated_row_data is None) and not dataframe_already_updated:
+            raise ValueError('Exactly one of new_row_data or updated_row_data must be provided')
+
         df_row_index = np.where(self.dataframe['filepath'].values == filepath)
         try:
             df_row_index = df_row_index[0][0]
         except IndexError:
             # Row has been deleted, nothing to do here:
             return
+
+        if updated_row_data is not None and not dataframe_already_updated:
+            for group, name in updated_row_data:
+                self.dataframe.loc[df_row_index, (group, name) + ('',) * (self.nlevels - 2)] = updated_row_data[group, name]
+            dataframe_already_updated = True
+
         if not dataframe_already_updated:
             if new_row_data is None:
                 raise ValueError("If dataframe_already_updated is False, then new_row_data, as returned "
@@ -1357,6 +1366,8 @@ class DataFrameModel(QtCore.QObject):
         for column_number, column_name in self.column_names.items():
             if not isinstance(column_name, tuple):
                 # One of our special columns, does not correspond to a column in the dataframe:
+                continue
+            if updated_row_data is not None and column_name not in updated_row_data:
                 continue
             item = self._model.item(model_row_number, column_number)
             if item is None:
@@ -1704,45 +1715,32 @@ class FileBox(object):
             self.shots_model.mark_as_deleted_off_disk(filepath)
             return
         self.to_singleshot.put(filepath)
-        df = self.shots_model.dataframe
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
-            if signal in ['error', 'progress', updated_data]:
-                # Do the dataframe updating here outside the GUI thread so as not to hang the GUI:
-                for file, values in updated_data.iteritems():
-                    df_row_index = np.where(df['filepath'].values == file)
-                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
-                    for group, name, value in values:
-                        new_row_data[(group, name)] = value
-                    new_row_data = new_row_data.reset_index()
-                    self.shots_model.update_row(file, new_row_data=new_row_data)
+            if signal in ['error', 'progress']:
+                for file in updated_data:
+                    self.shots_model.update_row(file, status_percent=status_percent, updated_row_data=updated_data[file])
             if signal == 'done':
                 # No need to update the dataframe again, that should have been done with the last 'progress' signal:
                 self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
             if signal == 'error':
-                # If new_row_data is None, that indicates that we got an
-                # IOError error above. Do not pause analysis in this
-                # case, as an error is expected given the shot file doesn't
-                # exist.
-                if new_row_data is not None:
+                if not os.path.exists(filepath):
+                    # Do not pause if the file has been deleted. An error is
+                    # no surprise there:
+                    self.shots_model.mark_as_deleted_off_disk(filepath)
+                else:
                     self.pause_analysis()
                 return
                         
     def do_multishot_analysis(self):
         self.to_multishot.put(None)
-        df = self.shots_model.dataframe
         while True:
             signal, _, updated_data = self.from_multishot.get()
+            for file in updated_data:
+                self.shots_model.update_row(file, updated_row_data=updated_data[file])
             if signal == 'done':
                 self.multishot_required = False
-                for file, values in updated_data.iteritems():
-                    df_row_index = np.where(df['filepath'].values == file)
-                    new_row_data = pandas.DataFrame(df.ix[df_row_index], columns=df.columns)
-                    for group, name, value in values:
-                        new_row_data[(group, name)] = value
-                    new_row_data = new_row_data.reset_index()
-                    self.shots_model.update_row(file, new_row_data=new_row_data)
                 return
             elif signal == 'error':
                 self.pause_analysis()
