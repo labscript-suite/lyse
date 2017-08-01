@@ -30,7 +30,7 @@ except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
 check_version('labscript_utils', '2.1', '3.0')
-check_version('qtutils', '1.5.4', '2.0')
+check_version('qtutils', '2.0.0', '3.0.0')
 check_version('zprocess', '1.1.7', '3.0')
 
 import zprocess.locking
