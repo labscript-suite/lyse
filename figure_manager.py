@@ -12,8 +12,8 @@
 #####################################################################
 
 from __future__ import division, unicode_literals, print_function, absolute_import
-import six
-if six.PY2:
+from labscript_utils import PY2
+if PY2:
     str = unicode
     
 import lyse

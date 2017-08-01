@@ -12,8 +12,8 @@
 #####################################################################
 
 from __future__ import division, unicode_literals, print_function, absolute_import
-import six
-if six.PY2:
+from labscript_utils import PY2
+if PY2:
     str = unicode
 
 import labscript_utils.excepthook
@@ -231,7 +231,7 @@ class AnalysisWorker(object):
         # so that the right string type can be passed to functions that
         # require the 'native' string type for that python version. On
         # Python 2, encode it with the filesystem encoding.
-        if six.PY2:
+        if PY2:
             self.filepath_native_string = self.filepath.encode(sys.getfilesystemencoding())
         else:
             self.filepath_native_string = self.filepath
@@ -317,7 +317,7 @@ class AnalysisWorker(object):
             # https://bugs.python.org/issue21591
             message = ''
             for line in traceback_lines:
-                if six.PY2:
+                if PY2:
                     # errors='replace' is for Windows filenames present in the
                     # traceback that are not UTF8. They will not display
                     # correctly, but that's the best we can do - the traceback

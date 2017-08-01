@@ -1,10 +1,4 @@
 from __future__ import division, unicode_literals, print_function, absolute_import  # Ease the transition to Python 3
-import six
-if six.PY2:
-    str = unicode
-    import Queue as queue
-else:
-    import queue
 
 # stdlib imports
 
@@ -45,9 +39,7 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-check_version('labscript_utils', '2.1', '3.0')
 check_version('qtutils', '1.5.4', '2.0')
-check_version('zprocess', '2.2.2', '3.0')
 
 import zprocess.locking
 from zprocess import ZMQServer
@@ -65,6 +57,13 @@ from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
+
+from labscript_utils import PY2
+if PY2:
+    str = unicode
+    import Queue as queue
+else:
+    import queue
 
 # Set working directory to lyse folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))

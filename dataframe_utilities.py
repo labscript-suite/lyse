@@ -12,8 +12,8 @@
 #####################################################################
 
 from __future__ import division, unicode_literals, print_function, absolute_import
-import six
-if six.PY2:
+from labscript_utils import PY2
+if PY2:
     str = unicode
     
 import labscript_utils.h5_lock, h5py
@@ -28,7 +28,7 @@ import runmanager
 # Monkey patch a bugfix onto older versions of pandas on Python 2. This code
 # can be removed once lyse otherwise depends on pandas >= 0.21.0.
 # https://github.com/pandas-dev/pandas/pull/17099
-if six.PY2:
+if PY2:
     try:
         from labscript_utils import check_version, VersionException
         check_version('pandas', '0.21.0', '2.0')
