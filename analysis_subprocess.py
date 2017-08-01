@@ -267,9 +267,9 @@ class AnalysisWorker(object):
                     path = data
                     success = self.do_analysis(path)
                     if success:
-                        self.to_parent.put(['done', None])
+                        self.to_parent.put(['done', lyse._updated_data])
                     else:
-                        self.to_parent.put(['error', None])
+                        self.to_parent.put(['error', lyse._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
@@ -294,7 +294,7 @@ class AnalysisWorker(object):
         sandbox.deprecation_messages['path'] = deprecation_message
         # Use lyse.path instead:
         lyse.path = path
-
+        lyse._updated_data = {}
 
         # Save the current working directory before changing it to the
         # location of the user's script:
