@@ -565,7 +565,7 @@ class RoutineBox(object):
                 active_item.setCheckState(state)
         
     def on_treeView_context_menu_requested(self, point):
-        menu = QtGui.QMenu(self.ui.treeView)
+        menu = QtWidgets.QMenu(self.ui.treeView)
         menu.addAction(self.action_set_selected_active)
         menu.addAction(self.action_set_selected_inactive)
         menu.addAction(self.action_restart_selected)
@@ -857,7 +857,7 @@ class EditColumns(object):
         self.ui.treeView.sortByColumn(self.COL_NAME, QtCore.Qt.AscendingOrder)
 
     def on_treeView_context_menu_requested(self, point):
-        menu = QtGui.QMenu(self.ui)
+        menu = QtWidgets.QMenu(self.ui)
         menu.addAction(self.action_set_selected_visible)
         menu.addAction(self.action_set_selected_hidden)
         menu.exec_(QtGui.QCursor.pos())
@@ -1206,7 +1206,7 @@ class DataFrameModel(QtCore.QObject):
             status_item.setData(0, self.ROLE_STATUS_PERCENT)
         
     def on_view_context_menu_requested(self, point):
-        menu = QtGui.QMenu(self._view)
+        menu = QtWidgets.QMenu(self._view)
         menu.addAction(self.action_remove_selected)
         menu.exec_(QtGui.QCursor.pos())
 
