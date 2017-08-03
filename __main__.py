@@ -1852,6 +1852,10 @@ class Lyse(object):
     def on_close_event(self):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
+            if self.only_window_geometry_is_different(save_data, self.last_save_data):
+                self.save_configuration(self.last_save_config_file)
+                return True
+
             message = ('Current configuration (which scripts are loaded and other GUI state) '
                        'has changed: save config file \'%s\'?' % self.last_save_config_file)
             reply = QtGui.QMessageBox.question(self.ui, 'Quit lyse', message,
@@ -1899,6 +1903,11 @@ class Lyse(object):
         # forward slashes:
         save_file = os.path.abspath(save_file)
         self.save_configuration(save_file)
+
+    def only_window_geometry_is_different(self, current_data, old_data):
+        ui_keys = ['window_size', 'window_pos', 'splitter', 'splitter_vertical', 'splitter_horizontal']
+        compare = [current_data[key] == old_data[key] for key in current_data.keys() if key not in ui_keys]
+        return all(compare)
 
     def get_save_data(self):
         save_data = {}
