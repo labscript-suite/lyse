@@ -1784,7 +1784,6 @@ class Lyse(object):
         # self.ui.showMaximized()
 
     def setup_config(self):
-        config_path = os.path.join(config_prefix, '%s.ini' % socket.gethostname())
         required_config_params = {"DEFAULT": ["experiment_name"],
                                   "programs": ["text_editor",
                                                "text_editor_arguments",
@@ -1795,7 +1794,7 @@ class Lyse(object):
                                             "analysislib"],
                                   "ports": ["lyse"]
                                   }
-        self.exp_config = LabConfig(config_path, required_config_params)
+        self.exp_config = LabConfig(required_params=required_config_params)
 
     def connect_signals(self):
         if os.name == 'nt':
