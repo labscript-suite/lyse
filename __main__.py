@@ -1775,6 +1775,9 @@ class Lyse(object):
         self.filebox = FileBox(self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
 
+        self.ui.actionSave_dataframe.triggered.connect(self.on_save_dataframe_triggered)
+        self.ui.actionLoad_dataframe.triggered.connect(self.on_load_dataframe_triggered)
+
         self.ui.resize(1600, 900)
 
         # Set the splitters to appropriate fractions of their maximum size:
@@ -1812,7 +1815,51 @@ class Lyse(object):
             if self.multishot_routinebox.ui.treeView.hasFocus():
                 self.multishot_routinebox.remove_selection(confirm)
                 
+    def on_save_dataframe_triggered(self):
+        df = self.filebox.shots_model.dataframe.copy()
+        if len(df) > 0:
+            default = self.exp_config.get('paths', 'experiment_shot_storage')
+            save_path = QtWidgets.QFileDialog.getExistingDirectory(self.ui, 'Select a Folder for the Dataframes', default)
+            if not save_path:
+                # User cancelled
+                return
+            if type(save_path) is tuple:
+                save_path, _ = save_path
+            sequences = df.sequence.unique()
+            for sequence in sequences:
+                sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
+                labscript = sequence_df['labscript'].iloc[0]
+                filename = "dataframe_{}_{}.df".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                sequence_df.to_hdf(os.path.join(save_path, filename), 'table',mode='w',table=True)
+        else:
+            error_dialog('Dataframe is empty')
+
+    def on_load_dataframe_triggered(self):
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.df')
+        file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
+                        'Select dataframe file to load',
+                        default,
+                        "dataframe files (*.df)")
+        if not file:
+            # User cancelled
+            return
+        if type(file) is tuple:
+            file, _ = file
+        # Convert to standard platform specific path, otherwise Qt likes
+        # forward slashes:
+        file = os.path.abspath(file)
+        changetime_cache = os.path.getmtime(file)
+        df = pandas.read_hdf(file,'table').sort_values("run time").reset_index()
+        filepaths = df["filepath"].tolist()
+        need_updating = np.where(map(lambda x: os.path.getmtime(x) > changetime_cache, filepaths))[0]
+        for index in need_updating:
+            filepath = filepaths.pop(index)
+            self.filebox.incoming_queue.put(filepath)
+        df = df.drop(need_updating)
+        self.filebox.shots_model.add_files(filepaths, df)
                 
+
+
 class KeyPressQApplication(QtGui.QApplication):
 
     """A Qapplication that emits a signal keyPress(key) on keypresses"""
