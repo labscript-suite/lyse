@@ -22,6 +22,7 @@ import inspect
 import sys
 
 import labscript_utils.h5_lock, h5py
+from labscript_utils.labconfig import LabConfig
 import pandas
 from numpy import array, ndarray
 import types
@@ -46,6 +47,10 @@ spinning_top = False
 # data to be sent back to the lyse GUI if running within lyse
 _updated_data = {}
 
+# get port that lyse is using for communication
+_labconfig = LabConfig(required_params={"ports": ["lyse"]})
+_lyse_port = int(_labconfig.get('ports', 'lyse'))
+
 if len(sys.argv) > 1:
     path = sys.argv[1]
 else:
@@ -69,8 +74,7 @@ def data(filepath=None, host='localhost', timeout=5):
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
-        port = 42519
-        df = zmq_get(port, host, 'get dataframe', timeout)
+        df = zmq_get(_lyse_port, host, 'get dataframe', timeout)
         try:
             padding = ('',)*(df.columns.nlevels - 1)
             df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
