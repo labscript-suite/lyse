@@ -1891,7 +1891,15 @@ class Lyse(object):
         if self.last_save_config_file is not None:
             default = self.last_save_config_file
         else:
-            default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'lyse.ini')
+            try:
+                default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
+            except LabConfig.NoOptionError:
+                self.exp_config.set('DEFAULT', 'app_saved_configs', os.path.join('%(labscript_suite)s', 'userlib', 'app_saved_configs', '%(experiment_name)s'))
+                default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
+                if not os.path.exists(default_path):
+                    os.makedirs(default_path)
+
+            default = os.path.join(default_path, 'lyse.ini')
         save_file = QtGui.QFileDialog.getSaveFileName(self.ui,
                                                       'Select  file to save current lyse configuration',
                                                       default,
