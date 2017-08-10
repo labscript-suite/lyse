@@ -48,8 +48,11 @@ spinning_top = False
 _updated_data = {}
 
 # get port that lyse is using for communication
-_labconfig = LabConfig(required_params={"ports": ["lyse"]})
-_lyse_port = int(_labconfig.get('ports', 'lyse'))
+try:
+    _labconfig = LabConfig(required_params={"ports": ["lyse"]})
+    _lyse_port = int(_labconfig.get('ports', 'lyse'))
+except:
+    _lyse_port = 42519
 
 if len(sys.argv) > 1:
     path = sys.argv[1]
@@ -70,11 +73,13 @@ class _RoutineStorage(object):
 routine_storage = _RoutineStorage()
 
 
-def data(filepath=None, host='localhost', timeout=5):
+def data(filepath=None, host='localhost', port=None, timeout=5):
+    if port is None:
+        port = _lyse_port
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
-        df = zmq_get(_lyse_port, host, 'get dataframe', timeout)
+        df = zmq_get(port, host, 'get dataframe', timeout)
         try:
             padding = ('',)*(df.columns.nlevels - 1)
             df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
