@@ -1976,48 +1976,48 @@ class Lyse(object):
 
         try:
             self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')), clear_existing=True)
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')), clear_existing=True)
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.ui.resize(*ast.literal_eval(lyse_config.get('lyse_state', 'window_size')))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.ui.move(*ast.literal_eval(lyse_config.get('lyse_state', 'window_pos')))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             if ast.literal_eval(lyse_config.get('lyse_state', 'analysis_paused')):
                 self.filebox.pause_analysis()
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.ui.splitter.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter')))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.ui.splitter_vertical.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_vertical')))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
             self.ui.splitter_horizontal.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_horizontal')))
-        except LabConfig.NoOptionError:
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
 
         # Set as self.last_save_data:
