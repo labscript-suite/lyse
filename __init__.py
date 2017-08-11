@@ -51,7 +51,7 @@ _updated_data = {}
 try:
     _labconfig = LabConfig(required_params={"ports": ["lyse"]})
     _lyse_port = int(_labconfig.get('ports', 'lyse'))
-except:
+except Exception:
     _lyse_port = 42519
 
 if len(sys.argv) > 1:
