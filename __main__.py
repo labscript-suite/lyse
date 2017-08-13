@@ -1717,15 +1717,12 @@ class FileBox(object):
         self.to_singleshot.put(filepath)
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
-            if signal in ['error', 'progress']:
-                for file in updated_data:
-                    # Update the data for all the rows with new data:
-                    self.shots_model.update_row(file, updated_row_data=updated_data[file])
-                # Update the status percent for the the row on which analysis is actually running:
-                self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
+            for file in updated_data:
+                # Update the data for all the rows with new data:
+                self.shots_model.update_row(file, updated_row_data=updated_data[file])
+            # Update the status percent for the the row on which analysis is actually running:
+            self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
             if signal == 'done':
-                # No need to update the dataframe again, that should have been done with the last 'progress' signal:
-                self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
                 return
             if signal == 'error':
                 if not os.path.exists(filepath):
@@ -1735,6 +1732,9 @@ class FileBox(object):
                 else:
                     self.pause_analysis()
                 return
+            if signal == 'progress':
+                continue
+            raise ValueError('invalid signal %s' % str(signal))
                         
     def do_multishot_analysis(self):
         self.to_multishot.put(None)
