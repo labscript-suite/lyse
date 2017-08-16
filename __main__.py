@@ -1860,11 +1860,11 @@ class Lyse(object):
 
             message = ('Current configuration (which scripts are loaded and other GUI state) '
                        'has changed: save config file \'%s\'?' % self.last_save_config_file)
-            reply = QtGui.QMessageBox.question(self.ui, 'Quit lyse', message,
-                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
-            if reply == QtGui.QMessageBox.Cancel:
+            reply = QtWigets.QMessageBox.question(self.ui, 'Quit lyse', message,
+                                               QtWigets.QMessageBox.Yes | QtWigets.QMessageBox.No | QtWigets.QMessageBox.Cancel)
+            if reply == QtWigets.QMessageBox.Cancel:
                 return False
-            if reply == QtGui.QMessageBox.Yes:
+            if reply == QtWigets.QMessageBox.Yes:
                 self.save_configuration(self.last_save_config_file)
         return True
 
@@ -1880,11 +1880,11 @@ class Lyse(object):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
             message = 'Revert configuration to the last saved state in \'%s\'?' % self.last_save_config_file
-            reply = QtGui.QMessageBox.question(self.ui, 'Load configuration', message,
-                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.Cancel)
-            if reply == QtGui.QMessageBox.Cancel:
+            reply = QtWigets.QMessageBox.question(self.ui, 'Load configuration', message,
+                                               QtWigets.QMessageBox.Yes | QtWigets.QMessageBox.Cancel)
+            if reply == QtWigets.QMessageBox.Cancel:
                 return
-            elif reply == QtGui.QMessageBox.Yes:
+            elif reply == QtWigets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
             error_dialog('no changes to revert')
@@ -1902,10 +1902,13 @@ class Lyse(object):
                     os.makedirs(default_path)
 
             default = os.path.join(default_path, 'lyse.ini')
-        save_file = QtGui.QFileDialog.getSaveFileName(self.ui,
+        save_file = QtWigets.QFileDialog.getSaveFileName(self.ui,
                                                       'Select  file to save current lyse configuration',
                                                       default,
                                                       "config files (*.ini)")
+        if type(save_file) is tuple:
+            save_file, _ = save_file
+
         if not save_file:
             # User cancelled
             return
@@ -1955,11 +1958,11 @@ class Lyse(object):
         if self.last_save_data is not None and save_data != self.last_save_data:
             message = ('Current configuration (which groups are active/open and other GUI state) '
                        'has changed: save config file \'%s\'?' % self.last_save_config_file)
-            reply = QtGui.QMessageBox.question(self.ui, 'Load configuration', message,
-                                               QtGui.QMessageBox.Yes | QtGui.QMessageBox.No | QtGui.QMessageBox.Cancel)
-            if reply == QtGui.QMessageBox.Cancel:
+            reply = QtWidgets.QMessageBox.question(self.ui, 'Load configuration', message,
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+            if reply == QtWidgets.QMessageBox.Cancel:
                 return
-            if reply == QtGui.QMessageBox.Yes:
+            if reply == QtWidgets.QMessageBox.Yes:
                 self.save_configuration(self.last_save_config_file)
 
         if self.last_save_config_file is not None:
@@ -1967,10 +1970,13 @@ class Lyse(object):
         else:
             default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'lyse.ini')
 
-        file = QtGui.QFileDialog.getOpenFileName(self.ui,
+        file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                                                  'Select lyse configuration file to load',
                                                  default,
                                                  "config files (*.ini)")
+        if type(file) is tuple:
+            file, _ = file
+
         if not file:
             # User cancelled
             return
