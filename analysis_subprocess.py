@@ -21,27 +21,27 @@ import threading
 import traceback
 import time
 
-import sip
-# Have to set PyQt API via sip before importing PyQt:
-API_NAMES = ["QDate", "QDateTime", "QString", "QTextStream", "QTime", "QUrl", "QVariant"]
-API_VERSION = 2
-for name in API_NAMES:
-    sip.setapi(name, API_VERSION)
-
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import pyqtSignal as Signal
-from PyQt4.QtCore import pyqtSlot as Slot
+from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV, PYQT5
+from qtutils.qt.QtCore import pyqtSignal as Signal
+from qtutils.qt.QtCore import pyqtSlot as Slot
 
 import matplotlib
-matplotlib.use("QT4Agg")
+if QT_ENV == PYQT5:
+    matplotlib.use("QT5Agg")
+else:
+    matplotlib.use("QT4Agg")
 
 import lyse
 lyse.spinning_top = True
 import lyse.figure_manager
 lyse.figure_manager.install()
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+if QT_ENV == PYQT5:
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+else:
+    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
 import zprocess.locking, labscript_utils.h5_lock, h5py
 
@@ -102,15 +102,15 @@ def set_win_appusermodel(window_id):
     relaunch_command = executable + ' ' + os.path.abspath(__file__.replace('.pyc', '.py'))
     relaunch_display_name = app_descriptions['lyse']
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
-    
-    
-class PlotWindow(QtGui.QWidget):
+
+
+class PlotWindow(QtWidgets.QWidget):
     # A signal for when the window manager has created a new window for this widget:
     newWindow = Signal(int)
     close_signal = Signal()
 
     def event(self, event):
-        result = QtGui.QWidget.event(self, event)
+        result = QtWidgets.QWidget.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
             self.newWindow.emit(self.effectiveWinId())
         return result
@@ -338,8 +338,8 @@ if __name__ == '__main__':
     
     # Set a meaningful client id for zprocess.locking:
     zprocess.locking.set_client_process_name('lyse-'+os.path.basename(filepath))
-    
-    qapplication = QtGui.QApplication(sys.argv)
+
+    qapplication = QtWidgets.QApplication(sys.argv)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec_()
         
