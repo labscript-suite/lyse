@@ -191,12 +191,12 @@ class LyseMainWindow(QtWidgets.QMainWindow):
     newWindow = Signal(int)
 
     def __init__(self, *args, **kwargs):
-        QtGui.QMainWindow.__init__(self, *args, **kwargs)
+        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self._previously_painted = False
 
     def closeEvent(self, event):
         if app.on_close_event():
-            return QtGui.QMainWindow.closeEvent(self, event)
+            return QtWidgets.QMainWindow.closeEvent(self, event)
         else:
             event.ignore()
 
@@ -207,7 +207,7 @@ class LyseMainWindow(QtWidgets.QMainWindow):
         return result
 
     def paintEvent(self, event):
-        result = QtGui.QMainWindow.paintEvent(self, event)
+        result = QtWidgets.QMainWindow.paintEvent(self, event)
         if not self._previously_painted:
             self._previously_painted = True
             self.firstPaint.emit()
