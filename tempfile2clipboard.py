@@ -15,11 +15,8 @@ from __future__ import division, unicode_literals, print_function, absolute_impo
 import sys
 import os
 
-try:
-    from PyQt5.QtWidgets import QApplication
-    from PyQt5.QtGui import QImage
-except ImportError:
-    from PyQt4.QtGui import QApplication, QImage
+from qtutils.qt.QtWidgets import QApplication
+from qtutils.qt.QtGui import QImage
 
 """
 This is a stand-alone script which copies an image to the clipboard and then
