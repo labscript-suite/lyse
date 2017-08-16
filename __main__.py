@@ -1860,11 +1860,11 @@ class Lyse(object):
 
             message = ('Current configuration (which scripts are loaded and other GUI state) '
                        'has changed: save config file \'%s\'?' % self.last_save_config_file)
-            reply = QtWigets.QMessageBox.question(self.ui, 'Quit lyse', message,
-                                               QtWigets.QMessageBox.Yes | QtWigets.QMessageBox.No | QtWigets.QMessageBox.Cancel)
-            if reply == QtWigets.QMessageBox.Cancel:
+            reply = QtWidgets.QMessageBox.question(self.ui, 'Quit lyse', message,
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+            if reply == QtWidgets.QMessageBox.Cancel:
                 return False
-            if reply == QtWigets.QMessageBox.Yes:
+            if reply == QtWidgets.QMessageBox.Yes:
                 self.save_configuration(self.last_save_config_file)
         return True
 
@@ -1880,11 +1880,11 @@ class Lyse(object):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
             message = 'Revert configuration to the last saved state in \'%s\'?' % self.last_save_config_file
-            reply = QtWigets.QMessageBox.question(self.ui, 'Load configuration', message,
-                                               QtWigets.QMessageBox.Yes | QtWigets.QMessageBox.Cancel)
-            if reply == QtWigets.QMessageBox.Cancel:
+            reply = QtWidgets.QMessageBox.question(self.ui, 'Load configuration', message,
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel)
+            if reply == QtWidgets.QMessageBox.Cancel:
                 return
-            elif reply == QtWigets.QMessageBox.Yes:
+            elif reply == QtWidgets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
             error_dialog('no changes to revert')
@@ -1902,7 +1902,7 @@ class Lyse(object):
                     os.makedirs(default_path)
 
             default = os.path.join(default_path, 'lyse.ini')
-        save_file = QtWigets.QFileDialog.getSaveFileName(self.ui,
+        save_file = QtWidgets.QFileDialog.getSaveFileName(self.ui,
                                                       'Select  file to save current lyse configuration',
                                                       default,
                                                       "config files (*.ini)")
