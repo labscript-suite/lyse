@@ -1739,6 +1739,7 @@ class FileBox(object):
                            'Original exception was:\n\n' + orig_exception)
                 # Raise the exception in a thread so we can keep running
                 zprocess.raise_exception_in_thread((RuntimeError, RuntimeError(message), tb))
+                self.pause_analysis()
             
    
     @inmain_decorator()
