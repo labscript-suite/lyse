@@ -1331,7 +1331,22 @@ class DataFrameModel(QtCore.QObject):
 
         if updated_row_data is not None and not dataframe_already_updated:
             for group, name in updated_row_data:
-                self.dataframe.set_value(df_row_index, (group, name) + ('',) * (self.nlevels - 2), updated_row_data[group, name])
+                column_name = (group, name) + ('',) * (self.nlevels - 2)
+                value = updated_row_data[group, name]
+                try:
+                    self.dataframe.set_value(df_row_index, column_name, value)
+                except ValueError:
+                    # did the column not already exist when we tried to set an iterable?
+                    if not column_name in self.dataframe.columns:
+                        # create it with a non-iterable and then overwrite with the iterable value:
+                        self.dataframe.set_value(df_row_index, column_name, None)
+                    else:
+                        # Incompatible datatype - convert the datatype of the column to
+                        # 'object'
+                        self.dataframe[column_name] = self.dataframe[column_name].astype('object')
+                    # Now that the column exists and has dtype object, we can set the value:
+                    self.dataframe.set_value(df_row_index, column_name, value)
+
             dataframe_already_updated = True
 
         if not dataframe_already_updated:
