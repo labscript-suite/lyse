@@ -1817,7 +1817,8 @@ class Lyse(object):
         self.ui.actionRevert_configuration.triggered.connect(self.on_revert_configuration_triggered)
         self.ui.actionSave_configuration.triggered.connect(self.on_save_configuration_triggered)
         self.ui.actionSave_configuration_as.triggered.connect(self.on_save_configuration_as_triggered)
-        self.ui.actionSave_dataframe.triggered.connect(self.on_save_dataframe_triggered)
+        self.ui.actionSave_dataframe_as.triggered.connect(lambda: self.on_save_dataframe_triggered(True))
+        self.ui.actionSave_dataframe.triggered.connect(lambda: self.on_save_dataframe_triggered(False))
         self.ui.actionLoad_dataframe.triggered.connect(self.on_load_dataframe_triggered)
 
         self.ui.resize(1600, 900)
@@ -2072,22 +2073,25 @@ class Lyse(object):
                 self.singleshot_routinebox.remove_selection(confirm)
             if self.multishot_routinebox.ui.treeView.hasFocus():
                 self.multishot_routinebox.remove_selection(confirm)
-                
-    def on_save_dataframe_triggered(self):
+
+    def on_save_dataframe_triggered(self, choose_folder=True):
         df = self.filebox.shots_model.dataframe.copy()
         if len(df) > 0:
             default = self.exp_config.get('paths', 'experiment_shot_storage')
-            save_path = QtWidgets.QFileDialog.getExistingDirectory(self.ui, 'Select a Folder for the Dataframes', default)
-            if not save_path:
-                # User cancelled
-                return
-            if type(save_path) is tuple:
-                save_path, _ = save_path
+            if choose_folder:
+                save_path = QtWidgets.QFileDialog.getExistingDirectory(self.ui, 'Select a Folder for the Dataframes', default)
+                if not save_path:
+                    # User cancelled
+                    return
+                if type(save_path) is tuple:
+                    save_path, _ = save_path
             sequences = df.sequence.unique()
             for sequence in sequences:
                 sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
                 labscript = sequence_df['labscript'].iloc[0]
                 filename = "dataframe_{}_{}.df".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                if not choose_folder:
+                    save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
                 sequence_df.to_hdf(os.path.join(save_path, filename), 'table',mode='w',table=True)
         else:
             error_dialog('Dataframe is empty')
