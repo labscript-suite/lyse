@@ -37,10 +37,8 @@ import lyse.figure_manager
 lyse.figure_manager.install()
 
 if QT_ENV == PYQT5:
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 else:
-    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
 import zprocess.locking, labscript_utils.h5_lock, h5py
@@ -133,7 +131,7 @@ class Plot(object):
 
         # figure.tight_layout()
         self.figure = figure
-        self.canvas = FigureCanvas(figure)
+        self.canvas = figure.canvas
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
 
         self.lock_action = self.navigation_toolbar.addAction(
