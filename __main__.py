@@ -11,7 +11,7 @@ import threading
 import signal
 import subprocess
 import time
-
+import traceback
 import pprint
 import ast
 
@@ -1704,30 +1704,42 @@ class FileBox(object):
         # imported. So we'll silence them in this thread too:
         h5py._errors.silence_errors()
         while True:
-            self.analysis_pending.wait()
-            self.analysis_pending.clear()
-            at_least_one_shot_analysed = False
-            while True:
-                if not self.analysis_paused:
-                    # Find the first shot that has not finished being analysed:
-                    filepath = self.shots_model.get_first_incomplete()
-                    if filepath is not None:
-                        logger.info('analysing: %s'%filepath)
-                        self.do_singleshot_analysis(filepath)
-                        at_least_one_shot_analysed = True
-                    if filepath is None and at_least_one_shot_analysed:
-                        self.multishot_required = True
-                    if filepath is None:
+            try:
+                self.analysis_pending.wait()
+                self.analysis_pending.clear()
+                at_least_one_shot_analysed = False
+                while True:
+                    if not self.analysis_paused:
+                        # Find the first shot that has not finished being analysed:
+                        filepath = self.shots_model.get_first_incomplete()
+                        if filepath is not None:
+                            logger.info('analysing: %s'%filepath)
+                            self.do_singleshot_analysis(filepath)
+                            at_least_one_shot_analysed = True
+                        if filepath is None and at_least_one_shot_analysed:
+                            self.multishot_required = True
+                        if filepath is None:
+                            break
+                        if self.multishot_required:
+                            logger.info('doing multishot analysis')
+                            self.do_multishot_analysis()
+                    else:
+                        logger.info('analysis is paused')
                         break
-                    if self.multishot_required:
-                        logger.info('doing multishot analysis')
-                        self.do_multishot_analysis()
-                else:
-                    logger.info('analysis is paused')
-                    break
-            if self.multishot_required:
-                logger.info('doing multishot analysis')
-                self.do_multishot_analysis()
+                if self.multishot_required:
+                    logger.info('doing multishot analysis')
+                    self.do_multishot_analysis()
+            except Exception:
+                etype, value, tb = sys.exc_info()
+                orig_exception = ''.join(traceback.format_exception_only(etype, value))
+                message = ('Analysis loop encountered unexpected exception. ' +
+                           'This is a bug and should be reported. The analysis ' +
+                           'loop is continuing, but lyse may be in an inconsistent state. '
+                           'Restart lyse, or continue at your own risk. '
+                           'Original exception was:\n\n' + orig_exception)
+                # Raise the exception in a thread so we can keep running
+                zprocess.raise_exception_in_thread((RuntimeError, RuntimeError(message), tb))
+                self.pause_analysis()
             
    
     @inmain_decorator()
