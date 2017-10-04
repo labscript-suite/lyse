@@ -155,6 +155,17 @@ def scientific_notation(x, sigfigs=4, mode='eng'):
     return result
 
 
+def get_screen_geometry():
+    """Return the a list of the geometries of each screen: each a tuple of
+    left, top, width and height"""
+    geoms = []
+    desktop = qapplication.desktop()
+    for i in range(desktop.screenCount()):
+        sg = desktop.screenGeometry(i)
+        geoms.append((sg.left(), sg.top(), sg.width(), sg.height()))
+    return geoms
+
+
 class WebServer(ZMQServer):
 
     def handler(self, request_data):
@@ -1950,8 +1961,10 @@ class Lyse(object):
         window_size = self.ui.size()
         save_data['window_size'] = (window_size.width(), window_size.height())
         window_pos = self.ui.pos()
+
         save_data['window_pos'] = (window_pos.x(), window_pos.y())
 
+        save_data['screen_geometry'] = get_screen_geometry()
         save_data['splitter'] = self.ui.splitter.sizes()
         save_data['splitter_vertical'] = self.ui.splitter_vertical.sizes()
         save_data['splitter_horizontal'] = self.ui.splitter_horizontal.sizes()
@@ -2023,30 +2036,43 @@ class Lyse(object):
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
-            self.ui.resize(*ast.literal_eval(lyse_config.get('lyse_state', 'window_size')))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.ui.move(*ast.literal_eval(lyse_config.get('lyse_state', 'window_pos')))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
             if ast.literal_eval(lyse_config.get('lyse_state', 'analysis_paused')):
                 self.filebox.pause_analysis()
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
         try:
-            self.ui.splitter.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter')))
+            screen_geometry = ast.literal_eval(lyse_config.get('lyse_state', 'screen_geometry'))
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
-        try:
-            self.ui.splitter_vertical.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_vertical')))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.ui.splitter_horizontal.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_horizontal')))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
+        else:
+            # Only restore the window size and position, and splitter
+            # positions if the screen is the same size/same number of monitors
+            # etc. This prevents the window moving off the screen if say, the
+            # position was saved when 2 monitors were plugged in but there is
+            # only one now, and the splitters may not make sense in light of a
+            # different window size, so better to fall back to defaults:
+            current_screen_geometry = get_screen_geometry()
+            if current_screen_geometry == screen_geometry:
+                try:
+                    self.ui.resize(*ast.literal_eval(lyse_config.get('lyse_state', 'window_size')))
+                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                    pass
+                try:
+                    self.ui.move(*ast.literal_eval(lyse_config.get('lyse_state', 'window_pos')))
+                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                    pass
+                try:
+                    self.ui.splitter.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter')))
+                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                    pass
+                try:
+                    self.ui.splitter_vertical.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_vertical')))
+                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                    pass
+                try:
+                    self.ui.splitter_horizontal.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_horizontal')))
+                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                    pass
 
         # Set as self.last_save_data:
         save_data = self.get_save_data()
