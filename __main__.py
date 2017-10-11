@@ -5,7 +5,6 @@ from __future__ import division, unicode_literals, print_function, absolute_impo
 import os
 import sys
 import socket
-import Queue
 import logging
 import threading
 import signal
