@@ -1429,9 +1429,13 @@ class DataFrameModel(QtCore.QObject):
         if new_column_names or defunct_column_names:
             self.columns_changed.emit()
 
-    def new_row(self, filepath):
+    def new_row(self, filepath, done=False):
         status_item = QtGui.QStandardItem()
-        status_item.setData(0, self.ROLE_STATUS_PERCENT)
+        if done:
+          status_item.setData(100, self.ROLE_STATUS_PERCENT)
+          status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
+        else:
+          status_item.setData(0, self.ROLE_STATUS_PERCENT)
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [status_item, name_item]
@@ -1451,7 +1455,7 @@ class DataFrameModel(QtCore.QObject):
             vertical_header_item.setText(vert_header_text)
     
     @inmain_decorator()
-    def add_files(self, filepaths, new_row_data):
+    def add_files(self, filepaths, new_row_data, done=False):
         """Add files to the dataframe model. New_row_data should be a
         dataframe containing the new rows."""
 
@@ -1472,7 +1476,7 @@ class DataFrameModel(QtCore.QObject):
 
         for filepath in to_add:
             # Add the new rows to the model:
-            self._model.appendRow(self.new_row(filepath))
+            self._model.appendRow(self.new_row(filepath, done=done))
             vert_header_item = QtGui.QStandardItem('...loading...')
             self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
             self._view.resizeRowToContents(self._model.rowCount() - 1)
@@ -2118,7 +2122,7 @@ class Lyse(object):
             filepath = filepaths.pop(index)
             self.filebox.incoming_queue.put(filepath)
         df = df.drop(need_updating)
-        self.filebox.shots_model.add_files(filepaths, df)
+        self.filebox.shots_model.add_files(filepaths, df, done=True)
                 
 
 
