@@ -2084,19 +2084,20 @@ class Lyse(object):
             default = self.exp_config.get('paths', 'experiment_shot_storage')
             if choose_folder:
                 save_path = QtWidgets.QFileDialog.getExistingDirectory(self.ui, 'Select a Folder for the Dataframes', default)
+                if type(save_path) is tuple:
+                    save_path, _ = save_path
                 if not save_path:
                     # User cancelled
                     return
-                if type(save_path) is tuple:
-                    save_path, _ = save_path
             sequences = df.sequence.unique()
             for sequence in sequences:
                 sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
                 labscript = sequence_df['labscript'].iloc[0]
-                filename = "dataframe_{}_{}.df".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                filename = "dataframe_{}_{}.msg".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
-                sequence_df.to_hdf(os.path.join(save_path, filename), 'table',mode='w',table=True)
+                sequence_df.infer_objects()
+                sequence_df.to_msgpack(os.path.join(save_path, filename))
         else:
             error_dialog('Dataframe is empty')
 
@@ -2105,23 +2106,34 @@ class Lyse(object):
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                         'Select dataframe file to load',
                         default,
-                        "dataframe files (*.df)")
+                        "dataframe files (*.msg)")
+        if type(file) is tuple:
+            file, _ = file
         if not file:
             # User cancelled
             return
-        if type(file) is tuple:
-            file, _ = file
         # Convert to standard platform specific path, otherwise Qt likes
         # forward slashes:
         file = os.path.abspath(file)
-        changetime_cache = os.path.getmtime(file)
-        df = pandas.read_hdf(file,'table').sort_values("run time").reset_index()
+        df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                
+        # Check for changes in the shot files since the dataframe was exported
+        def changed_since(filepath, time):
+            if os.path.isfile(filepath):
+                return os.path.getmtime(filepath) > time
+            else:
+                return False
+
         filepaths = df["filepath"].tolist()
-        need_updating = np.where(map(lambda x: os.path.getmtime(x) > changetime_cache, filepaths))[0]
+        changetime_cache = os.path.getmtime(file)                
+        need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
+        
+        # Reload the files where changes where made since exporting
         for index in need_updating:
             filepath = filepaths.pop(index)
             self.filebox.incoming_queue.put(filepath)
         df = df.drop(need_updating)
+        
         self.filebox.shots_model.add_files(filepaths, df, done=True)
                 
 
