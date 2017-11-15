@@ -55,7 +55,7 @@ def get_nested_dict_from_shot(filepath):
         try:
             row['run time'] = asdatetime(h5_file.attrs['run time'])
         except KeyError:
-            row['run time'] = pandas.Timestamp('NaT')
+            row['run time'] = float('nan')
         try:    
             row['run number'] = h5_file.attrs['run number']
         except KeyError:
@@ -143,19 +143,15 @@ def concat_with_padding(*dataframes):
     """Concatenates dataframes with MultiIndex column labels,
     padding shallower hierarchies such that the MultiIndexes have
     the same nlevels."""
-    # from IPython import embed; embed()
     dataframes = list(dataframes)
     # Remove empty dataframes (these don't concat since pandas 0.18) 
-    dataframes = [df for df in dataframes if not df.empty] #  or df['run time'].isnull()[0])
+    dataframes = [df for df in dataframes if not df.empty]
     max_nlevels = max(df.columns.nlevels for df in dataframes)
     for i, df in enumerate(dataframes):
         if df.columns.nlevels < max_nlevels:
             dataframes[i] = pad_columns(df, max_nlevels)
-    try:
-        return pandas.concat(dataframes, ignore_index=True)
-    except:
-        from IPython import embed; embed()
-
+    return pandas.concat(dataframes, ignore_index=True)
+    
 def replace_with_padding(df, row, index):
     if df.columns.nlevels < row.columns.nlevels:
         df = pad_columns(df, row.columns.nlevels)
