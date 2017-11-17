@@ -36,8 +36,7 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-# require pandas v0.15.0 up to the next major version
-check_version('pandas', '0.15.0', '1.0')
+check_version('pandas', '0.21.0', '1.0')
 check_version('zprocess', '2.2', '3.0')
 
 # If running stand-alone, and not from within lyse, the below two variables
