@@ -59,11 +59,10 @@ def get_nested_dict_from_shot(filepath):
         try:    
             row['run number'] = h5_file.attrs['run number']
         except KeyError:
-            # ignore:
-            pass
+            row['run number'] = float('nan')
         try:
             row['run repeat'] = h5_file.attrs['run repeat']
-        except:
+        except KeyError:
             row['run repeat'] = 0
         try:
             row['individual id'] = h5_file.attrs['individual id']

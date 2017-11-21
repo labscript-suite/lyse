@@ -1162,6 +1162,12 @@ class DataFrameModel(QtCore.QObject):
         self._view.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         self._view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
+        # Check if integer indexing is to be used
+        try:
+            self.integer_indexing = self.exp_config.getboolean('lyse', 'integer_indexing')
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+            self.integer_indexing = False
+
         # This dataframe will contain all the scalar data
         # from the shot files that are currently open:
         index = pandas.MultiIndex.from_tuples([('filepath', '')])
@@ -1469,11 +1475,23 @@ class DataFrameModel(QtCore.QObject):
         print(self._model.rowCount())
         for row_number in range(self._model.rowCount()):
             vertical_header_item = self._model.verticalHeaderItem(row_number)
-            filepath_item = self._model.item(row_number, self.COL_FILEPATH)
-            filepath = filepath_item.text()
-            basename = os.path.splitext(os.path.basename(filepath))[0]
             row_number_str = str(row_number).rjust(n_digits)
-            vert_header_text = '{}. | {}'.format(row_number_str, basename)
+            vert_header_text = '{}. |'.format(row_number_str)
+            if self.integer_indexing:
+                header_cols = ['sequence_index', 'run number', 'run repeat']
+                header_strings = []
+                for col in header_cols:
+                    try:
+                        val = self.dataframe[col].values[row_number]
+                        header_strings.append(' {:04d}'.format(val))
+                    except (KeyError, ValueError):
+                        header_strings.append('----')
+                vert_header_text += ' |'.join(header_strings)
+            else:
+                filepath_item = self._model.item(row_number, self.COL_FILEPATH)
+                filepath = filepath_item.text()
+                basename = os.path.splitext(os.path.basename(filepath))[0]
+                vert_header_text += ' ' + basename
             vertical_header_item.setText(vert_header_text)
     
     @inmain_decorator()

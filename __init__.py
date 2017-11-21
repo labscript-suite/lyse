@@ -80,11 +80,17 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5):
         df = zmq_get(port, host, 'get dataframe', timeout)
         try:
             padding = ('',)*(df.columns.nlevels - 1)
-            df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
-            df.index.names = ['sequence', 'run time']
-            # df.set_index(['sequence', 'run time'], inplace=True, drop=False)
+            try:
+                integer_indexing = _labconfig.getboolean('lyse', 'integer_indexing')
+            except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+                integer_indexing = False
+            if integer_indexing:
+                df.set_index(['sequence_index', 'run number', 'run repeat'], inplace=True, drop=False)
+            else:
+                df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
+                df.index.names = ['sequence', 'run time']
         except KeyError:
-            # Empty dataframe?
+            # Empty DataFrame or index column not found, so fall back to RangeIndex instead
             pass
         df.sort_index(inplace=True)
         return df
