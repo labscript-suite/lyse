@@ -5,7 +5,6 @@ from __future__ import division, unicode_literals, print_function, absolute_impo
 import os
 import sys
 import socket
-import Queue
 import logging
 import threading
 import signal
@@ -31,9 +30,7 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-check_version('labscript_utils', '2.1', '3.0')
 check_version('qtutils', '2.0.0', '3.0.0')
-check_version('zprocess', '1.1.7', '3.0')
 
 import zprocess.locking
 from zprocess import ZMQServer
@@ -53,6 +50,13 @@ from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
+
+from labscript_utils import PY2
+if PY2:
+    str = unicode
+    import Queue as queue
+else:
+    import queue
 
 # Set working directory to lyse folder, resolving symlinks
 lyse_dir = os.path.dirname(os.path.realpath(__file__))
@@ -878,10 +882,14 @@ class EditColumns(object):
         self.ui.treeView.resizeColumnToContents(self.COL_VISIBLE)
         # Which indices in self.columns_visible the row numbers correspond to
         self.column_indices = {}
-        for column_index, name in sorted(column_names.items(), key=lambda s: s[1]):
-            if not isinstance(name, tuple):
-                # one of our special columns, ignore:
-                continue
+
+        # Remove our special columns from the dict of column names by keeping only tuples:
+        column_names = {i: name for i, name in column_names.items() if isinstance(name, tuple)}
+
+        # Sort the column names as comma separated values, converting to lower case:
+        sortkey = lambda item: ', '.join(item[1]).lower().strip(', ')
+
+        for column_index, name in sorted(column_names.items(), key=sortkey):
             visible = columns_visible[column_index]
             visible_item = QtGui.QStandardItem()
             visible_item.setCheckable(True)
@@ -893,7 +901,7 @@ class EditColumns(object):
                 visible_item.setData(QtCore.Qt.Unchecked, self.ROLE_SORT_DATA)
             name_as_string = ', '.join(name).strip(', ')
             name_item = QtGui.QStandardItem(name_as_string)
-            name_item.setData(name_as_string, self.ROLE_SORT_DATA)
+            name_item.setData(sortkey((column_index, name)), self.ROLE_SORT_DATA)
             self.model.appendRow([visible_item, name_item])
             self.column_indices[self.model.rowCount() - 1] = column_index
 
@@ -1578,7 +1586,7 @@ class FileBox(object):
         # A queue for storing incoming files from the ZMQ server so
         # the server can keep receiving files even if analysis is slow
         # or paused:
-        self.incoming_queue = Queue.Queue()
+        self.incoming_queue = queue.Queue()
 
         # Start the thread to handle incoming files, and store them in
         # a buffer if processing is paused:
@@ -1686,7 +1694,7 @@ class FileBox(object):
                 while True:
                     try:
                         filepath = self.incoming_queue.get(False)
-                    except Queue.Empty:
+                    except queue.Empty:
                         break
                     else:
                         filepaths.append(filepath)
@@ -1851,12 +1859,12 @@ class Lyse(object):
 
         # The singleshot routinebox will be connected to the filebox
         # by queues:
-        to_singleshot = Queue.Queue()
-        from_singleshot = Queue.Queue()
+        to_singleshot = queue.Queue()
+        from_singleshot = queue.Queue()
 
         # So will the multishot routinebox:
-        to_multishot = Queue.Queue()
-        from_multishot = Queue.Queue()
+        to_multishot = queue.Queue()
+        from_multishot = queue.Queue()
 
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
         self.singleshot_routinebox = RoutineBox(self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
