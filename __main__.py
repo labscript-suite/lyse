@@ -46,7 +46,7 @@ from lyse.dataframe_utilities import (concat_with_padding,
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
-from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
+from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
@@ -1528,19 +1528,25 @@ class DataFrameModel(QtCore.QObject):
 
         assert len(new_row_data) == len(to_add)
 
+        if to_add:
+            # Update the dataframe:
+            self.dataframe = concat_with_padding(self.dataframe, new_row_data)
+            self.update_column_levels()
+
+        app.filebox.set_add_shots_progress(None, None, "updating filebox")
+
         for filepath in to_add:
-            # Add the new rows to the model:
+            # Add the new rows to the Qt model:
             self._model.appendRow(self.new_row(filepath))
             vert_header_item = QtGui.QStandardItem('...loading...')
             self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
             self._view.resizeRowToContents(self._model.rowCount() - 1)
+
         self.renumber_rows(add_from=self._model.rowCount()-len(to_add))
 
-        if to_add:
-            self.dataframe = concat_with_padding(self.dataframe, new_row_data)
-            self.update_column_levels()
-            for filepath in to_add:
-                self.update_row(filepath, dataframe_already_updated=True)
+        # Update the Qt model:
+        for filepath in to_add:
+            self.update_row(filepath, dataframe_already_updated=True)
             
 
     @inmain_decorator()
@@ -1669,13 +1675,18 @@ class FileBox(object):
     @inmain_decorator()
     def set_add_shots_progress(self, completed, total, message):
         self.ui.progressBar_add_shots.setFormat("Adding shots: [{}] %v/%m (%p%)".format(message))
-        if completed == total:
+        if completed == total and message is None:
             self.ui.progressBar_add_shots.hide()
         else:
-            self.ui.progressBar_add_shots.setMaximum(total)
-            self.ui.progressBar_add_shots.setValue(completed)
+            if total is not None:
+                self.ui.progressBar_add_shots.setMaximum(total)
+            if completed is not None:
+                self.ui.progressBar_add_shots.setValue(completed)
             if self.ui.progressBar_add_shots.isHidden():
                 self.ui.progressBar_add_shots.show()
+        if completed is None and total is None and message is not None:
+            # Ensure a repaint when only the message changes:
+            self.ui.progressBar_add_shots.repaint()
 
     def incoming_buffer_loop(self):
         """We use a queue as a buffer for incoming shots. We don't want to hang and not
@@ -1737,7 +1748,6 @@ class FileBox(object):
                     new_row_data = concat_with_padding(*dataframes)
                 else:
                     new_row_data = None
-                self.set_add_shots_progress(n_shots_added, total_shots, "updating filebox")
 
                 # Do not add the shots that were not found on disk. Reverse
                 # loop so that removing an item doesn't change the indices of
@@ -1749,6 +1759,7 @@ class FileBox(object):
                     # Let the analysis loop know to look for new shots:
                     self.analysis_pending.set()
                 if shots_remaining == 0:
+                    self.set_add_shots_progress(n_shots_added, total_shots, None)
                     n_shots_added = 0 # reset our counter for the next batch
                 
             except Exception:
