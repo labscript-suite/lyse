@@ -30,7 +30,7 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-check_version('qtutils', '2.0.0', '3.0.0')
+check_version('qtutils', '2.1.0', '3.0.0')
 
 import zprocess.locking
 from zprocess import ZMQServer
@@ -190,8 +190,10 @@ class WebServer(ZMQServer):
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
-                if not (isinstance(h5_filepath, unicode) or isinstance(h5_filepath, str)):
-                    raise AssertionError(str(type(h5_filepath)) + ' is not str or unicode')
+                if isinstance(h5_filepath, bytes):
+                    h5_filepath = h5_filepath.decode('utf8')
+                if not isinstance(h5_filepath, str):
+                    raise AssertionError(str(type(h5_filepath)) + ' is not str or bytes')
                 app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
         return ("error: operation not supported. Recognised requests are:\n "
@@ -2016,10 +2018,14 @@ class Lyse(object):
         save_data = {}
 
         box = self.singleshot_routinebox
-        save_data['SingleShot'] = zip([routine.filepath for routine in box.routines], [box.model.item(row, box.COL_ACTIVE).checkState()  for row in range(box.model.rowCount())])
+        save_data['SingleShot'] = list(zip([routine.filepath for routine in box.routines],
+                                           [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                            for row in range(box.model.rowCount())]))
         save_data['LastSingleShotFolder'] = box.last_opened_routine_folder
         box = self.multishot_routinebox
-        save_data['MultiShot'] = zip([routine.filepath for routine in box.routines], [box.model.item(row, box.COL_ACTIVE).checkState()  for row in range(box.model.rowCount())])
+        save_data['MultiShot'] = list(zip([routine.filepath for routine in box.routines],
+                                          [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                           for row in range(box.model.rowCount())]))
         save_data['LastMultiShotFolder'] = box.last_opened_routine_folder
 
         save_data['LastFileBoxFolder'] = self.filebox.last_opened_shots_folder

@@ -157,7 +157,7 @@ def flat_dict_to_flat_series(dictionary):
             result[key] = dictionary[key]
         else:
             result[key[0]] = dictionary[key]
-    keys = result.keys()
+    keys = list(result.keys())
     keys.sort(key = lambda item: 
         (len(item),) + item if isinstance(item, tuple) else (1,item))
     return pandas.Series(result,index=keys)  
@@ -224,7 +224,7 @@ def dict_diff(dict1, dict2):
     """Return the difference between two dictionaries as a dictionary of key: [val1, val2] pairs.
     Keys unique to either dictionary are included as key: [val1, '-'] or key: ['-', val2]."""
     diff_keys = []
-    common_keys = intersect1d(dict1.keys(), dict2.keys())
+    common_keys = intersect1d(list(dict1.keys()), list(dict2.keys()))
     for key in common_keys:
         if iterable(dict1[key]):
             if any(dict1[key] != dict2[key]):
