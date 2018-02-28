@@ -22,6 +22,7 @@ import os
 from numpy import *
 import tzlocal
 import labscript_utils.shared_drive
+from labscript_utils.dict_diff import dict_diff
 
 import runmanager
 
@@ -220,31 +221,5 @@ def replace_with_padding(df, row, index):
     df = df.sort_index()
     return df
     
-def dict_diff(dict1, dict2):
-    """Return the difference between two dictionaries as a dictionary of key: [val1, val2] pairs.
-    Keys unique to either dictionary are included as key: [val1, '-'] or key: ['-', val2]."""
-    diff_keys = []
-    common_keys = intersect1d(list(dict1.keys()), list(dict2.keys()))
-    for key in common_keys:
-        if iterable(dict1[key]):
-            if any(dict1[key] != dict2[key]):
-                diff_keys.append(key)
-        else:
-            if dict1[key] != dict2[key]:
-                diff_keys.append(key)
 
-    dict1_unique = [key for key in dict1.keys() if key not in common_keys]    
-    dict2_unique = [key for key in dict2.keys() if key not in common_keys]
-                
-    diff = {}
-    for key in diff_keys:
-        diff[key] = [dict1[key], dict2[key]]
-    
-    for key in dict1_unique:
-        diff[key] = [dict1[key], '-']
-        
-    for key in dict2_unique:
-        diff[key] = ['-', dict2[key]]       
-
-    return diff
     
