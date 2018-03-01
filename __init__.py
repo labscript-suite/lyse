@@ -38,7 +38,7 @@ except ImportError:
 # require pandas v0.15.0 up to the next major version
 check_version('pandas', '0.15.0', '1.0')
 check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.4', '3.0')
+check_version('labscript_utils', '2.6', '3.0')
 from labscript_utils import PY2
 if PY2:
     str = unicode
@@ -143,7 +143,7 @@ class Run(object):
     def trace_names(self):
         with h5py.File(self.h5_path) as h5_file:
             try:
-                return h5_file['data']['traces'].keys()
+                return list(h5_file['data']['traces'].keys())
             except KeyError:
                 return []
 
@@ -176,7 +176,7 @@ class Run(object):
             elif not group in h5_file:
                 # Create the group if it doesn't exist
                 h5_file.create_group(group) 
-            if name in h5_file[group].attrs.keys() and not overwrite:
+            if name in h5_file[group].attrs and not overwrite:
                 raise Exception('Attribute %s exists in group %s. ' \
                                 'Use overwrite=True to overwrite.' % (name, group))                   
             h5_file[group].attrs[name] = value
@@ -269,7 +269,7 @@ class Run(object):
         images_list = {}
         with h5py.File(self.h5_path) as h5_file:
             for orientation in h5_file['/images'].keys():
-                images_list[orientation] = h5_file['/images'][orientation].keys()                
+                images_list[orientation] = list(h5_file['/images'][orientation].keys())               
         return images_list                
     
     def get_image_attributes(self, orientation):
@@ -352,7 +352,7 @@ class Run(object):
     def globals_groups(self):
         with h5py.File(self.h5_path) as h5_file:
             try:
-                return h5_file['globals'].keys()
+                return list(h5_file['globals'].keys())
             except KeyError:
                 return []   
                 
