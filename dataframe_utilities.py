@@ -11,16 +11,68 @@
 #                                                                   #
 #####################################################################
 
+from __future__ import division, unicode_literals, print_function, absolute_import
+from labscript_utils import PY2
+if PY2:
+    str = unicode
+    
 import labscript_utils.h5_lock, h5py
 import pandas
 import os
 from numpy import *
 import tzlocal
 import labscript_utils.shared_drive
+from labscript_utils.dict_diff import dict_diff
 
 import runmanager
 
+# Monkey patch a bugfix onto older versions of pandas on Python 2. This code
+# can be removed once lyse otherwise depends on pandas >= 0.21.0.
+# https://github.com/pandas-dev/pandas/pull/17099
+if PY2:
+    try:
+        from labscript_utils import check_version, VersionException
+        check_version('pandas', '0.21.0', '2.0')
+    except VersionException:
+        
+        import numpy as np
+        from pandas import Series, Index
+        from pandas.core.indexing import maybe_droplevels
+        def _getitem_multilevel(self, key):
+            loc = self.columns.get_loc(key)
+            if isinstance(loc, (slice, Series, np.ndarray, Index)):
+                new_columns = self.columns[loc]
+                result_columns = maybe_droplevels(new_columns, key)
+                if self._is_mixed_type:
+                    result = self.reindex(columns=new_columns)
+                    result.columns = result_columns
+                else:
+                    new_values = self.values[:, loc]
+                    result = self._constructor(new_values, index=self.index,
+                                               columns=result_columns)
+                    result = result.__finalize__(self)
+                if len(result.columns) == 1:
+                    top = result.columns[0]
+                    if isinstance(top, tuple):
+                        top = top[0]
+                    if top == '':
+                        result = result['']
+                        if isinstance(result, Series):
+                            result = self._constructor_sliced(result,
+                                                              index=self.index,
+                                                              name=key)
+
+                result._set_is_copy(self)
+                return result
+            else:
+                return self._get_item_cache(key)
+
+        pandas.DataFrame._getitem_multilevel = _getitem_multilevel
+
+
 def asdatetime(timestr):
+    if isinstance(timestr, bytes):
+        timestr = timestr.decode('utf-8')
     tz = tzlocal.get_localzone().zone
     return pandas.Timestamp(timestr, tz=tz)
 
@@ -59,8 +111,11 @@ def get_nested_dict_from_shot(filepath):
         try:    
             row['run number'] = h5_file.attrs['run number']
         except KeyError:
-            # ignore:
-            pass
+            row['run number'] = float('nan')
+        try:
+            row['run repeat'] = h5_file.attrs['run repeat']
+        except KeyError:
+            row['run repeat'] = 0
         try:
             row['individual id'] = h5_file.attrs['individual id']
             row['generation'] = h5_file.attrs['generation']
@@ -75,10 +130,10 @@ def flatten_dict(dictionary, keys=tuple()):
     result = {}
     for name in dictionary:
         if isinstance(dictionary[name],dict):
-            flat = flatten_dict(dictionary[name],keys=keys + (str(name),))
+            flat = flatten_dict(dictionary[name],keys=keys + (name,))
             result.update(flat)
         else:
-            result[keys + (str(name),)] = dictionary[name]
+            result[keys + (name,)] = dictionary[name]
     return result
             
 def flat_dict_to_hierarchical_dataframe(dictionary):
@@ -103,7 +158,7 @@ def flat_dict_to_flat_series(dictionary):
             result[key] = dictionary[key]
         else:
             result[key[0]] = dictionary[key]
-    keys = result.keys()
+    keys = list(result.keys())
     keys.sort(key = lambda item: 
         (len(item),) + item if isinstance(item, tuple) else (1,item))
     return pandas.Series(result,index=keys)  
@@ -166,31 +221,5 @@ def replace_with_padding(df, row, index):
     df = df.sort_index()
     return df
     
-def dict_diff(dict1, dict2):
-    """Return the difference between two dictionaries as a dictionary of key: [val1, val2] pairs.
-    Keys unique to either dictionary are included as key: [val1, '-'] or key: ['-', val2]."""
-    diff_keys = []
-    common_keys = intersect1d(dict1.keys(), dict2.keys())
-    for key in common_keys:
-        if iterable(dict1[key]):
-            if any(dict1[key] != dict2[key]):
-                diff_keys.append(key)
-        else:
-            if dict1[key] != dict2[key]:
-                diff_keys.append(key)
 
-    dict1_unique = [key for key in dict1.keys() if key not in common_keys]    
-    dict2_unique = [key for key in dict2.keys() if key not in common_keys]
-                
-    diff = {}
-    for key in diff_keys:
-        diff[key] = [dict1[key], dict2[key]]
-    
-    for key in dict1_unique:
-        diff[key] = [dict1[key], '-']
-        
-    for key in dict2_unique:
-        diff[key] = ['-', dict2[key]]       
-
-    return diff
     

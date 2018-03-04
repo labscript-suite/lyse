@@ -11,6 +11,11 @@
 #                                                                   #
 #####################################################################
 
+from __future__ import division, unicode_literals, print_function, absolute_import
+from labscript_utils import PY2
+if PY2:
+    str = unicode
+
 import labscript_utils.excepthook
 import zprocess
 to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
@@ -37,10 +42,8 @@ import lyse.figure_manager
 lyse.figure_manager.install()
 
 if QT_ENV == PYQT5:
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 else:
-    from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
 import zprocess.locking, labscript_utils.h5_lock, h5py
@@ -133,7 +136,7 @@ class Plot(object):
 
         # figure.tight_layout()
         self.figure = figure
-        self.canvas = FigureCanvas(figure)
+        self.canvas = figure.canvas
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
 
         self.lock_action = self.navigation_toolbar.addAction(
@@ -221,9 +224,18 @@ class AnalysisWorker(object):
         self.to_parent = to_parent
         self.from_parent = from_parent
         self.filepath = filepath
+
+        # Filepath as a unicode string on py3 and a bytestring on py2,
+        # so that the right string type can be passed to functions that
+        # require the 'native' string type for that python version. On
+        # Python 2, encode it with the filesystem encoding.
+        if PY2:
+            self.filepath_native_string = self.filepath.encode(sys.getfilesystemencoding())
+        else:
+            self.filepath_native_string = self.filepath
         
         # Add user script directory to the pythonpath:
-        sys.path.insert(0, os.path.dirname(self.filepath))
+        sys.path.insert(0, os.path.dirname(self.filepath_native_string))
         
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
@@ -272,7 +284,7 @@ class AnalysisWorker(object):
         # The namespace the routine will run in:
         sandbox = _DeprecationDict(path=path,
                                    __name__='__main__',
-                                   __file__= self.filepath)
+                                   __file__= os.path.basename(self.filepath_native_string))
         # path global variable is deprecated:
         deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
                                "in a future version of lyse.  Please use lyse.path, which defaults " +
@@ -281,20 +293,43 @@ class AnalysisWorker(object):
         # Use lyse.path instead:
         lyse.path = path
         lyse._updated_data = {}
+
+        # Save the current working directory before changing it to the
+        # location of the user's script:
+        cwd = os.getcwd()
+        os.chdir(os.path.dirname(self.filepath))
+
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
-                execfile(self.filepath, sandbox, sandbox)
+                with open(self.filepath) as f:
+                    code = compile(f.read(), os.path.basename(self.filepath_native_string),
+                                   'exec', dont_inherit=True)
+                    exec(code, sandbox)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
-            message = ''.join(traceback_lines)
+            # Avoiding a list comprehension here so as to avoid this
+            # python bug in earlier versions of 2.7 (fixed in 2.7.9):
+            # https://bugs.python.org/issue21591
+            message = ''
+            for line in traceback_lines:
+                if PY2:
+                    # errors='replace' is for Windows filenames present in the
+                    # traceback that are not UTF8. They will not display
+                    # correctly, but that's the best we can do - the traceback
+                    # may contain code from the file in a different encoding,
+                    # so we could have a mixed encoding string. This is only
+                    # a problem for Python 2.
+                    line = line.decode('utf8', errors='replace')
+                message += line
             sys.stderr.write(message)
             return False
         else:
             return True
         finally:
+            os.chdir(cwd)
             print('')
             self.post_analysis_plot_actions()
         
