@@ -364,6 +364,11 @@ class AnalysisRoutine(object):
         else:
             app.output_box.output('%s worker exited cleanly\n'%self.shortname)
         
+
+        if worker.returncode is not None:
+            # if analysis was running notify analysisloop that analysis has failed
+            self.from_worker.put(('error', {}))
+
         if restart:
             self.to_worker, self.from_worker, self.worker = self.start_worker()
             app.output_box.output('%s worker restarted\n'%self.shortname)
