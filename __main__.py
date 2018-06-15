@@ -2205,9 +2205,6 @@ if __name__ == "__main__":
     timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
-    # Do not run qapplication.exec_() whilst waiting for keyboard input if
-    # we hop into interactive mode.
-    QtCore.pyqtRemoveInputHook() # TODO remove once updating to pyqt 4.11 or whatever fixes that bug
     
     qapplication.exec_()
     server.shutdown()
