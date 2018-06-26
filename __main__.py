@@ -364,6 +364,9 @@ class AnalysisRoutine(object):
         else:
             app.output_box.output('%s worker exited cleanly\n'%self.shortname)
         
+        # if analysis was running notify analysisloop that analysis has failed
+        self.from_worker.put(('error', {}))
+
         if restart:
             self.to_worker, self.from_worker, self.worker = self.start_worker()
             app.output_box.output('%s worker restarted\n'%self.shortname)
@@ -2176,18 +2179,10 @@ class Lyse(object):
     def connect_signals(self):
         if os.name == 'nt':
             self.ui.newWindow.connect(set_win_appusermodel)
-    
-    def on_keyPress(self, key, modifiers, is_autorepeat):
-        # Keyboard shortcut to delete shots or routines depending on which
-        # treeview/tableview has focus. Shift-delete to skip confirmation.
-        if key == QtCore.Qt.Key_Delete and not is_autorepeat:
-            confirm = modifiers != QtCore.Qt.ShiftModifier 
-            if self.filebox.ui.tableView.hasFocus():
-                self.filebox.shots_model.remove_selection(confirm)
-            if self.singleshot_routinebox.ui.treeView.hasFocus():
-                self.singleshot_routinebox.remove_selection(confirm)
-            if self.multishot_routinebox.ui.treeView.hasFocus():
-                self.multishot_routinebox.remove_selection(confirm)
+
+        # Keyboard shortcuts:
+        QtWidgets.QShortcut('Del', self.ui, lambda: self.delete_items(True))
+        QtWidgets.QShortcut('Shift+Del', self.ui, lambda: self.delete_items(False))
 
     def on_save_dataframe_triggered(self, choose_folder=True):
         df = self.filebox.shots_model.dataframe.copy()
@@ -2250,28 +2245,23 @@ class Lyse(object):
         df = df.drop(need_updating)
         
         self.filebox.shots_model.add_files(filepaths, df, done=True)
-                
 
-
-class KeyPressQApplication(QtWidgets.QApplication):
-
-    """A Qapplication that emits a signal keyPress(key) on keypresses"""
-    keyPress = Signal(int, QtCore.Qt.KeyboardModifiers, bool)
-    keyRelease = Signal(int, QtCore.Qt.KeyboardModifiers, bool)
-
-    def notify(self, object, event):
-        if event.type() == QtCore.QEvent.KeyPress and event.key():
-            self.keyPress.emit(event.key(), event.modifiers(), event.isAutoRepeat())
-        elif event.type() == QtCore.QEvent.KeyRelease and event.key():
-            self.keyRelease.emit(event.key(), event.modifiers(), event.isAutoRepeat())
-        return QtWidgets.QApplication.notify(self, object, event)
+    def delete_items(self, confirm):
+        """Delete items from whichever box has focus, with optional confirmation
+        dialog"""
+        if self.filebox.ui.tableView.hasFocus():
+            self.filebox.shots_model.remove_selection(confirm)
+        if self.singleshot_routinebox.ui.treeView.hasFocus():
+            self.singleshot_routinebox.remove_selection(confirm)
+        if self.multishot_routinebox.ui.treeView.hasFocus():
+            self.multishot_routinebox.remove_selection(confirm)
 
 
 if __name__ == "__main__":
     logger = setup_logging('lyse')
     labscript_utils.excepthook.set_logger(logger)
     logger.info('\n\n===============starting===============\n')
-    qapplication = KeyPressQApplication(sys.argv)
+    qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
     app = Lyse()
 
@@ -2284,12 +2274,6 @@ if __name__ == "__main__":
     timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
-    # Do not run qapplication.exec_() whilst waiting for keyboard input if
-    # we hop into interactive mode.
-    QtCore.pyqtRemoveInputHook() # TODO remove once updating to pyqt 4.11 or whatever fixes that bug
-    
-    # Connect keyboard shortcuts:
-    qapplication.keyPress.connect(app.on_keyPress)
     
     qapplication.exec_()
     server.shutdown()
