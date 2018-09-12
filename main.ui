@@ -139,6 +139,11 @@ QToolButton:hover:checked {
     <addaction name="actionRevert_configuration"/>
     <addaction name="actionSave_configuration"/>
     <addaction name="actionSave_configuration_as"/>
+    <addaction name="separator"/>
+    <addaction name="actionSave_dataframe"/>
+    <addaction name="actionSave_dataframe_as"/>
+    <addaction name="actionLoad_dataframe"/>
+    <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
    <addaction name="menuFile"/>
@@ -192,6 +197,33 @@ QToolButton:hover:checked {
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionSave_dataframe">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/qtutils/fugue/disk.png</normaloff>:/qtutils/fugue/disk.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save dataframe</string>
+   </property>
+  </action>
+  <action name="actionSave_dataframe_as">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/qtutils/fugue/disk--plus.png</normaloff>:/qtutils/fugue/disk--plus.png</iconset>
+   </property>
+   <property name="text">
+    <string>Save dataframe as...</string>
+   </property>
+  </action>
+  <action name="actionLoad_dataframe">
+   <property name="icon">
+    <iconset>
+     <normaloff>:/qtutils/fugue/folder-open.png</normaloff>:/qtutils/fugue/folder-open.png</iconset>
+   </property>
+   <property name="text">
+    <string>Load dataframe</string>
    </property>
   </action>
   <action name="actionRevert_configuration">

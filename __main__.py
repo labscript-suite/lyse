@@ -1475,9 +1475,13 @@ class DataFrameModel(QtCore.QObject):
         self._model.blockSignals(False)
         self._model.layoutChanged.emit()
 
-    def new_row(self, filepath):
+    def new_row(self, filepath, done=False):
         status_item = QtGui.QStandardItem()
-        status_item.setData(0, self.ROLE_STATUS_PERCENT)
+        if done:
+            status_item.setData(100, self.ROLE_STATUS_PERCENT)
+            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
+        else:
+            status_item.setData(0, self.ROLE_STATUS_PERCENT)
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [status_item, name_item]
@@ -1521,7 +1525,7 @@ class DataFrameModel(QtCore.QObject):
             vertical_header_item.setText(vert_header_text)
     
     @inmain_decorator()
-    def add_files(self, filepaths, new_row_data):
+    def add_files(self, filepaths, new_row_data, done=False):
         """Add files to the dataframe model. New_row_data should be a
         dataframe containing the new rows."""
 
@@ -1549,7 +1553,7 @@ class DataFrameModel(QtCore.QObject):
 
         for filepath in to_add:
             # Add the new rows to the Qt model:
-            self._model.appendRow(self.new_row(filepath))
+            self._model.appendRow(self.new_row(filepath, done=done))
             vert_header_item = QtGui.QStandardItem('...loading...')
             self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
             self._view.resizeRowToContents(self._model.rowCount() - 1)
@@ -1912,6 +1916,9 @@ class Lyse(object):
         self.ui.actionRevert_configuration.triggered.connect(self.on_revert_configuration_triggered)
         self.ui.actionSave_configuration.triggered.connect(self.on_save_configuration_triggered)
         self.ui.actionSave_configuration_as.triggered.connect(self.on_save_configuration_as_triggered)
+        self.ui.actionSave_dataframe_as.triggered.connect(lambda: self.on_save_dataframe_triggered(True))
+        self.ui.actionSave_dataframe.triggered.connect(lambda: self.on_save_dataframe_triggered(False))
+        self.ui.actionLoad_dataframe.triggered.connect(self.on_load_dataframe_triggered)
 
         self.ui.resize(1600, 900)
 
@@ -2176,7 +2183,69 @@ class Lyse(object):
         # Keyboard shortcuts:
         QtWidgets.QShortcut('Del', self.ui, lambda: self.delete_items(True))
         QtWidgets.QShortcut('Shift+Del', self.ui, lambda: self.delete_items(False))
-    
+
+    def on_save_dataframe_triggered(self, choose_folder=True):
+        df = self.filebox.shots_model.dataframe.copy()
+        if len(df) > 0:
+            default = self.exp_config.get('paths', 'experiment_shot_storage')
+            if choose_folder:
+                save_path = QtWidgets.QFileDialog.getExistingDirectory(self.ui, 'Select a Folder for the Dataframes', default)
+                if type(save_path) is tuple:
+                    save_path, _ = save_path
+                if not save_path:
+                    # User cancelled
+                    return
+            sequences = df.sequence.unique()
+            for sequence in sequences:
+                sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
+                labscript = sequence_df['labscript'].iloc[0]
+                filename = "dataframe_{}_{}.msg".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                if not choose_folder:
+                    save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
+                sequence_df.infer_objects()
+                for col in sequence_df.columns :
+                    if sequence_df[col].dtype == object:
+                        sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
+                sequence_df.to_msgpack(os.path.join(save_path, filename))
+        else:
+            error_dialog('Dataframe is empty')
+
+    def on_load_dataframe_triggered(self):
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.msg')
+        file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
+                        'Select dataframe file to load',
+                        default,
+                        "dataframe files (*.msg)")
+        if type(file) is tuple:
+            file, _ = file
+        if not file:
+            # User cancelled
+            return
+        # Convert to standard platform specific path, otherwise Qt likes
+        # forward slashes:
+        file = os.path.abspath(file)
+        df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                
+        # Check for changes in the shot files since the dataframe was exported
+        def changed_since(filepath, time):
+            if os.path.isfile(filepath):
+                return os.path.getmtime(filepath) > time
+            else:
+                return False
+
+        filepaths = df["filepath"].tolist()
+        changetime_cache = os.path.getmtime(file)
+        need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
+        need_updating = np.sort(need_updating)[::-1]  # sort in descending order to not remove the wrong items with pop
+
+        # Reload the files where changes where made since exporting
+        for index in need_updating:
+            filepath = filepaths.pop(index)
+            self.filebox.incoming_queue.put(filepath)
+        df = df.drop(need_updating)
+        
+        self.filebox.shots_model.add_files(filepaths, df, done=True)
+
     def delete_items(self, confirm):
         """Delete items from whichever box has focus, with optional confirmation
         dialog"""
