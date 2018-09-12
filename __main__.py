@@ -1478,10 +1478,10 @@ class DataFrameModel(QtCore.QObject):
     def new_row(self, filepath, done=False):
         status_item = QtGui.QStandardItem()
         if done:
-          status_item.setData(100, self.ROLE_STATUS_PERCENT)
-          status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
+            status_item.setData(100, self.ROLE_STATUS_PERCENT)
+            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
         else:
-          status_item.setData(0, self.ROLE_STATUS_PERCENT)
+            status_item.setData(0, self.ROLE_STATUS_PERCENT)
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
         name_item = QtGui.QStandardItem(filepath)
         return [status_item, name_item]
@@ -2211,7 +2211,7 @@ class Lyse(object):
             error_dialog('Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
-        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.df')
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.msg')
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                         'Select dataframe file to load',
                         default,
@@ -2234,9 +2234,9 @@ class Lyse(object):
                 return False
 
         filepaths = df["filepath"].tolist()
-        changetime_cache = os.path.getmtime(file)                
+        changetime_cache = os.path.getmtime(file)
         need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
-        need_updating = np.sort(need_updating)[::-1]  # sort in desceing order to not remove the wrong items with pop
+        need_updating = np.sort(need_updating)[::-1]  # sort in descending order to not remove the wrong items with pop
 
         # Reload the files where changes where made since exporting
         for index in need_updating:
