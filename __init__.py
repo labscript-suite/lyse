@@ -19,6 +19,7 @@ import socket
 import pickle as pickle
 import inspect
 import sys
+import threading
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -50,6 +51,12 @@ spinning_top = False
 _updated_data = {}
 # dictionary of plot id's to classes to use for Plot object
 _plot_classes = {}
+# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
+plots = {}
+# A threading.Event to delay the 
+delay_event = threading.Event()
+# a flag to determine whether we should wait for the delay event
+_delay_flag = False
 
 # get port that lyse is using for communication
 try:
@@ -455,3 +462,10 @@ def register_plot_class(identifier, cls):
 
 def get_plot_class(identifier):
     return _plot_classes.get(identifier, None)
+
+def delay_results_return():
+    global _delay_flag
+    if not spinning_top:
+        sys.stderr.write('Warning: lyse.delay_results_return has no effect on scripts not run with the lyse GUI.\n')
+    _delay_flag = True
+    
