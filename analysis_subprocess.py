@@ -125,8 +125,9 @@ class PlotWindow(QtWidgets.QWidget):
 
 class Plot(object):
     def __init__(self, figure, identifier, filepath):
+        self.id = identifier
         loader = UiLoader()
-        self.ui = loader.load('plot_window.ui', PlotWindow())
+        self.ui = loader.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'plot_window.ui'), PlotWindow())
 
         # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
         if os.name == 'nt':
@@ -292,6 +293,8 @@ class AnalysisWorker(object):
         sandbox.deprecation_messages['path'] = deprecation_message
         # Use lyse.path instead:
         lyse.path = path
+        lyse.plots = self.plots
+        lyse.Plot = Plot
         lyse._updated_data = {}
 
         # Save the current working directory before changing it to the
@@ -346,7 +349,7 @@ class AnalysisWorker(object):
             if not fig.axes:
                 continue
             try:
-                plot = self.plots[fig]
+                plot = self.plots[identifier]
             except KeyError:
                 # If we don't already have this figure, make a window
                 # to put it in:
@@ -362,7 +365,38 @@ class AnalysisWorker(object):
 
 
     def new_figure(self, fig, identifier):
-        self.plots[fig] = Plot(fig, identifier, self.filepath)
+        try:
+            # Get custom class for this plot if it is registered
+            cls = lyse.get_plot_class(identifier)
+            # If no plot was registered, use the base class
+            if cls is None: cls = Plot
+            # if cls is not a subclass of Plot, then raise an Exception
+            if not issubclass(cls, Plot): raise RuntimeError('The specified class must be a subclass of lyse.Plot')
+            # Instantiate the plot
+            self.plots[identifier] = cls(fig, identifier, self.filepath)
+        except Exception:
+            traceback_lines = traceback.format_exception(*sys.exc_info())
+            del traceback_lines[1]
+            # Avoiding a list comprehension here so as to avoid this
+            # python bug in earlier versions of 2.7 (fixed in 2.7.9):
+            # https://bugs.python.org/issue21591
+            message = 'Failed to instantiate custom class for plot "{identifier}". Perhaps lyse.register_plot_class() was called incorrectly from your script? The exception raised was:\n'.format(identifier=identifier)
+            for line in traceback_lines:
+                if PY2:
+                    # errors='replace' is for Windows filenames present in the
+                    # traceback that are not UTF8. They will not display
+                    # correctly, but that's the best we can do - the traceback
+                    # may contain code from the file in a different encoding,
+                    # so we could have a mixed encoding string. This is only
+                    # a problem for Python 2.
+                    line = line.decode('utf8', errors='replace')
+                message += line
+            message += '\n'
+            message += 'Due to this error, we used the default lyse.Plot class instead.\n'
+            sys.stderr.write(message)
+
+            # instantiate plot using original Base class so that we always get a plot
+            self.plots[identifier] = Plot(fig, identifier, self.filepath)
 
     def reset_figs(self):
         pass
