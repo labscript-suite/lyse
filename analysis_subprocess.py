@@ -219,6 +219,10 @@ class Plot(object):
     def is_shown(self):
         return self.ui.isVisible()
 
+    def analysis_complete(self):
+        """To be overriden by subclasses. Called as part of the post analysis plot actions"""
+        pass
+
 
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
@@ -357,7 +361,7 @@ class AnalysisWorker(object):
             except KeyError:
                 # If we don't already have this figure, make a window
                 # to put it in:
-                self.new_figure(fig, identifier)
+                plot = self.new_figure(fig, identifier)
             else:
                 if not plot.is_shown:
                     plot.show()
@@ -366,6 +370,7 @@ class AnalysisWorker(object):
                 if plot.lock_axes:
                     plot.restore_axis_limits()
                 plot.draw()
+            plot.analysis_complete()
 
 
     def new_figure(self, fig, identifier):
@@ -401,6 +406,8 @@ class AnalysisWorker(object):
 
             # instantiate plot using original Base class so that we always get a plot
             self.plots[identifier] = Plot(fig, identifier, self.filepath)
+
+        return self.plots[identifier]
 
     def reset_figs(self):
         pass
