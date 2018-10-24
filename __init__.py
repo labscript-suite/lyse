@@ -450,13 +450,13 @@ def register_plot_class(identifier, cls):
     if not spinning_top:
         sys.stderr.write('Warning: lyse.register_plot_class has no effect on scripts not run with the lyse GUI.\n')
 
-    if identifier in _plot_classes:
-        if cls == _plot_classes[identifier]:
-            return
+    # if identifier in _plot_classes:
+    #     if cls == _plot_classes[identifier]:
+    #         return
 
-        # if a new class was specified, raise an Exception as you have to 
-        # restart the worker process for this to work!
-        raise RuntimeError('You can only register the plot class for "%s" once. If you have updated the plot class, please restart the worker process.'%identifier)
+    #     # if a new class was specified, raise an Exception as you have to 
+    #     # restart the worker process for this to work!
+    #     raise RuntimeError('You can only register the plot class for "%s" once. If you have updated the plot class, please restart the worker process.'%identifier)
 
     _plot_classes[identifier] = cls
 
@@ -468,4 +468,3 @@ def delay_results_return():
     if not spinning_top:
         sys.stderr.write('Warning: lyse.delay_results_return has no effect on scripts not run with the lyse GUI.\n')
     _delay_flag = True
-    

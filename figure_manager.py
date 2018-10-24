@@ -26,12 +26,22 @@ class FigureManager(object):
         self._figure = matplotlib.pyplot.figure
         self._close = matplotlib.pyplot.close
         self._show = matplotlib.pyplot.show
-        
-    def get_first_empty_figure(self,*args,**kwargs):
+        self.__allocated_figures = []
+
+    def get_first_empty_figure(self, identifier, *args, **kwargs):
         i = 1
         while True:
+            # skip over protected figures that have been allocated to a specific identifier
+            if i in self.__allocated_figures:
+                i += 1
+                continue
             fig = self._figure(i,*args,**kwargs)
             if not fig.axes:
+                # only protect the figure if it has an explicit identifier
+                # (this stops "figure();figure();"" from generating multiple)
+                # empty figures
+                if identifier is not None:
+                    self.__allocated_figures.append(i)
                 return i, fig
             i += 1
             
@@ -40,26 +50,30 @@ class FigureManager(object):
                 
     def __call__(self,identifier=None, *args, **kwargs):
         if identifier is None:
-            number, fig =  self.get_first_empty_figure(*args,**kwargs)
+            number, fig =  self.get_first_empty_figure(identifier, *args,**kwargs)
             self.figs[number] = fig
+            self._remove_dead_references(number, fig)
         elif identifier in self.figs:
             fig = self.figs[identifier]
             self._figure(fig.number)
+            if fig.number not in self.__allocated_figures:
+                self.__allocated_figures.append(fig.number)
         else:
-            number, fig =  self.get_first_empty_figure(*args,**kwargs)
+            number, fig =  self.get_first_empty_figure(identifier, *args,**kwargs)
             self.figs[identifier] = fig
+            self._remove_dead_references(identifier, fig)
         return fig
 
     def close(self,identifier=None):
         if identifier is None:
             thisfig = matplotlib.pyplot.gcf()
-            for key, fig in self.figs.items():
+            for key, fig in list(self.figs.items()):
                 if fig is thisfig:
                     del self.figs[key]
                     self._close()
         elif isinstance(identifier,matplotlib.figure.Figure):
             thisfig = identifier
-            for key, fig in self.figs.items():
+            for key, fig in list(self.figs.items()):
                 if fig is thisfig:
                     del self.figs[fig]
                     self._close(thisfig)
@@ -77,6 +91,13 @@ class FigureManager(object):
         else:
             self._show()
 
+    def reset(self):
+        self.__allocated_figures = []
+
+    def _remove_dead_references(self, current_identifier, current_fig):
+        for key, fig in list(self.figs.items()):
+            if fig == current_fig and key != current_identifier:
+                del self.figs[key]
 
 figuremanager = None
 matplotlib = None

@@ -106,6 +106,10 @@ def set_win_appusermodel(window_id):
     relaunch_display_name = app_descriptions['lyse']
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
 
+class PlotWindowCloseEvent(QtGui.QCloseEvent):
+    def __init__(self, force, *args, **kwargs):
+        QtGui.QCloseEvent.__init__(self, *args, **kwargs)
+        self.force = force
 
 class PlotWindow(QtWidgets.QWidget):
     # A signal for when the window manager has created a new window for this widget:
@@ -120,7 +124,11 @@ class PlotWindow(QtWidgets.QWidget):
 
     def closeEvent(self, event):
         self.hide()
-        event.ignore()
+        if isinstance(event, PlotWindowCloseEvent) and event.force:
+            event.accept()
+            # QtWidgets.QWidget.event(self, event)
+        else:
+            event.ignore()
         
 
 class Plot(object):
@@ -345,6 +353,7 @@ class AnalysisWorker(object):
             self.post_analysis_plot_actions()
         
     def pre_analysis_plot_actions(self):
+        lyse.figure_manager.figuremanager.reset()
         for plot in self.plots.values():
             plot.save_axis_limits()
             plot.clear()
@@ -357,7 +366,21 @@ class AnalysisWorker(object):
             if not fig.axes:
                 continue
             try:
-                plot = self.plots[identifier]
+                plot = self.plots[fig]
+
+                cls = lyse.get_plot_class(identifier)
+                # If no plot was registered, use the base class
+                if cls is None: cls = Plot
+                
+                # if plot instance does not match the expected identifier, we need to close and reopen it!
+                if type(plot) != cls:
+                    event = PlotWindowCloseEvent(True)
+                    QtCore.QCoreApplication.instance().postEvent(plot.ui, event)
+                    del self.plots[fig]
+
+                    # force raise the keyerror exception to recreate the window
+                    self.plots[fig]
+
             except KeyError:
                 # If we don't already have this figure, make a window
                 # to put it in:
@@ -382,7 +405,7 @@ class AnalysisWorker(object):
             # if cls is not a subclass of Plot, then raise an Exception
             if not issubclass(cls, Plot): raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
-            self.plots[identifier] = cls(fig, identifier, self.filepath)
+            self.plots[fig] = cls(fig, identifier, self.filepath)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
@@ -405,9 +428,9 @@ class AnalysisWorker(object):
             sys.stderr.write(message)
 
             # instantiate plot using original Base class so that we always get a plot
-            self.plots[identifier] = Plot(fig, identifier, self.filepath)
+            self.plots[fig] = Plot(fig, identifier, self.filepath)
 
-        return self.plots[identifier]
+        return self.plots[fig]
 
     def reset_figs(self):
         pass
