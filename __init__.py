@@ -38,8 +38,8 @@ except ImportError:
 
 check_version('pandas', '0.21.0', '1.0')
 check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.6', '3.0')
-from labscript_utils import PY2
+check_version('labscript_utils', '2.8.1', '3.0')
+from labscript_utils import PY2, dedent
 if PY2:
     str = unicode
 
@@ -51,6 +51,8 @@ spinning_top = False
 _updated_data = {}
 # dictionary of plot id's to classes to use for Plot object
 _plot_classes = {}
+# A fake Plot object to subclass if we are not running in the GUI
+Plot=object
 # An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
 plots = {}
 # A threading.Event to delay the 
@@ -448,16 +450,10 @@ def figure_to_clipboard(figure=None, **kwargs):
 
 def register_plot_class(identifier, cls):
     if not spinning_top:
-        sys.stderr.write('Warning: lyse.register_plot_class has no effect on scripts not run with the lyse GUI.\n')
-
-    # if identifier in _plot_classes:
-    #     if cls == _plot_classes[identifier]:
-    #         return
-
-    #     # if a new class was specified, raise an Exception as you have to 
-    #     # restart the worker process for this to work!
-    #     raise RuntimeError('You can only register the plot class for "%s" once. If you have updated the plot class, please restart the worker process.'%identifier)
-
+        msg = """Warning: lyse.register_plot_class has no effect on scripts not run with
+            the lyse GUI.
+            """
+        sys.stderr.write(dedent(msg))
     _plot_classes[identifier] = cls
 
 def get_plot_class(identifier):
@@ -466,5 +462,8 @@ def get_plot_class(identifier):
 def delay_results_return():
     global _delay_flag
     if not spinning_top:
-        sys.stderr.write('Warning: lyse.delay_results_return has no effect on scripts not run with the lyse GUI.\n')
+        msg = """Warning: lyse.delay_results_return has no effect on scripts not run 
+            with the lyse GUI.
+            """
+        sys.stderr.write(dedent(msg))
     _delay_flag = True

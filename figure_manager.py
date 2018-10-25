@@ -17,12 +17,13 @@ if PY2:
     str = unicode
     
 import lyse
+from collections import OrderedDict
 import sys
 
 class FigureManager(object):
 
     def __init__(self):
-        self.figs = {}
+        self.figs = OrderedDict()
         self._figure = matplotlib.pyplot.figure
         self._close = matplotlib.pyplot.close
         self._show = matplotlib.pyplot.show
@@ -75,14 +76,14 @@ class FigureManager(object):
             thisfig = identifier
             for key, fig in list(self.figs.items()):
                 if fig is thisfig:
-                    del self.figs[fig]
+                    del self.figs[key]
                     self._close(thisfig)
         elif identifier == 'all':
-            self.figs = {}
+            self.figs = OrderedDict()
             self._close('all')
         else:
             fig = self.figs[identifier]
-            self._close(fig.number)
+            self._close(fig)
             del self.figs[identifier]
             
     def show(self):

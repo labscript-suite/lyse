@@ -116,6 +116,10 @@ class PlotWindow(QtWidgets.QWidget):
     newWindow = Signal(int)
     close_signal = Signal()
 
+    def __init__(self, plot, *args, **kwargs):
+        self.__plot = plot
+        QtWidgets.QWidget.__init__(self, *args, **kwargs)
+
     def event(self, event):
         result = QtWidgets.QWidget.event(self, event)
         if event.type() == QtCore.QEvent.WinIdChange:
@@ -125,17 +129,17 @@ class PlotWindow(QtWidgets.QWidget):
     def closeEvent(self, event):
         self.hide()
         if isinstance(event, PlotWindowCloseEvent) and event.force:
+            self.__plot.on_close()
             event.accept()
-            # QtWidgets.QWidget.event(self, event)
         else:
             event.ignore()
         
 
 class Plot(object):
     def __init__(self, figure, identifier, filepath):
-        self.id = identifier
+        self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'plot_window.ui'), PlotWindow())
+        self.ui = loader.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'plot_window.ui'), PlotWindow(self))
 
         # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
         if os.name == 'nt':
@@ -227,9 +231,77 @@ class Plot(object):
     def is_shown(self):
         return self.ui.isVisible()
 
-    def analysis_complete(self):
-        """To be overriden by subclasses. Called as part of the post analysis plot actions"""
+    def analysis_complete(self, figure_in_use):
+        """To be overriden by subclasses. 
+        Called as part of the post analysis plot actions"""
         pass
+
+    def get_window_state(self):
+        """Called when the Plot window is about to be closed due to a change in 
+        registered Plot window class
+
+        Can be overridden by subclasses if custom information should be saved
+        (although bear in mind that you will passing the information from the previous 
+        Plot subclass which might not be what you want unless the old and new classes
+        have a common ancestor, or the change in Plot class is triggered by a reload
+        of the module containing your Plot subclass). 
+
+        Returns a dictionary of information on the window state.
+
+        If you have overridden this method, please call the base method first and
+        then update the returned dictionary with your additional information before 
+        returning it from your method.
+        """
+        return {
+            'window_geometry': self.ui.saveGeometry(),
+            'axis_lock_state': self.lock_axes,
+            'axis_limits': self.axis_limits,
+        }
+
+    def restore_window_state(self, state):
+        """Called when the Plot window is recreated due to a change in registered
+        Plot window class.
+
+        Can be overridden by subclasses if custom information should be restored
+        (although bear in mind that you will get the information from the previous 
+        Plot subclass which might not be what you want unless the old and new classes
+        have a common ancestor, or the change in Plot class is triggered by a reload
+        of the module containing your Plot subclass). 
+
+        If overriding, please call the parent method in addition to your new code
+
+        Arguments:
+            state: A dictionary of information to restore
+        """
+        geometry = state.get('window_geometry', None)
+        if geometry is not None:
+            self.ui.restoreGeometry(geometry)
+
+        axis_limits = state.get('axis_limits', None)
+        axis_lock_state = state.get('axis_lock_state', None)
+        if axis_lock_state is not None:
+            if axis_lock_state:
+                # assumes the default state is False for new windows
+                self.lock_action.trigger()
+
+                if axis_limits is not None:
+                    self.axis_limits = axis_limits
+                    self.restore_axis_limits()
+
+    def on_close(self):
+        """Called when the window is closed.
+
+        Note that this only happens if the Plot window class has changed. 
+        Clicking the "X" button in the window title bar has been overridden to hide
+        the window instead of closing it."""
+        # release selected toolbar action as selecting an action acquires a lock
+        # that is associated with the figure canvas (which is reused in the new
+        # plot window) and this must be released before closing the window or else
+        # it is held forever
+        self.navigation_toolbar.pan()
+        self.navigation_toolbar.zoom()
+        self.navigation_toolbar.pan()
+        self.navigation_toolbar.pan()
 
 
 class AnalysisWorker(object):
@@ -363,19 +435,37 @@ class AnalysisWorker(object):
         lyse.figure_manager.figuremanager.set_first_figure_current()
         # Introspect the figures that were produced:
         for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+            window_state = None
             if not fig.axes:
+                # Try and clear the figure if it is not in use
+                try:
+                    plot = self.plots[fig]
+                    plot.set_window_title("Empty", self.filepath)
+                    plot.draw()
+                    plot.analysis_complete(figure_in_use=False)
+                except KeyError:
+                    pass
+                # Skip the rest of the loop regardless of whether we managed to clear
+                # the unused figure or not!
                 continue
             try:
                 plot = self.plots[fig]
 
+                # Get the Plot subclass registered for this plot identifier if it exists
                 cls = lyse.get_plot_class(identifier)
                 # If no plot was registered, use the base class
                 if cls is None: cls = Plot
                 
-                # if plot instance does not match the expected identifier, we need to close and reopen it!
-                if type(plot) != cls:
+                # if plot instance does not match the expected identifier,  
+                # or the identifier in use with this plot has changes,
+                #  we need to close and reopen it!
+                if type(plot) != cls or plot.identifier != identifier:
+                    window_state = plot.get_window_state()
+
+                    # Create a custom CloseEvent to force close the plot window
                     event = PlotWindowCloseEvent(True)
                     QtCore.QCoreApplication.instance().postEvent(plot.ui, event)
+                    # Delete the plot
                     del self.plots[fig]
 
                     # force raise the keyerror exception to recreate the window
@@ -385,6 +475,10 @@ class AnalysisWorker(object):
                 # If we don't already have this figure, make a window
                 # to put it in:
                 plot = self.new_figure(fig, identifier)
+
+                # restore window state/geometry if it was saved
+                if window_state is not None:
+                    plot.restore_window_state(window_state)
             else:
                 if not plot.is_shown:
                     plot.show()
@@ -393,7 +487,7 @@ class AnalysisWorker(object):
                 if plot.lock_axes:
                     plot.restore_axis_limits()
                 plot.draw()
-            plot.analysis_complete()
+            plot.analysis_complete(figure_in_use=True)
 
 
     def new_figure(self, fig, identifier):
