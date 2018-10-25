@@ -497,7 +497,8 @@ class AnalysisWorker(object):
             # If no plot was registered, use the base class
             if cls is None: cls = Plot
             # if cls is not a subclass of Plot, then raise an Exception
-            if not issubclass(cls, Plot): raise RuntimeError('The specified class must be a subclass of lyse.Plot')
+            if not issubclass(cls, Plot): 
+                raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
             self.plots[fig] = cls(fig, identifier, self.filepath)
         except Exception:
@@ -506,7 +507,11 @@ class AnalysisWorker(object):
             # Avoiding a list comprehension here so as to avoid this
             # python bug in earlier versions of 2.7 (fixed in 2.7.9):
             # https://bugs.python.org/issue21591
-            message = 'Failed to instantiate custom class for plot "{identifier}". Perhaps lyse.register_plot_class() was called incorrectly from your script? The exception raised was:\n'.format(identifier=identifier)
+            message = """Failed to instantiate custom class for plot "{identifier}".
+                Perhaps lyse.register_plot_class() was called incorrectly from your
+                script? The exception raised was:
+                """.format(identifier=identifier)
+            message = lyse.dedent(message)
             for line in traceback_lines:
                 if PY2:
                     # errors='replace' is for Windows filenames present in the
