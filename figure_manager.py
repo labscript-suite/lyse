@@ -47,7 +47,30 @@ class FigureManager(object):
             i += 1
             
     def set_first_figure_current(self):
-        self._figure(1)
+        identifier = 1
+        fig = self._figure(identifier)
+        if fig not in self.figs.values():
+            self.figs[identifier] = fig
+        elif identifier not in self.__allocated_figures:
+            # handle case where we are swapping from all identified figures
+            # to the first not being explicitly identified through a call to figure()
+            # AND we already had a figure with the identifier of "1" which is what we use
+            # for the default figure
+            if identifier in self.figs and self.figs[identifier] != fig:
+                j = identifier
+                while j in self.figs:
+                    j += 1
+                self.figs[j] = self.figs[identifier]
+                msg = """Warning: detected collision of matplotlib figure identifiers.
+                    Plot output may not be as expected. 
+                    Re-run the analysis script to (hopefully) resolve the collision.
+                    To permanently fix this, please ensure you call figure() prior
+                    to other matplotlib plotting functions.
+                    """
+                sys.stderr.write(lyse.dedent(msg))
+            self.figs[identifier] = fig
+            self.__allocated_figures.append(identifier)
+            self._remove_dead_references(identifier, fig)
                 
     def __call__(self,identifier=None, *args, **kwargs):
         if identifier is None:
