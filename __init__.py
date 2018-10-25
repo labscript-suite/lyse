@@ -42,6 +42,19 @@ from labscript_utils import PY2
 if PY2:
     str = unicode
 
+
+from labscript_utils import labscript_suite_install_dir
+if labscript_suite_install_dir is not None:
+    LYSE_DIR = os.path.join(labscript_suite_install_dir, 'lyse')
+else:
+    # No labscript install directory found? Fall back to relying on __file__
+    LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
+if not os.path.isdir(LYSE_DIR):
+    # Don't want to continue if we have not found the directory:
+    msg = "Cannot locate the directory lyse is installed in."
+    raise RuntimeError(msg)
+
+
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
 # True and path <name of hdf5 file being analysed>:
@@ -431,7 +444,5 @@ def figure_to_clipboard(figure=None, **kwargs):
 
     figure.savefig(tempfile_name, **kwargs)
 
-    import lyse
-    lyse_dir = os.path.dirname(os.path.abspath(lyse.__file__))
-    tempfile2clipboard = os.path.join(lyse_dir, 'tempfile2clipboard.py')
+    tempfile2clipboard = os.path.join(LYSE_DIR, 'tempfile2clipboard.py')
     start_daemon([sys.executable, tempfile2clipboard, '--delete', tempfile_name])
