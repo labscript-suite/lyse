@@ -47,6 +47,12 @@ class FigureManager(object):
             i += 1
             
     def set_first_figure_current(self):
+        # only do this if we have any figures at all
+        # If we don't, we don't want to create one as that sets the size of the
+        # window and then figures sizes are ignored by subsequent runs of the script
+        if len(matplotlib.pyplot.get_fignums()) == 0:
+            return 
+            
         identifier = 1
         fig = self._figure(identifier)
         if fig not in self.figs.values():
