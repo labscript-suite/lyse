@@ -23,51 +23,8 @@ from numpy import *
 import tzlocal
 import labscript_utils.shared_drive
 from labscript_utils.dict_diff import dict_diff
-
+from labscript_utils.connections import _ensure_str
 import runmanager
-
-# Monkey patch a bugfix onto older versions of pandas on Python 2. This code
-# can be removed once lyse otherwise depends on pandas >= 0.21.0.
-# https://github.com/pandas-dev/pandas/pull/17099
-if PY2:
-    try:
-        from labscript_utils import check_version, VersionException
-        check_version('pandas', '0.21.0', '2.0')
-    except VersionException:
-        
-        import numpy as np
-        from pandas import Series, Index
-        from pandas.core.indexing import maybe_droplevels
-        def _getitem_multilevel(self, key):
-            loc = self.columns.get_loc(key)
-            if isinstance(loc, (slice, Series, np.ndarray, Index)):
-                new_columns = self.columns[loc]
-                result_columns = maybe_droplevels(new_columns, key)
-                if self._is_mixed_type:
-                    result = self.reindex(columns=new_columns)
-                    result.columns = result_columns
-                else:
-                    new_values = self.values[:, loc]
-                    result = self._constructor(new_values, index=self.index,
-                                               columns=result_columns)
-                    result = result.__finalize__(self)
-                if len(result.columns) == 1:
-                    top = result.columns[0]
-                    if isinstance(top, tuple):
-                        top = top[0]
-                    if top == '':
-                        result = result['']
-                        if isinstance(result, Series):
-                            result = self._constructor_sliced(result,
-                                                              index=self.index,
-                                                              name=key)
-
-                result._set_is_copy(self)
-                return result
-            else:
-                return self._get_item_cache(key)
-
-        pandas.DataFrame._getitem_multilevel = _getitem_multilevel
 
 
 def asdatetime(timestr):
@@ -95,17 +52,18 @@ def get_nested_dict_from_shot(filepath):
                             for key, val in group[image].attrs.items():
                                 if not isinstance(val, h5py.Reference):
                                     row[orientation][label][image][key] = val
-        row['filepath'] = filepath
+        row['filepath'] = _ensure_str(filepath)
         row['agnostic_path'] = labscript_utils.shared_drive.path_to_agnostic(filepath)
-        row['sequence'] = asdatetime(h5_file.attrs['sequence_id'].split('_')[0])
+        seq_id = _ensure_str(h5_file.attrs['sequence_id'])
+        row['sequence'] = asdatetime(seq_id.split('_')[0])
         try:
             row['sequence_index'] = h5_file.attrs['sequence_index']
         except KeyError:
             row['sequence_index'] = None
         if 'script' in h5_file: 
-            row['labscript'] = h5_file['script'].attrs['name']
+            row['labscript'] = _ensure_str(h5_file['script'].attrs['name'])
         try:
-            row['run time'] = asdatetime(h5_file.attrs['run time'])
+            row['run time'] = asdatetime(_ensure_str(h5_file.attrs['run time']))
         except KeyError:
             row['run time'] = float('nan')
         try:    
@@ -116,11 +74,6 @@ def get_nested_dict_from_shot(filepath):
             row['run repeat'] = h5_file.attrs['run repeat']
         except KeyError:
             row['run repeat'] = 0
-        try:
-            row['individual id'] = h5_file.attrs['individual id']
-            row['generation'] = h5_file.attrs['generation']
-        except KeyError:
-            pass
         return row
             
 def flatten_dict(dictionary, keys=tuple()):
@@ -151,7 +104,6 @@ def flat_dict_to_hierarchical_dataframe(dictionary):
     return pandas.DataFrame([result],columns=index)  
 
 def flat_dict_to_flat_series(dictionary):
-    max_tuple_length = 2 # Must have at least two levels to make a MultiIndex
     result = {}
     for key in dictionary:
         if len(key) > 1:
