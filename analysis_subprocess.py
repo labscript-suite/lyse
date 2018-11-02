@@ -37,6 +37,7 @@ else:
     matplotlib.use("QT4Agg")
 
 import lyse
+from lyse import LYSE_DIR
 lyse.spinning_top = True
 import lyse.figure_manager
 lyse.figure_manager.install()
@@ -98,11 +99,11 @@ class _DeprecationDict(dict):
 
 def set_win_appusermodel(window_id):
     from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
-    icon_path = os.path.abspath('lyse.ico')
+    icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
     executable = sys.executable.lower()
     if not executable.endswith('w.exe'):
         executable = executable.replace('.exe', 'w.exe')
-    relaunch_command = executable + ' ' + os.path.abspath(__file__.replace('.pyc', '.py'))
+    relaunch_command = executable + ' ' + os.path.join(LYSE_DIR, '__main__.py')
     relaunch_display_name = app_descriptions['lyse']
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
 
@@ -139,7 +140,7 @@ class Plot(object):
     def __init__(self, figure, identifier, filepath):
         self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'plot_window.ui'), PlotWindow(self))
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow())
 
         # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
         if os.name == 'nt':

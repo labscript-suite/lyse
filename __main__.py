@@ -57,10 +57,7 @@ if PY2:
     import Queue as queue
 else:
     import queue
-
-# Set working directory to lyse folder, resolving symlinks
-lyse_dir = os.path.dirname(os.path.realpath(__file__))
-os.chdir(lyse_dir)
+from lyse import LYSE_DIR
 
 # Set a meaningful name for zprocess.locking's client id:
 zprocess.locking.set_client_process_name('lyse')
@@ -68,11 +65,11 @@ zprocess.locking.set_client_process_name('lyse')
 
 def set_win_appusermodel(window_id):
     from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
-    icon_path = os.path.abspath('lyse.ico')
+    icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
     executable = sys.executable.lower()
     if not executable.endswith('w.exe'):
         executable = executable.replace('.exe', 'w.exe')
-    relaunch_command = executable + ' ' + os.path.abspath(__file__.replace('.pyc', '.py'))
+    relaunch_command = executable + ' ' + os.path.join(LYSE_DIR, '__main__.py')
     relaunch_display_name = app_descriptions['lyse']
     set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
 
@@ -263,7 +260,8 @@ class AnalysisRoutine(object):
         
     def start_worker(self):
         # Start a worker process for this analysis routine:
-        child_handles = zprocess.subprocess_with_queues('analysis_subprocess.py', self.output_box_port)
+        worker_path = os.path.join(LYSE_DIR, 'analysis_subprocess.py')
+        child_handles = zprocess.subprocess_with_queues(worker_path, self.output_box_port)
         to_worker, from_worker, worker = child_handles
         # Tell the worker what script it with be executing:
         to_worker.put(self.filepath)
@@ -445,7 +443,7 @@ class RoutineBox(object):
         
         loader = UiLoader()
         loader.registerCustomWidget(TreeView)
-        self.ui = loader.load('routinebox.ui')
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'routinebox.ui'))
         container.addWidget(self.ui)
 
         if multishot:
@@ -792,14 +790,6 @@ class RoutineBox(object):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
             else:
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
-                
-   # TESTING ONLY REMOVE IN PRODUCTION
-    def queue_dummy_routines(self):
-        folder = os.path.abspath('test_routines')
-        for filepath in ['hello.py', 'test.py']:
-            routine = AnalysisRoutine(os.path.join(folder, filepath), self.model, self.output_box_port)
-            self.routines.append(routine)
-        self.update_select_all_checkstate()
 
 
 class EditColumnsDialog(QtWidgets.QDialog):
@@ -833,7 +823,7 @@ class EditColumns(object):
         self.old_columns_visible = columns_visible.copy()
 
         loader = UiLoader()
-        self.ui = loader.load('edit_columns.ui', EditColumnsDialog())
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'edit_columns.ui'), EditColumnsDialog())
 
         self.model = UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
@@ -1591,7 +1581,7 @@ class FileBox(object):
 
         loader = UiLoader()
         loader.registerCustomWidget(TableView)
-        self.ui = loader.load('filebox.ui')
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'filebox.ui'))
         self.ui.progressBar_add_shots.hide()
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.ui.tableView, self.exp_config)
@@ -1885,7 +1875,7 @@ class Lyse(object):
 
     def __init__(self):
         loader = UiLoader()
-        self.ui = loader.load('main.ui', LyseMainWindow())
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow())
 
         self.connect_signals()
 
