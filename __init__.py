@@ -19,6 +19,7 @@ import socket
 import pickle as pickle
 import inspect
 import sys
+import threading
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -37,8 +38,8 @@ except ImportError:
 
 check_version('pandas', '0.21.0', '1.0')
 check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.6', '3.0')
-from labscript_utils import PY2
+check_version('labscript_utils', '2.8.1', '3.0')
+from labscript_utils import PY2, dedent
 if PY2:
     str = unicode
 
@@ -48,6 +49,16 @@ if PY2:
 spinning_top = False
 # data to be sent back to the lyse GUI if running within lyse
 _updated_data = {}
+# dictionary of plot id's to classes to use for Plot object
+_plot_classes = {}
+# A fake Plot object to subclass if we are not running in the GUI
+Plot=object
+# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
+plots = {}
+# A threading.Event to delay the 
+delay_event = threading.Event()
+# a flag to determine whether we should wait for the delay event
+_delay_flag = False
 
 # get port that lyse is using for communication
 try:
@@ -435,3 +446,24 @@ def figure_to_clipboard(figure=None, **kwargs):
     lyse_dir = os.path.dirname(os.path.abspath(lyse.__file__))
     tempfile2clipboard = os.path.join(lyse_dir, 'tempfile2clipboard.py')
     start_daemon([sys.executable, tempfile2clipboard, '--delete', tempfile_name])
+
+
+def register_plot_class(identifier, cls):
+    if not spinning_top:
+        msg = """Warning: lyse.register_plot_class has no effect on scripts not run with
+            the lyse GUI.
+            """
+        sys.stderr.write(dedent(msg))
+    _plot_classes[identifier] = cls
+
+def get_plot_class(identifier):
+    return _plot_classes.get(identifier, None)
+
+def delay_results_return():
+    global _delay_flag
+    if not spinning_top:
+        msg = """Warning: lyse.delay_results_return has no effect on scripts not run 
+            with the lyse GUI.
+            """
+        sys.stderr.write(dedent(msg))
+    _delay_flag = True
