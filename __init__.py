@@ -29,7 +29,7 @@ import types
 
 from zprocess import zmq_get
 
-__version__ = '2.3.0'
+__version__ = '2.3.1'
 
 try:
     from labscript_utils import check_version

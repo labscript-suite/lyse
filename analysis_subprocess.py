@@ -140,7 +140,7 @@ class Plot(object):
     def __init__(self, figure, identifier, filepath):
         self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow())
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow(self))
 
         # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
         if os.name == 'nt':
