@@ -1,8 +1,20 @@
 from __future__ import division, unicode_literals, print_function, absolute_import  # Ease the transition to Python 3
 
-# stdlib imports
-
 import os
+import labscript_utils.excepthook
+
+try:
+    from labscript_utils import check_version
+except ImportError:
+    raise ImportError('Require labscript_utils > 2.1.0')
+
+check_version('labscript_utils', '2.10.0', '3')
+# Splash screen
+from labscript_utils.splash import Splash
+splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.ico'))
+splash.show()
+
+# stdlib imports
 import sys
 import socket
 import logging
@@ -13,10 +25,6 @@ import time
 import traceback
 import pprint
 import ast
-
-# Turn on our error catching for all subsequent imports
-import labscript_utils.excepthook
-
 
 # 3rd party imports:
 
@@ -2265,5 +2273,6 @@ if __name__ == "__main__":
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
+    splash.hide()
     qapplication.exec_()
     server.shutdown()
