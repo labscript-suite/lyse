@@ -14,6 +14,7 @@ from labscript_utils.splash import Splash
 splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.ico'))
 splash.show()
 
+splash.update_text('importing standard library modules')
 # stdlib imports
 import sys
 import socket
@@ -27,22 +28,22 @@ import pprint
 import ast
 
 # 3rd party imports:
-
+splash.update_text('importing numpy')
 import numpy as np
+splash.update_text('importing h5_lock and h5py')
 import labscript_utils.h5_lock
 import h5py
+splash.update_text('importing pandas')
 import pandas
 
-try:
-    from labscript_utils import check_version
-except ImportError:
-    raise ImportError('Require labscript_utils > 2.1.0')
-
+splash.update_text('importing Qt')
 check_version('qtutils', '2.1.0', '3.0.0')
 
+splash.update_text('importing zprocess')
 import zprocess.locking
 from zprocess import ZMQServer
 
+splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
@@ -1882,6 +1883,7 @@ class FileBox(object):
 class Lyse(object):
 
     def __init__(self):
+        splash.update_text('loading graphical interface')
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow())
 
@@ -2264,8 +2266,9 @@ if __name__ == "__main__":
     app = Lyse()
 
     # Start the web server:
+    splash.update_text('starting analysis server')
     server = WebServer(app.port)
-
+    splash.update_text('done')
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
     timer.start(500)
