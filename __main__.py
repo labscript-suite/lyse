@@ -11,7 +11,7 @@ except ImportError:
 check_version('labscript_utils', '2.10.0', '3')
 # Splash screen
 from labscript_utils.splash import Splash
-splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.ico'))
+splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
 splash.show()
 
 splash.update_text('importing standard library modules')
