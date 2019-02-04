@@ -1927,7 +1927,7 @@ class Lyse(object):
 
             def load_the_config_file():
                 try:
-                    self.load_configuration(autoload_config_file)
+                    self.load_configuration(autoload_config_file, restore_window_geometry)
                     self.output_box.output('done.\n')
                 except Exception as e:
                     self.output_box.output('\nCould not load config file: %s: %s\n\n' %
@@ -1936,8 +1936,16 @@ class Lyse(object):
                     self.output_box.output('Ready.\n\n')
                 finally:
                     self.ui.setEnabled(True)
-            # Defer this until 50ms after the window has shown,
-            # so that the GUI pops up faster in the meantime
+            # Load the window geometry now, but then defer the other loading until 50ms
+            # after the window has shown, so that the GUI pops up faster in the meantime.
+            try:
+                self.load_window_geometry_configuration(autoload_config_file)
+            except Exception:
+                # ignore error for now and let it be raised again in the call to load_configuration:
+                restore_window_geometry = True
+            else:
+                # Success - skip loading window geometry in load_configuration:
+                restore_window_geometry = False
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
 
         self.ui.show()
@@ -2083,7 +2091,7 @@ class Lyse(object):
         file = os.path.abspath(file)
         self.load_configuration(file)
 
-    def load_configuration(self, filename):
+    def load_configuration(self, filename, restore_window_geometry=True):
         self.last_save_config_file = filename
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
         lyse_config = LabConfig(filename)
@@ -2113,6 +2121,20 @@ class Lyse(object):
                 self.filebox.pause_analysis()
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             pass
+        if restore_window_geometry:
+            self.load_window_geometry_configuration(filename)
+
+        # Set as self.last_save_data:
+        save_data = self.get_save_data()
+        self.last_save_data = save_data
+        self.ui.actionSave_configuration_as.setEnabled(True)
+        self.ui.actionRevert_configuration.setEnabled(True)
+
+    def load_window_geometry_configuration(self, filename):
+        """Load only the window geometry from the config file. It's useful to have this
+        separate from the rest of load_configuration so that it can be called before the
+        window is shown."""
+        lyse_config = LabConfig(filename)
         try:
             screen_geometry = ast.literal_eval(lyse_config.get('lyse_state', 'screen_geometry'))
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
@@ -2147,11 +2169,6 @@ class Lyse(object):
                 except (LabConfig.NoOptionError, LabConfig.NoSectionError):
                     pass
 
-        # Set as self.last_save_data:
-        save_data = self.get_save_data()
-        self.last_save_data = save_data
-        self.ui.actionSave_configuration_as.setEnabled(True)
-        self.ui.actionRevert_configuration.setEnabled(True)
 
     def setup_config(self):
         required_config_params = {"DEFAULT": ["experiment_name"],
