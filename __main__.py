@@ -1,8 +1,21 @@
 from __future__ import division, unicode_literals, print_function, absolute_import  # Ease the transition to Python 3
 
-# stdlib imports
-
 import os
+import labscript_utils.excepthook
+
+try:
+    from labscript_utils import check_version
+except ImportError:
+    raise ImportError('Require labscript_utils > 2.1.0')
+
+check_version('labscript_utils', '2.10.0', '3')
+# Splash screen
+from labscript_utils.splash import Splash
+splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
+splash.show()
+
+splash.update_text('importing standard library modules')
+# stdlib imports
 import sys
 import socket
 import logging
@@ -14,27 +27,23 @@ import traceback
 import pprint
 import ast
 
-# Turn on our error catching for all subsequent imports
-import labscript_utils.excepthook
-
-
 # 3rd party imports:
-
+splash.update_text('importing numpy')
 import numpy as np
+splash.update_text('importing h5_lock and h5py')
 import labscript_utils.h5_lock
 import h5py
+splash.update_text('importing pandas')
 import pandas
 
-try:
-    from labscript_utils import check_version
-except ImportError:
-    raise ImportError('Require labscript_utils > 2.1.0')
-
+splash.update_text('importing Qt')
 check_version('qtutils', '2.1.0', '3.0.0')
 
+splash.update_text('importing zprocess')
 import zprocess.locking
 from zprocess import ZMQServer
 
+splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
@@ -1874,6 +1883,7 @@ class FileBox(object):
 class Lyse(object):
 
     def __init__(self):
+        splash.update_text('loading graphical interface')
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow())
 
@@ -2273,8 +2283,9 @@ if __name__ == "__main__":
     app = Lyse()
 
     # Start the web server:
+    splash.update_text('starting analysis server')
     server = WebServer(app.port)
-
+    splash.update_text('done')
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
     timer.start(500)
@@ -2282,5 +2293,6 @@ if __name__ == "__main__":
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
+    splash.hide()
     qapplication.exec_()
     server.shutdown()
