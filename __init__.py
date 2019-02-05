@@ -169,6 +169,13 @@ class Run(object):
                 return list(h5_file['data']['traces'].keys())
             except KeyError:
                 return []
+                
+    def get_attrs(self, group):
+        """Returns all attributes of the specified group as a dictionary."""
+        with h5py.File(self.h5_path) as h5_file:
+            if not group in h5_file:
+                raise Exception('The group \'%s\' does not exist'%group)
+            return dict(h5_file[group].attrs)
 
     def get_trace(self,name):
         with h5py.File(self.h5_path) as h5_file:
@@ -185,7 +192,29 @@ class Run(object):
                 raise Exception('The result array \'%s\' doesn not exist'%name)
             return array(h5_file['results'][group][name])
             
+    def get_result(self, group, name):
+        """Return 'result' in 'results/group' that was saved by 
+        the save_result() method."""
+        with h5py.File(self.h5_path) as h5_file:
+            if not group in h5_file['results']:
+                raise Exception('The result group \'%s\' does not exist'%group)
+            if not name in h5_file['results'][group].attrs.keys():
+                raise Exception('The result \'%s\' does not exist'%name)
+            return h5_file['results'][group].attrs.get(name)
+            
+    def get_results(self, group, *names):
+        """Iteratively call get_result(group,name) for each name provided.
+        Returns a list of all results in same order as names provided."""
+        results = []
+        for name in names:
+            results.append(self.get_result(group,name))
+        return results        
+            
     def save_result(self, name, value, group=None, overwrite=True):
+        """Save a result to h5 file. Defaults are to save to the active group 
+        in the 'results' group and overwrite an existing result.
+        Note that the result is saved as an attribute of 'results/group' and
+        overwriting attributes causes h5 file size bloat."""
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -211,8 +240,8 @@ class Run(object):
 
     def save_result_array(self, name, data, group=None, 
                           overwrite=True, keep_attrs=False, **kwargs):
-        """Save data array to h5 file. Defaults are to save to the group 'results'
-        and overwrite existing data.
+        """Save data array to h5 file. Defaults are to save to the active 
+        group in the 'results' group and overwrite existing data.
         Additional keyword arguments are passed directly to h5py.create_dataset()."""
         if self.no_write:
             raise Exception('This run is read-only. '
@@ -253,12 +282,16 @@ class Run(object):
             results.append(self.get_result_array(group, name))
         return results
         
-    def save_results(self, *args):
+    def save_results(self, *args, **kwargs):
+        """Iteratively call save_result() on multiple results.
+        Assumes arguments are ordered such that each result to be saved is
+        preceeded by the name of the attribute to save it under.
+        Keywords arguments are passed to each call of save_result()."""
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
             print('saving %s =' % name, value)
-            self.save_result(name, value)
+            self.save_result(name, value, **kwargs)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
         for name, value in results_dict.items():
