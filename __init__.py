@@ -209,7 +209,11 @@ class Run(object):
                 _updated_data[self.h5_path] = {}
             _updated_data[self.h5_path][str(self.group), name] = value
 
-    def save_result_array(self, name, data, group=None, overwrite=True, keep_attrs=False):
+    def save_result_array(self, name, data, group=None, 
+                          overwrite=True, keep_attrs=False, **kwargs):
+        """Save data array to h5 file. Defaults are to save to the group 'results'
+        and overwrite existing data.
+        Additional keyword arguments are passed directly to h5py.create_dataset()."""
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -233,7 +237,7 @@ class Run(object):
                 else:
                     raise Exception('Dataset %s exists. Use overwrite=True to overwrite.' % 
                                      group + '/' + name)
-            h5_file[group].create_dataset(name, data=data)
+            h5_file[group].create_dataset(name, data=data, **kwargs)
             for key, val in attrs.items():
                 h5_file[group][name].attrs[key] = val
 
@@ -264,11 +268,15 @@ class Run(object):
                 self.save_result(name, value[0], **kwargs)
                 self.save_result('u_' + name, value[1], **kwargs)
 
-    def save_result_arrays(self, *args):
+    def save_result_arrays(self, *args, **kwargs):
+        """Iteratively call save_result_array() on multiple data sets. 
+        Assumes arguments are ordered such that each dataset to be saved is 
+        preceeded by the name to save it as. 
+        All keyword arguments are passed to each call of save_result_array()."""
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
-            self.save_result_array(name, value)
+            self.save_result_array(name, value, **kwargs)
     
     def get_image(self,orientation,label,image):
         with h5py.File(self.h5_path) as h5_file:
