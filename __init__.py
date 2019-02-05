@@ -169,6 +169,13 @@ class Run(object):
                 return list(h5_file['data']['traces'].keys())
             except KeyError:
                 return []
+                
+    def get_attrs(self, group):
+        """Returns all attributes of the specified group as a dictionary."""
+        with h5py.File(self.h5_path) as h5_file:
+            if not group in h5_file:
+                raise Exception('The group \'%s\' does not exist'%group)
+            return dict(h5_file[group].attrs)
 
     def get_trace(self,name):
         with h5py.File(self.h5_path) as h5_file:
