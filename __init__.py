@@ -185,6 +185,24 @@ class Run(object):
                 raise Exception('The result array \'%s\' doesn not exist'%name)
             return array(h5_file['results'][group][name])
             
+    def get_result(self, group, name):
+        """Return 'result' in 'results/group' that was saved by 
+        the save_result() method."""
+        with h5py.File(self.h5_path) as h5_file:
+            if not group in h5_file['results']:
+                raise Exception('The result group \'%s\' does not exist'%group)
+            if not name in h5_file['results'][group].attrs.keys():
+                raise Exception('The result \'%s\' does not exist'%name)
+            return h5_file['results'][group].attrs.get(name)
+            
+    def get_results(self, group, *names):
+        """Iteratively call get_result(group,name) for each name provided.
+        Returns a list of all results in same order as names provided."""
+        results = []
+        for name in names:
+            results.append(self.get_result(group,name))
+        return results        
+            
     def save_result(self, name, value, group=None, overwrite=True):
         if self.no_write:
             raise Exception('This run is read-only. '
