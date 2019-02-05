@@ -209,7 +209,8 @@ class Run(object):
                 _updated_data[self.h5_path] = {}
             _updated_data[self.h5_path][str(self.group), name] = value
 
-    def save_result_array(self, name, data, group=None, overwrite=True, keep_attrs=False):
+    def save_result_array(self, name, data, group=None, 
+                          overwrite=True, keep_attrs=False, **compress_args):
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -233,7 +234,7 @@ class Run(object):
                 else:
                     raise Exception('Dataset %s exists. Use overwrite=True to overwrite.' % 
                                      group + '/' + name)
-            h5_file[group].create_dataset(name, data=data)
+            h5_file[group].create_dataset(name, data=data, **compress_args)
             for key, val in attrs.items():
                 h5_file[group][name].attrs[key] = val
 
@@ -264,11 +265,11 @@ class Run(object):
                 self.save_result(name, value[0], **kwargs)
                 self.save_result('u_' + name, value[1], **kwargs)
 
-    def save_result_arrays(self, *args):
+    def save_result_arrays(self, *args, **compress_args):
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
-            self.save_result_array(name, value)
+            self.save_result_array(name, value, **compress_args)
     
     def get_image(self,orientation,label,image):
         with h5py.File(self.h5_path) as h5_file:
