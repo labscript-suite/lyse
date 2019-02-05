@@ -204,6 +204,10 @@ class Run(object):
         return results        
             
     def save_result(self, name, value, group=None, overwrite=True):
+        """Save a result to h5 file. Defaults are to save to the active group 
+        in the 'results' group and overwrite an existing result.
+        Note that the result is saved as an attribute of 'results/group' and
+        overwriting attributes causes h5 file size bloat."""
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -229,8 +233,8 @@ class Run(object):
 
     def save_result_array(self, name, data, group=None, 
                           overwrite=True, keep_attrs=False, **kwargs):
-        """Save data array to h5 file. Defaults are to save to the group 'results'
-        and overwrite existing data.
+        """Save data array to h5 file. Defaults are to save to the active 
+        group in the 'results' group and overwrite existing data.
         Additional keyword arguments are passed directly to h5py.create_dataset()."""
         if self.no_write:
             raise Exception('This run is read-only. '
@@ -271,12 +275,16 @@ class Run(object):
             results.append(self.get_result_array(group, name))
         return results
         
-    def save_results(self, *args):
+    def save_results(self, *args, **kwargs):
+        """Iteratively call save_result() on multiple results.
+        Assumes arguments are ordered such that each result to be saved is
+        preceeded by the name of the attribute to save it under.
+        Keywords arguments are passed to each call of save_result()."""
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
             print('saving %s =' % name, value)
-            self.save_result(name, value)
+            self.save_result(name, value, **kwargs)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
         for name, value in results_dict.items():
