@@ -27,8 +27,6 @@ import pandas
 from numpy import array, ndarray
 import types
 
-from zprocess import zmq_get
-
 __version__ = '2.3.1'
 
 try:
@@ -38,8 +36,9 @@ except ImportError:
 
 check_version('pandas', '0.21.0', '1.0')
 check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.9.1', '3.0')
+check_version('labscript_utils', '2.11.0', '3.0')
 from labscript_utils import PY2, dedent
+from labscript_utils.ls_zprocess import zmq_get
 if PY2:
     str = unicode
 

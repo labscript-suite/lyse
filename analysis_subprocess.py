@@ -17,8 +17,11 @@ if PY2:
     str = unicode
 
 import labscript_utils.excepthook
-import zprocess
-to_parent, from_parent, kill_lock = zprocess.setup_connection_with_parent(lock = True)
+from labscript_utils.ls_zprocess import ProcessTree
+process_tree = ProcessTree.connect_to_parent()
+to_parent = process_tree.to_parent
+from_parent = process_tree.from_parent
+kill_lock = process_tree.kill_lock
 
 import sys
 import os
@@ -47,9 +50,8 @@ if QT_ENV == PYQT5:
 else:
     from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 import pylab
-import zprocess.locking, labscript_utils.h5_lock, h5py
+import labscript_utils.h5_lock, h5py
 
-import zprocess
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
@@ -539,8 +541,8 @@ class AnalysisWorker(object):
 if __name__ == '__main__':
     filepath = from_parent.get()
     
-    # Set a meaningful client id for zprocess.locking:
-    zprocess.locking.set_client_process_name('lyse-'+os.path.basename(filepath))
+    # Set a meaningful client id for zlock
+    process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
     qapplication = QtWidgets.QApplication(sys.argv)
     worker = AnalysisWorker(filepath, to_parent, from_parent)

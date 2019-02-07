@@ -39,14 +39,14 @@ import pandas
 splash.update_text('importing Qt')
 check_version('qtutils', '2.1.0', '3.0.0')
 
-splash.update_text('importing zprocess')
-import zprocess.locking
-from zprocess import ZMQServer
-
 splash.update_text('importing labscript suite modules')
+check_version('labscript_utils', '2.11.0', '3')
+
+from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
+from labscript_utils.qtwidgets.outputbox import OutputBox
 import labscript_utils.shared_drive as shared_drive
 
 from lyse.dataframe_utilities import (concat_with_padding,
@@ -56,7 +56,6 @@ from lyse.dataframe_utilities import (concat_with_padding,
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
-from qtutils.outputbox import OutputBox
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
 
@@ -68,8 +67,10 @@ else:
     import queue
 from lyse import LYSE_DIR
 
-# Set a meaningful name for zprocess.locking's client id:
-zprocess.locking.set_client_process_name('lyse')
+process_tree = ProcessTree.instance()
+
+# Set a meaningful name for zlock client id:
+process_tree.zlock_client.set_process_name('lyse')
 
 
 def set_win_appusermodel(window_id):
@@ -270,7 +271,11 @@ class AnalysisRoutine(object):
     def start_worker(self):
         # Start a worker process for this analysis routine:
         worker_path = os.path.join(LYSE_DIR, 'analysis_subprocess.py')
-        child_handles = zprocess.subprocess_with_queues(worker_path, self.output_box_port)
+
+        child_handles = process_tree.subprocess(
+            worker_path, output_redirection_port=self.output_box_port
+        )
+        
         to_worker, from_worker, worker = child_handles
         # Tell the worker what script it with be executing:
         to_worker.put(self.filepath)
