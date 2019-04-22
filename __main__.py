@@ -43,6 +43,7 @@ splash.update_text('importing labscript suite modules')
 check_version('labscript_utils', '2.11.0', '3')
 
 from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
+import zprocess
 from labscript_utils.labconfig import LabConfig, config_prefix
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
@@ -1410,7 +1411,7 @@ class DataFrameModel(QtCore.QObject):
             self._model.setHorizontalHeaderItem(column_number, header_item)
         if new_column_names:
             # Update the visibility state of new columns, in case some new columns are hidden:
-            self.set_columns_visible
+            self.set_columns_visible(self.columns_visible)
 
         # Check and remove any no-longer-needed columns in the Qt model:
         defunct_column_names = (set(self.column_names.values()) - set(self.dataframe.columns)
@@ -1686,8 +1687,8 @@ class FileBox(object):
         self.analysis_pending.set()
         
     def on_run_multishot_analysis_clicked(self):
-         self.multishot_required = True
-         self.analysis_pending.set()
+        self.multishot_required = True
+        self.analysis_pending.set()
         
     def set_columns_visible(self, columns_visible):
         self.shots_model.set_columns_visible(columns_visible)
