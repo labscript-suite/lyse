@@ -1157,7 +1157,7 @@ class DataFrameModel(QtCore.QObject):
 
         self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
-        self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
         
         # Smaller font for headers:
         font = self._vertheader.font();
