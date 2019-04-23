@@ -1503,7 +1503,7 @@ class DataFrameModel(QtCore.QObject):
         for row_number in range(add_from, self._model.rowCount()):
             vertical_header_item = self._model.verticalHeaderItem(row_number)
             row_number_str = str(row_number).rjust(n_digits)
-            vert_header_text = '{}. |'.format(row_number_str)
+            vert_header_text = '{}. '.format(row_number_str)
             filepath_item = self._model.item(row_number, self.COL_FILEPATH)
             filepath = filepath_item.text()
             self.row_number_by_filepath[filepath] = row_number
