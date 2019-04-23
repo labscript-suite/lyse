@@ -1156,22 +1156,16 @@ class DataFrameModel(QtCore.QObject):
         self.row_number_by_filepath = {}
         self._previous_n_digits = 0
 
-        headerview_style = """
-                           QHeaderView {
-                             font-size: 8pt;
-                             color: black;
-                           }
-                           QHeaderView::section{
-                             font-size: 8pt;
-                             color: black;
-                           }
-                           """
-                           
         self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
         self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
-        self._vertheader.setStyleSheet(headerview_style)
-        self._header.setStyleSheet(headerview_style)
+
+        # Smaller font for headers:
+        font = self._vertheader.font()
+        font.setPointSize(8)
+        self._vertheader.setFont(font)
+        self._header.setFont(font)
+
         self._vertheader.setHighlightSections(True)
         self._vertheader.setSectionsClickable(True)
         self._view.setModel(self._model)
@@ -1507,7 +1501,7 @@ class DataFrameModel(QtCore.QObject):
         for row_number in range(add_from, self._model.rowCount()):
             vertical_header_item = self._model.verticalHeaderItem(row_number)
             row_number_str = str(row_number).rjust(n_digits)
-            vert_header_text = '{}. |'.format(row_number_str)
+            vert_header_text = '{}. '.format(row_number_str)
             filepath_item = self._model.item(row_number, self.COL_FILEPATH)
             filepath = filepath_item.text()
             self.row_number_by_filepath[filepath] = row_number
