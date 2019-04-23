@@ -1409,9 +1409,6 @@ class DataFrameModel(QtCore.QObject):
             header_item = QtGui.QStandardItem(column_name_as_string)
             header_item.setToolTip(column_name_as_string)
             self._model.setHorizontalHeaderItem(column_number, header_item)
-        if new_column_names:
-            # Update the visibility state of new columns, in case some new columns are hidden:
-            self.set_columns_visible(self.columns_visible)
 
         # Check and remove any no-longer-needed columns in the Qt model:
         defunct_column_names = (set(self.column_names.values()) - set(self.dataframe.columns)
