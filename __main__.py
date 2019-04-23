@@ -1155,22 +1155,16 @@ class DataFrameModel(QtCore.QObject):
         self.row_number_by_filepath = {}
         self._previous_n_digits = 0
 
-        headerview_style = """
-                           QHeaderView {
-                             font-size: 8pt;
-                             color: black;
-                           }
-                           QHeaderView::section{
-                             font-size: 8pt;
-                             color: black;
-                           }
-                           """
-                           
         self._header = HorizontalHeaderViewWithWidgets(self._model)
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
-        self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
-        self._vertheader.setStyleSheet(headerview_style)
-        self._header.setStyleSheet(headerview_style)
+        self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Interactive)
+        
+        # Smaller font for headers:
+        font = self._vertheader.font();
+        font.setPointSize(8);
+        self._vertheader.setFont(font)
+        self._header.setFont(font)
+
         self._vertheader.setHighlightSections(True)
         self._vertheader.setSectionsClickable(True)
         self._view.setModel(self._model)
