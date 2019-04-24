@@ -1163,8 +1163,9 @@ class DataFrameModel(QtCore.QObject):
         # Smaller font for headers:
         font = self._vertheader.font()
         font.setPointSize(8)
-        self._vertheader.setFont(font)
         self._header.setFont(font)
+        font.setFamily('Ubuntu Mono')
+        self._vertheader.setFont(font)
 
         self._vertheader.setHighlightSections(True)
         self._vertheader.setSectionsClickable(True)
@@ -1511,13 +1512,13 @@ class DataFrameModel(QtCore.QObject):
                 for col in header_cols:
                     val = self.dataframe[col].values[row_number]
                     if pandas.notna(val):
-                        header_strings.append(' {:04d}'.format(val))
+                        header_strings.append('{:04d}'.format(val))
                     else:
                         header_strings.append('----')
-                vert_header_text += ' |'.join(header_strings)
+                vert_header_text += ' | '.join(header_strings)
             else:
                 basename = os.path.splitext(os.path.basename(filepath))[0]
-                vert_header_text += ' ' + basename
+                vert_header_text += basename
             vertical_header_item.setText(vert_header_text)
     
     @inmain_decorator()
