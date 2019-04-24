@@ -37,7 +37,7 @@ splash.update_text('importing pandas')
 import pandas
 
 splash.update_text('importing Qt')
-check_version('qtutils', '2.1.0', '3.0.0')
+check_version('qtutils', '2.2.2', '3.0.0')
 
 splash.update_text('importing labscript suite modules')
 check_version('labscript_utils', '2.11.0', '3')
@@ -1164,6 +1164,7 @@ class DataFrameModel(QtCore.QObject):
         font = self._vertheader.font()
         font.setPointSize(8)
         self._header.setFont(font)
+        font.setPointSize(7)
         font.setFamily('Ubuntu Mono')
         self._vertheader.setFont(font)
 
