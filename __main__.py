@@ -1509,10 +1509,10 @@ class DataFrameModel(QtCore.QObject):
                 header_cols = ['sequence_index', 'run number', 'run repeat']
                 header_strings = []
                 for col in header_cols:
-                    try:
-                        val = self.dataframe[col].values[row_number]
+                    val = self.dataframe[col].values[row_number]
+                    if pandas.notna(val):
                         header_strings.append(' {:04d}'.format(val))
-                    except (KeyError, ValueError):
+                    else:
                         header_strings.append('----')
                 vert_header_text += ' |'.join(header_strings)
             else:
