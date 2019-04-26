@@ -1162,9 +1162,8 @@ class DataFrameModel(QtCore.QObject):
 
         # Smaller font for headers:
         font = self._vertheader.font()
-        font.setPointSize(8)
+        font.setPointSize(10 if sys.platform == 'darwin' else 8)
         self._header.setFont(font)
-        font.setPointSize(7)
         font.setFamily('Ubuntu Mono')
         self._vertheader.setFont(font)
 
