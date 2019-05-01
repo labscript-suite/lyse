@@ -18,10 +18,6 @@ if PY2:
 
 import labscript_utils.excepthook
 from labscript_utils.ls_zprocess import ProcessTree
-process_tree = ProcessTree.connect_to_parent()
-to_parent = process_tree.to_parent
-from_parent = process_tree.from_parent
-kill_lock = process_tree.kill_lock
 
 import sys
 import os
@@ -33,29 +29,8 @@ from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV, PYQT5
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
-import matplotlib
-if QT_ENV == PYQT5:
-    matplotlib.use("QT5Agg")
-else:
-    matplotlib.use("QT4Agg")
-
-import lyse
-from lyse import LYSE_DIR
-lyse.spinning_top = True
-import lyse.figure_manager
-lyse.figure_manager.install()
-
-if QT_ENV == PYQT5:
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-else:
-    from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-import pylab
-import labscript_utils.h5_lock, h5py
-
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
-
-from labscript_utils.modulewatcher import ModuleWatcher
 
 class _DeprecationDict(dict):
     """Dictionary that spouts deprecation warnings when you try to access some
@@ -539,6 +514,32 @@ class AnalysisWorker(object):
         
         
 if __name__ == '__main__':
+
+    import matplotlib
+    if QT_ENV == PYQT5:
+        matplotlib.use("QT5Agg")
+    else:
+        matplotlib.use("QT4Agg")
+
+    import lyse
+    from lyse import LYSE_DIR
+    lyse.spinning_top = True
+    import lyse.figure_manager
+    lyse.figure_manager.install()
+
+    if QT_ENV == PYQT5:
+        from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+    else:
+        from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+    import pylab
+    import labscript_utils.h5_lock, h5py
+
+    from labscript_utils.modulewatcher import ModuleWatcher
+
+    process_tree = ProcessTree.connect_to_parent()
+    to_parent = process_tree.to_parent
+    from_parent = process_tree.from_parent
+    kill_lock = process_tree.kill_lock
     filepath = from_parent.get()
     
     # Set a meaningful client id for zlock
