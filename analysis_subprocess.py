@@ -24,6 +24,7 @@ import os
 import threading
 import traceback
 import time
+from types import ModuleType
 
 from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV, PYQT5
 from qtutils.qt.QtCore import pyqtSignal as Signal
@@ -31,48 +32,6 @@ from qtutils.qt.QtCore import pyqtSlot as Slot
 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
-
-class _DeprecationDict(dict):
-    """Dictionary that spouts deprecation warnings when you try to access some
-    keys."""
-    def __init__(self, *args, **kwargs):
-        self.deprecation_messages = {} # To be added to after the deprecated items are added to the dict.
-        dict.__init__(self, *args, **kwargs)
-
-    def __getitem__(self, key):
-        if key in self.deprecation_messages:
-            import warnings
-            import linecache
-            # DeprecationWarnings are ignored by default. Clear the filter so
-            # they are not:
-            previous_warning_filters = warnings.filters[:]
-            try:
-                warnings.resetwarnings()
-                # Hacky stuff to get it to work from within execfile() with
-                # correct line data:
-                linecache.clearcache()
-                caller = sys._getframe(1)
-                globals = caller.f_globals
-                lineno = caller.f_lineno
-                module = globals['__name__']
-                filename = globals.get('__file__')
-                fnl = filename.lower()
-                if fnl.endswith((".pyc", ".pyo")):
-                    filename = filename[:-1]
-                message = self.deprecation_messages[key]
-                warnings.warn_explicit(message, DeprecationWarning, filename, lineno, module)
-            finally:
-                # Restore the warnings filter:
-                warnings.filters[:] = previous_warning_filters
-        return dict.__getitem__(self, key)
-
-    def __setitem__(self, key, value):
-        if key in self.deprecation_messages:
-            # No longer deprecated if the user puts something in place of the
-            # originally deprecated item:
-            del self.deprecation_messages[key]
-        return dict.__setitem__(self, key, value)
-
 
 def set_win_appusermodel(window_id):
     from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
@@ -300,6 +259,14 @@ class AnalysisWorker(object):
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath_native_string))
         
+        # Create a module for the user's routine, and insert it into sys.modules as the
+        # __main__ module:
+        self.routine_module = ModuleType('__main__')
+        self.routine_module.__file__ = self.filepath_native_string
+        # Save the dict so we can reset the module to a clean state later:
+        self.routine_module_clean_dict = self.routine_module.__dict__.copy()
+        sys.modules['__main__'] = self.routine_module
+
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
 
@@ -346,15 +313,10 @@ class AnalysisWorker(object):
 
         self.pre_analysis_plot_actions()
 
-        # The namespace the routine will run in:
-        sandbox = _DeprecationDict(path=path,
-                                   __name__='__main__',
-                                   __file__= os.path.basename(self.filepath_native_string))
-        # path global variable is deprecated:
-        deprecation_message = ("use of 'path' global variable is deprecated and will be removed " +
-                               "in a future version of lyse.  Please use lyse.path, which defaults " +
-                               "to sys.argv[1] when scripts are run stand-alone.")
-        sandbox.deprecation_messages['path'] = deprecation_message
+        # Reset the routine module's namespace:
+        self.routine_module.__dict__.clear()
+        self.routine_module.__dict__.update(self.routine_module_clean_dict)
+
         # Use lyse.path instead:
         lyse.path = path
         lyse.plots = self.plots
@@ -373,9 +335,13 @@ class AnalysisWorker(object):
             with self.modulewatcher.lock:
                 # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(f.read(), os.path.basename(self.filepath_native_string),
-                                   'exec', dont_inherit=True)
-                    exec(code, sandbox)
+                    code = compile(
+                        f.read(),
+                        self.routine_module.__file__,
+                        'exec',
+                        dont_inherit=True,
+                    )
+                    exec(code, self.routine_module.__dict__)
         except:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             del traceback_lines[1]
@@ -541,7 +507,16 @@ if __name__ == '__main__':
     from_parent = process_tree.from_parent
     kill_lock = process_tree.kill_lock
     filepath = from_parent.get()
-    
+
+    # Rename this module to _analysis_subprocess and put it in sys.modules
+    # under that name. The user's analysis routine will become the __main__ module
+    # '_analysis_subprocess'.
+    __name__ = '_analysis_subprocess'
+    if PY2:
+        __name__ = bytes(__name__)
+
+    sys.modules[__name__] = sys.modules['__main__']
+
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
