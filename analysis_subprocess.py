@@ -261,11 +261,11 @@ class AnalysisWorker(object):
         
         # Create a module for the user's routine, and insert it into sys.modules as the
         # __main__ module:
-        self.routine_module = ModuleType('__main__')
+        self.routine_module = ModuleType(b'__main__' if PY2 else '__main__')
         self.routine_module.__file__ = self.filepath_native_string
         # Save the dict so we can reset the module to a clean state later:
         self.routine_module_clean_dict = self.routine_module.__dict__.copy()
-        sys.modules['__main__'] = self.routine_module
+        sys.modules[self.routine_module.__name__] = self.routine_module
 
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
