@@ -33,8 +33,9 @@ from qtutils.qt.QtCore import pyqtSlot as Slot
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
+from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
+    
 def set_win_appusermodel(window_id):
-    from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
     icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
     executable = sys.executable.lower()
     if not executable.endswith('w.exe'):
