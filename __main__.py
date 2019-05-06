@@ -221,9 +221,15 @@ class LyseMainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event):
         if app.on_close_event():
-            return QtWidgets.QMainWindow.closeEvent(self, event)
+            timeout_time = time.time() + 2
+            self.delayedClose(timeout_time)
+        event.ignore()
+
+    def delayedClose(self, timeout_time):
+        if not all(app.workers_terminated().values()) and time.time() < timeout_time:
+            QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
-            event.ignore()
+            qapplication.quit()
 
     def event(self, event):
         result = QtWidgets.QMainWindow.event(self, event)
@@ -349,7 +355,7 @@ class AnalysisRoutine(object):
         self.model.removeRow(index)
          
     def end_child(self, restart=False):
-        self.to_worker.put(['quit',None])
+        self.to_worker.put(['quit', None])
         timeout_time = time.time() + 2
         self.exiting = True
         QtCore.QTimer.singleShot(50,
@@ -1959,6 +1965,13 @@ class Lyse(object):
         self.ui.show()
         # self.ui.showMaximized()
 
+    def workers_terminated(self):
+        terminated = {}
+        for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
+            routine.worker.poll()
+            terminated[routine.filepath] = routine.worker.returncode is not None
+        return terminated
+
     def on_close_event(self):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
@@ -1974,6 +1987,10 @@ class Lyse(object):
                 return False
             if reply == QtWidgets.QMessageBox.Yes:
                 self.save_configuration(self.last_save_config_file)
+
+        for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
+            routine.end_child()
+
         return True
 
     def on_save_configuration_triggered(self):
