@@ -40,7 +40,7 @@ splash.update_text('importing Qt')
 check_version('qtutils', '2.2.2', '3.0.0')
 
 splash.update_text('importing labscript suite modules')
-check_version('labscript_utils', '2.11.0', '3')
+check_version('labscript_utils', '2.12.4', '3')
 
 from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
 import zprocess
