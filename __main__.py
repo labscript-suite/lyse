@@ -1969,7 +1969,7 @@ class Lyse(object):
         terminated = {}
         for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
             routine.worker.poll()
-            terminated[routine.filename] = routine.worker.returncode is not None
+            terminated[routine.filepath] = routine.worker.returncode is not None
         return terminated
 
     def on_close_event(self):
