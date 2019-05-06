@@ -226,7 +226,7 @@ class LyseMainWindow(QtWidgets.QMainWindow):
         event.ignore()
 
     def delayedClose(self, timeout_time):
-        if not all(app.workers_terminated()) and time.time() < timeout_time:
+        if not all(app.workers_terminated().values()) and time.time() < timeout_time:
             QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
             qapplication.quit()
@@ -1969,7 +1969,7 @@ class Lyse(object):
         terminated = {}
         for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
             routine.worker.poll()
-            terminated[routine.shortname] = False if routine.worker.returncode is None else True
+            terminated[routine.filename] = routine.worker.returncode is not None
         return terminated
 
     def on_close_event(self):
