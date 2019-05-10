@@ -218,9 +218,13 @@ class LyseMainWindow(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self._previously_painted = False
+        self.closing = False
 
     def closeEvent(self, event):
+        if self.closing:
+            return QtWidgets.QMainWindow.closeEvent(self, event)
         if app.on_close_event():
+            self.closing = True
             timeout_time = time.time() + 2
             self.delayedClose(timeout_time)
         event.ignore()
@@ -229,7 +233,7 @@ class LyseMainWindow(QtWidgets.QMainWindow):
         if not all(app.workers_terminated().values()) and time.time() < timeout_time:
             QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
-            qapplication.quit()
+            self.close()
 
     def event(self, event):
         result = QtWidgets.QMainWindow.event(self, event)
@@ -1965,6 +1969,10 @@ class Lyse(object):
         self.ui.show()
         # self.ui.showMaximized()
 
+    def terminate_all_workers(self):
+        for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
+            routine.end_child()
+
     def workers_terminated(self):
         terminated = {}
         for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
@@ -1972,25 +1980,27 @@ class Lyse(object):
             terminated[routine.filepath] = routine.worker.returncode is not None
         return terminated
 
+    def are_you_sure(self):
+        message = ('Current configuration (which scripts are loaded and other GUI state) '
+                   'has changed: save config file \'%s\'?' % self.last_save_config_file)
+        reply = QtWidgets.QMessageBox.question(self.ui, 'Quit lyse', message,
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
+        if reply == QtWidgets.QMessageBox.Cancel:
+            return False
+        if reply == QtWidgets.QMessageBox.Yes:
+            self.save_configuration(self.last_save_config_file)
+        return True
+
     def on_close_event(self):
         save_data = self.get_save_data()
         if self.last_save_data is not None and save_data != self.last_save_data:
             if self.only_window_geometry_is_different(save_data, self.last_save_data):
                 self.save_configuration(self.last_save_config_file)
+                self.terminate_all_workers()
                 return True
-
-            message = ('Current configuration (which scripts are loaded and other GUI state) '
-                       'has changed: save config file \'%s\'?' % self.last_save_config_file)
-            reply = QtWidgets.QMessageBox.question(self.ui, 'Quit lyse', message,
-                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No | QtWidgets.QMessageBox.Cancel)
-            if reply == QtWidgets.QMessageBox.Cancel:
+            elif not self.are_you_sure():
                 return False
-            if reply == QtWidgets.QMessageBox.Yes:
-                self.save_configuration(self.last_save_config_file)
-
-        for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
-            routine.end_child()
-
+        self.terminate_all_workers()
         return True
 
     def on_save_configuration_triggered(self):
