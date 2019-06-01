@@ -284,7 +284,9 @@ class AnalysisRoutine(object):
         worker_path = os.path.join(LYSE_DIR, 'analysis_subprocess.py')
 
         child_handles = process_tree.subprocess(
-            worker_path, output_redirection_port=self.output_box_port
+            worker_path,
+            output_redirection_port=self.output_box_port,
+            startup_timeout=30,
         )
         
         to_worker, from_worker, worker = child_handles
