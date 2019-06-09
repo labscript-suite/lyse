@@ -35,6 +35,16 @@ import qtutils.icons
 
 from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
     
+import multiprocessing
+
+# This process is not fork-safe. Spawn fresh processes on platforms that would fork:
+if (
+    hasattr(multiprocessing, 'get_start_method')
+    and multiprocessing.get_start_method(True) != 'spawn'
+):
+    multiprocessing.set_start_method('spawn')
+
+
 def set_win_appusermodel(window_id):
     icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
     executable = sys.executable.lower()
