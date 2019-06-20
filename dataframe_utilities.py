@@ -24,6 +24,7 @@ import tzlocal
 import labscript_utils.shared_drive
 from labscript_utils.dict_diff import dict_diff
 from labscript_utils.connections import _ensure_str
+from labscript_utils.properties import get_attributes
 import runmanager
 
 
@@ -39,17 +40,17 @@ def get_nested_dict_from_shot(filepath):
         if 'results' in h5_file:
             for groupname in h5_file['results']:
                 resultsgroup = h5_file['results'][groupname]
-                row[groupname] = dict(resultsgroup.attrs)
+                row[groupname] = get_attributes(resultsgroup)
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
                 if isinstance(h5_file['images'][orientation], h5py.Group):
-                    row[orientation] = dict(h5_file['images'][orientation].attrs)
+                    row[orientation] = get_attributes(h5_file['images'][orientation])
                     for label in h5_file['images'][orientation]:
                         row[orientation][label] = {}
                         group = h5_file['images'][orientation][label]
                         for image in group:
                             row[orientation][label][image] = {}
-                            for key, val in group[image].attrs.items():
+                            for key, val in get_attributes(group[image]).items():
                                 if not isinstance(val, h5py.Reference):
                                     row[orientation][label][image][key] = val
         row['filepath'] = _ensure_str(filepath)
