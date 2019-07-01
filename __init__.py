@@ -36,7 +36,7 @@ except ImportError:
 
 check_version('pandas', '0.21.0', '1.0')
 check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.11.0', '3.0')
+check_version('labscript_utils', '2.14.0', '3.0')
 from labscript_utils import PY2, dedent
 from labscript_utils.ls_zprocess import zmq_get
 if PY2:
@@ -44,6 +44,7 @@ if PY2:
 
 
 from labscript_utils import labscript_suite_install_dir
+from labscript_utils.properties import get_attributes, get_attribute, set_attributes
 if labscript_suite_install_dir is not None:
     LYSE_DIR = os.path.join(labscript_suite_install_dir, 'lyse')
 else:
@@ -173,7 +174,7 @@ class Run(object):
         with h5py.File(self.h5_path) as h5_file:
             if not group in h5_file:
                 raise Exception('The group \'%s\' does not exist'%group)
-            return dict(h5_file[group].attrs)
+            return get_attributes(h5_file[group])
 
     def get_trace(self,name):
         with h5py.File(self.h5_path) as h5_file:
@@ -198,7 +199,7 @@ class Run(object):
                 raise Exception('The result group \'%s\' does not exist'%group)
             if not name in h5_file['results'][group].attrs.keys():
                 raise Exception('The result \'%s\' does not exist'%name)
-            return h5_file['results'][group].attrs.get(name)
+            return get_attribute(h5_file['results'][group], name)
             
     def get_results(self, group, *names):
         """Iteratively call get_result(group,name) for each name provided.
@@ -229,7 +230,7 @@ class Run(object):
             if name in h5_file[group].attrs and not overwrite:
                 raise Exception('Attribute %s exists in group %s. ' \
                                 'Use overwrite=True to overwrite.' % (name, group))                   
-            h5_file[group].attrs[name] = value
+            set_attributes(h5_file[group], {name: value})
             
         if spinning_top:
             if self.h5_path not in _updated_data:
@@ -340,8 +341,8 @@ class Run(object):
                 raise Exception('File does not contain any images')
             if not orientation in h5_file['images']:
                 raise Exception('File does not contain any images with orientation \'%s\''%orientation)
-            return dict(h5_file['images'][orientation].attrs)
-        
+            return get_attributes(h5_file['images'][orientation].attrs)
+
     def get_globals(self,group=None):
         if not group:
             with h5py.File(self.h5_path) as h5_file:

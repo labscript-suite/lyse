@@ -204,6 +204,11 @@ class WebServer(ZMQServer):
                     raise AssertionError(str(type(h5_filepath)) + ' is not str or bytes')
                 app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
+        elif isinstance(request_data, str):
+            # Just assume it's a filepath:
+            app.filebox.incoming_queue.put(shared_drive.path_to_local(request_data))
+            return "Experiment added successfully\n"
+
         return ("error: operation not supported. Recognised requests are:\n "
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
