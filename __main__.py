@@ -233,7 +233,7 @@ class LyseMainWindow(QtWidgets.QMainWindow):
         if not all(app.workers_terminated().values()) and time.time() < timeout_time:
             QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
-            self.close()
+            QtCore.QTimer.singleShot(0, self.close)
 
     def event(self, event):
         result = QtWidgets.QMainWindow.event(self, event)
