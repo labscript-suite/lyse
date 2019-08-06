@@ -1353,7 +1353,7 @@ class DataFrameModel(QtCore.QObject):
         app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data=None):
+    def update_row(self, filepath, dataframe_already_updated=False, new_row_data=None, updated_row_data=None):
         """"Updates a row in the dataframe and Qt model
         to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
         # To speed things up block signals to the model during update
@@ -1450,8 +1450,9 @@ class DataFrameModel(QtCore.QObject):
             if not isinstance(column_name, tuple):
                 # One of our special columns, does not correspond to a column in the dataframe:
                 continue
-            if updated_row_data is not None and column_name not in updated_row_data:
-                continue
+            if updated_row_data is not None:
+                if column_name[:column_name.index('')] not in updated_row_data:
+                    continue
             value = dataframe_row[column_name]
             if isinstance(value, float):
                 value_str = scientific_notation(value)
@@ -1478,16 +1479,22 @@ class DataFrameModel(QtCore.QObject):
             column_number = new_columns_start + i
             self._view.resizeColumnToContents(column_number)
 
-        if status_percent is not None:
-            status_item = self._model.item(row_number, self.COL_STATUS)
-            status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
-            
         if new_column_names or defunct_column_names:
             self.columns_changed.emit()
 
         # unblock signals to the model and tell it to update
         self._model.blockSignals(False)
         self._model.layoutChanged.emit()
+
+    @inmain_decorator()
+    def set_status_percent(self, filepath, status_percent):
+        try:
+            row_number = self.row_number_by_filepath[filepath]
+        except KeyError:
+            # Row has been deleted, nothing to do here:
+            return
+        status_item = self._model.item(row_number, self.COL_STATUS)
+        status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
 
     def new_row(self, filepath, done=False):
         status_item = QtGui.QStandardItem()
@@ -1866,7 +1873,7 @@ class FileBox(object):
                 # Update the data for all the rows with new data:
                 self.shots_model.update_row(file, updated_row_data=updated_data[file])
             # Update the status percent for the the row on which analysis is actually running:
-            self.shots_model.update_row(filepath, status_percent=status_percent, dataframe_already_updated=True)
+            self.shots_model.set_status_percent(filepath, status_percent)
             if signal == 'done':
                 return
             if signal == 'error':
