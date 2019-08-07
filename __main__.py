@@ -1451,7 +1451,8 @@ class DataFrameModel(QtCore.QObject):
                 # One of our special columns, does not correspond to a column in the dataframe:
                 continue
             if updated_row_data is not None:
-                if column_name[:column_name.index('')] not in updated_row_data:
+                # Must remove empty strings from tuple to compare with updated_row_data:
+                if tuple(s for s in column_name if s) not in updated_row_data:
                     continue
             value = dataframe_row[column_name]
             if isinstance(value, float):
