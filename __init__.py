@@ -341,7 +341,7 @@ class Run(object):
                 raise Exception('File does not contain any images')
             if not orientation in h5_file['images']:
                 raise Exception('File does not contain any images with orientation \'%s\''%orientation)
-            return get_attributes(h5_file['images'][orientation].attrs)
+            return get_attributes(h5_file['images'][orientation])
 
     def get_globals(self,group=None):
         if not group:
