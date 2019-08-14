@@ -185,16 +185,7 @@ class WebServer(ZMQServer):
         if request_data == 'hello':
             return 'hello'
         elif request_data == 'get dataframe':
-            # convert_objects() picks fixed datatypes for columns that are
-            # compatible with fixed datatypes, dramatically speeding up
-            # pickling. But we don't impose fixed datatypes earlier than now
-            # because the user is free to use mixed datatypes in a column, and
-            # we won't want to prevent values of a different type being added
-            # in the future. All kwargs False because we don't want to coerce
-            # strings to numbers or anything - just choose the correct
-            # datatype for columns that are already a single datatype:
-            return app.filebox.shots_model.dataframe.convert_objects(
-                       convert_dates=False, convert_numeric=False, convert_timedeltas=False)
+            return app.filebox.shots_model.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
