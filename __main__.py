@@ -185,16 +185,13 @@ class WebServer(ZMQServer):
         if request_data == 'hello':
             return 'hello'
         elif request_data == 'get dataframe':
-            # convert_objects() picks fixed datatypes for columns that are
-            # compatible with fixed datatypes, dramatically speeding up
-            # pickling. But we don't impose fixed datatypes earlier than now
-            # because the user is free to use mixed datatypes in a column, and
-            # we won't want to prevent values of a different type being added
-            # in the future. All kwargs False because we don't want to coerce
-            # strings to numbers or anything - just choose the correct
-            # datatype for columns that are already a single datatype:
-            return app.filebox.shots_model.dataframe.convert_objects(
-                       convert_dates=False, convert_numeric=False, convert_timedeltas=False)
+            # infer_objects() picks fixed datatypes for columns that are compatible with
+            # fixed datatypes, dramatically speeding up pickling. It is called here
+            # rather than when updating the dataframe as calling it during updating may
+            # call it needlessly often, whereas it only needs to be called prior to
+            # sending the dataframe to a client requesting it, as we're doing now.
+            app.filebox.shots_model.infer_objects()
+            return app.filebox.shots_model.dataframe
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -1351,6 +1348,15 @@ class DataFrameModel(QtCore.QObject):
         status_item.setToolTip("Shot has been deleted off disk or is unreadable")
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/drive--minus'))
         app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
+
+    @inmain_decorator()
+    def infer_objects(self):
+        """Convert columns in the dataframe with dtype 'object' into compatible, more
+        specific types, if possible. This improves pickling performance and ensures
+        multishot analysis code does not encounter columns with dtype 'object' for
+        non-mixed numerical data, which it might choke on.
+        """
+        self.dataframe = self.dataframe.infer_objects()
 
     @inmain_decorator()
     def update_row(self, filepath, dataframe_already_updated=False, status_percent=None, new_row_data=None, updated_row_data=None):
