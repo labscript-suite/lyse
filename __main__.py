@@ -1309,7 +1309,8 @@ class DataFrameModel(QtCore.QObject):
     def update_column_levels(self):
         """Pads the keys and values of our lists of column names so that
         they still match those in the dataframe after the number of
-        levels in its multiindex has increased"""
+        levels in its multiindex has increased (the number of levels never
+        decreases, given the current implementation of concat_with_padding())"""
         extra_levels = self.dataframe.columns.nlevels - self.nlevels
         if extra_levels > 0:
             self.nlevels = self.dataframe.columns.nlevels

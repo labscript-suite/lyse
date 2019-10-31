@@ -149,9 +149,9 @@ def concat_with_padding(*dataframes):
     padding shallower hierarchies such that the MultiIndexes have
     the same nlevels."""
     dataframes = list(dataframes)
+    max_nlevels = max(df.columns.nlevels for df in dataframes)
     # Remove empty dataframes (these don't concat since pandas 0.18) 
     dataframes = [df for df in dataframes if not df.empty]
-    max_nlevels = max(df.columns.nlevels for df in dataframes)
     for i, df in enumerate(dataframes):
         if df.columns.nlevels < max_nlevels:
             dataframes[i] = pad_columns(df, max_nlevels)
