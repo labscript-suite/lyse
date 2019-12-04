@@ -139,7 +139,7 @@ class Run(object):
                 # will be the name of the python script which is instantiating
                 # this Run object:
                 frame = inspect.currentframe()
-                __file__ = frame.f_back.f_locals['__file__']
+                __file__ = frame.f_back.f_globals['__file__']
                 if PY2:
                     __file__ = __file__.decode(sys.getfilesystemencoding())
                 self.group = os.path.basename(__file__).split('.py')[0]
@@ -343,7 +343,7 @@ class Run(object):
                 raise Exception('File does not contain any images')
             if not orientation in h5_file['images']:
                 raise Exception('File does not contain any images with orientation \'%s\''%orientation)
-            return get_attributes(h5_file['images'][orientation].attrs)
+            return get_attributes(h5_file['images'][orientation])
 
     def get_globals(self,group=None):
         if not group:
