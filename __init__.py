@@ -235,7 +235,9 @@ class Run(object):
         if spinning_top:
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
-            _updated_data[self.h5_path][str(self.group), name] = value
+            if group.startswith('results'):
+                toplevel = group.replace('results/', '', 1)
+                _updated_data[self.h5_path][toplevel, name] = value
 
     def save_result_array(self, name, data, group=None, 
                           overwrite=True, keep_attrs=False, **kwargs):
