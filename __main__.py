@@ -1361,8 +1361,8 @@ class DataFrameModel(QtCore.QObject):
 
     @inmain_decorator()
     def update_row(self, filepath, dataframe_already_updated=False, new_row_data=None, updated_row_data=None):
-        """"Updates a row in the dataframe and Qt model
-        to the data in the HDF5 file for that shot. Also sets the percent done, if specified"""
+        """"Updates a row in the dataframe and Qt model to the data in the HDF5 file for
+        that shot."""
         # To speed things up block signals to the model during update
         self._model.blockSignals(True)
 
@@ -1880,8 +1880,10 @@ class FileBox(object):
             for file in updated_data:
                 # Update the data for all the rows with new data:
                 self.shots_model.update_row(file, updated_row_data=updated_data[file])
-            # Update the status percent for the the row on which analysis is actually running:
-            self.shots_model.set_status_percent(filepath, status_percent)
+            # Update the status percent for the the row on which analysis is actually
+            # running:
+            if status_percent is not None:
+                self.shots_model.set_status_percent(filepath, status_percent)
             if signal == 'done':
                 return
             if signal == 'error':
