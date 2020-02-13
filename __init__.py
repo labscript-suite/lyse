@@ -34,7 +34,7 @@ try:
 except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
-check_version('pandas', '0.21.0', '1.0')
+check_version('pandas', '0.21.0', '2.0')
 check_version('zprocess', '2.2.0', '3.0')
 check_version('labscript_utils', '2.14.0', '3.0')
 from labscript_utils import PY2, dedent
