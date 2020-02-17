@@ -30,11 +30,11 @@ library, and two enhancements.
   (PRs [#66](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/66)
    and [#69](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/69))
 
-- Fix bug where lyse's close button was unresponsive if there were no analyis routines.
+- Fix bug where lyse's close button was unresponsive if there were no analysis routines.
   ([PR #67](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/67))
 
 - Fix incorrect logic for updating the Qt model and dataframe in lyse - it is hoped that
-  this will resolve an intermittant issue (issue #45) in which the dataframe and Qt
+  this will resolve an intermittent issue (issue #45) in which the dataframe and Qt
   model are sometimes not updated after analysis completes. If anyone sees the buggy
   behaviour again, please reopen issue #45 or a new bug report.
   ([PR #68](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/68))
@@ -44,7 +44,7 @@ library, and two enhancements.
   ([PR #70](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/70))
 
 - Fix a bug where lyse could crash if loading shots with different numbers of levels in
-  the hierarchy of their correspnding dataframes.
+  the hierarchy of their corresponding dataframes.
   ([PR #71](https://bitbucket.org/labscript_suite/labscript_devices/pull-requests/71))
 
 - Allow instantiating a `Run()` object from within a function, not just at the global
