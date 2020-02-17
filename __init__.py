@@ -27,7 +27,7 @@ import pandas
 from numpy import array, ndarray
 import types
 
-__version__ = '2.5.0'
+__version__ = '2.6.0'
 
 try:
     from labscript_utils import check_version
