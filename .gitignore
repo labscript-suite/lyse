@@ -6,3 +6,6 @@
 *.pyc
 dist
 *.egg-info
+*.eggs
+conda_build
+conda_packages

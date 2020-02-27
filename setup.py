@@ -57,6 +57,7 @@ INSTALL_REQUIRES = [
     "numpy",
     "matplotlib",
     "scipy",
+    "tzlocal",
 ]
 
 setup(
