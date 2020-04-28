@@ -27,7 +27,7 @@ import pandas
 from numpy import array, ndarray
 import types
 
-__version__ = '2.6.0'
+from .__version__ import __version__
 
 try:
     from labscript_utils import check_version
@@ -45,11 +45,7 @@ if PY2:
 
 from labscript_utils import labscript_suite_install_dir
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
-if labscript_suite_install_dir is not None:
-    LYSE_DIR = os.path.join(labscript_suite_install_dir, 'lyse')
-else:
-    # No labscript install directory found? Fall back to relying on __file__
-    LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
+LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
 if not os.path.isdir(LYSE_DIR):
     # Don't want to continue if we have not found the directory:
     msg = "Cannot locate the directory lyse is installed in."

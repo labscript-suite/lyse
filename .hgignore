@@ -1,7 +1,0 @@
-syntax: glob
-*.aux
-*.out
-*.pyg
-*.log
-*.toc
-*.pyc
