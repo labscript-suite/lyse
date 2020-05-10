@@ -531,7 +531,9 @@ if __name__ == '__main__':
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
-    qapplication = QtWidgets.QApplication(sys.argv)
+    qapplication = QtWidgets.QApplication.instance()
+    if qapplication is None:
+        qapplication = QtWidgets.QApplication(sys.argv)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec_()
         
