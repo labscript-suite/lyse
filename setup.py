@@ -57,6 +57,7 @@ INSTALL_REQUIRES = [
     "matplotlib",
     "scipy",
     "tzlocal",
+    "desktop-app"
 ]
 
 setup(
@@ -70,6 +71,10 @@ setup(
     url='http://labscriptsuite.org',
     license="BSD",
     packages=["lyse"],
+    entry_points={
+        'console_scripts': ['lyse = desktop_app:entry_point'],
+        'gui_scripts': ["lyse-gui = desktop_app:entry_point"],
+    },
     zip_safe=False,
     setup_requires=['setuptools', 'setuptools_scm'],
     include_package_data=True,
