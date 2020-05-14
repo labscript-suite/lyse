@@ -9,6 +9,11 @@ except ImportError:
     raise ImportError('Require labscript_utils > 2.1.0')
 
 check_version('labscript_utils', '2.10.0', '3')
+
+# Associate app windows with OS menu shortcuts:
+import desktop_app
+desktop_app.set_process_appid('lyse')
+
 # Splash screen
 from labscript_utils.splash import Splash
 splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
@@ -72,17 +77,6 @@ process_tree = ProcessTree.instance()
 
 # Set a meaningful name for zlock client id:
 process_tree.zlock_client.set_process_name('lyse')
-
-
-def set_win_appusermodel(window_id):
-    from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
-    icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
-    executable = sys.executable.lower()
-    if not executable.endswith('w.exe'):
-        executable = executable.replace('.exe', 'w.exe')
-    relaunch_command = executable + ' ' + os.path.join(LYSE_DIR, '__main__.py')
-    relaunch_display_name = app_descriptions['lyse']
-    set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
 
 
 @inmain_decorator()
@@ -214,9 +208,6 @@ class LyseMainWindow(QtWidgets.QMainWindow):
     # A signal to show that the window is shown and painted.
     firstPaint = Signal()
 
-    # A signal for when the window manager has created a new window for this widget:
-    newWindow = Signal(int)
-
     def __init__(self, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self._previously_painted = False
@@ -236,12 +227,6 @@ class LyseMainWindow(QtWidgets.QMainWindow):
             QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
             QtCore.QTimer.singleShot(0, self.close)
-
-    def event(self, event):
-        result = QtWidgets.QMainWindow.event(self, event)
-        if event.type() == QtCore.QEvent.WinIdChange:
-            self.newWindow.emit(self.effectiveWinId())
-        return result
 
     def paintEvent(self, event):
         result = QtWidgets.QMainWindow.paintEvent(self, event)
@@ -822,18 +807,10 @@ class RoutineBox(object):
 
 
 class EditColumnsDialog(QtWidgets.QDialog):
-    # A signal for when the window manager has created a new window for this widget:
-    newWindow = Signal(int)
     close_signal = Signal()
 
     def __init__(self):
         QtWidgets.QDialog.__init__(self, None, QtCore.Qt.WindowSystemMenuHint | QtCore.Qt.WindowTitleHint)
-
-    def event(self, event):
-        result = QtWidgets.QDialog.event(self, event)
-        if event.type() == QtCore.QEvent.WinIdChange:
-            self.newWindow.emit(self.effectiveWinId())
-        return result
 
     def closeEvent(self, event):
         self.close_signal.emit()
@@ -880,8 +857,6 @@ class EditColumns(object):
         self.populate_model(column_names, self.columns_visible)
 
     def connect_signals(self):
-        if os.name == 'nt':
-            self.ui.newWindow.connect(set_win_appusermodel)
         self.ui.close_signal.connect(self.close)
         self.ui.lineEdit_filter.textEdited.connect(self.on_filter_text_edited)
         self.ui.pushButton_make_it_so.clicked.connect(self.make_it_so)
@@ -2243,9 +2218,6 @@ class Lyse(object):
         self.exp_config = LabConfig(required_params=required_config_params)
 
     def connect_signals(self):
-        if os.name == 'nt':
-            self.ui.newWindow.connect(set_win_appusermodel)
-
         # Keyboard shortcuts:
         QtWidgets.QShortcut('Del', self.ui, lambda: self.delete_items(True))
         QtWidgets.QShortcut('Shift+Del', self.ui, lambda: self.delete_items(False))

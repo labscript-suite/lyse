@@ -33,9 +33,11 @@ from qtutils.qt.QtCore import pyqtSlot as Slot
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
-from labscript_utils.winshell import set_appusermodel, appids, app_descriptions
-    
 import multiprocessing
+
+# Associate app windows with OS menu shortcuts:
+import desktop_app
+desktop_app.set_process_appid('lyse')
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
 if (
@@ -45,15 +47,6 @@ if (
     multiprocessing.set_start_method('spawn')
 
 
-def set_win_appusermodel(window_id):
-    icon_path = os.path.join(LYSE_DIR, 'lyse.ico')
-    executable = sys.executable.lower()
-    if not executable.endswith('w.exe'):
-        executable = executable.replace('.exe', 'w.exe')
-    relaunch_command = executable + ' ' + os.path.join(LYSE_DIR, '__main__.py')
-    relaunch_display_name = app_descriptions['lyse']
-    set_appusermodel(window_id, appids['lyse'], icon_path, relaunch_command, relaunch_display_name)
-
 class PlotWindowCloseEvent(QtGui.QCloseEvent):
     def __init__(self, force, *args, **kwargs):
         QtGui.QCloseEvent.__init__(self, *args, **kwargs)
@@ -61,18 +54,11 @@ class PlotWindowCloseEvent(QtGui.QCloseEvent):
 
 class PlotWindow(QtWidgets.QWidget):
     # A signal for when the window manager has created a new window for this widget:
-    newWindow = Signal(int)
     close_signal = Signal()
 
     def __init__(self, plot, *args, **kwargs):
         self.__plot = plot
         QtWidgets.QWidget.__init__(self, *args, **kwargs)
-
-    def event(self, event):
-        result = QtWidgets.QWidget.event(self, event)
-        if event.type() == QtCore.QEvent.WinIdChange:
-            self.newWindow.emit(self.effectiveWinId())
-        return result
 
     def closeEvent(self, event):
         self.hide()
@@ -88,10 +74,6 @@ class Plot(object):
         self.identifier = identifier
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow(self))
-
-        # Tell Windows how to handle our windows in the the taskbar, making pinning work properly and stuff:
-        if os.name == 'nt':
-            self.ui.newWindow.connect(set_win_appusermodel)
 
         self.set_window_title(identifier, filepath)
 
