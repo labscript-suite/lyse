@@ -27,11 +27,7 @@ import pandas
 from numpy import array, ndarray
 import types
 
-from labscript_utils.versions import get_version, NoVersionInfo
-from pathlib import Path
-__version__ = get_version(__name__, import_path=Path(__file__).parent.parent)
-if __version__ is NoVersionInfo:
-    __version__ = None
+from .__version__ import __version__
 
 try:
     from labscript_utils import check_version
