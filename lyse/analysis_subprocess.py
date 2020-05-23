@@ -11,11 +11,6 @@
 #                                                                   #
 #####################################################################
 
-from __future__ import division, unicode_literals, print_function, absolute_import
-from labscript_utils import PY2
-if PY2:
-    str = unicode
-
 import labscript_utils.excepthook
 from labscript_utils.ls_zprocess import ProcessTree
 
@@ -240,22 +235,13 @@ class AnalysisWorker(object):
         self.from_parent = from_parent
         self.filepath = filepath
 
-        # Filepath as a unicode string on py3 and a bytestring on py2,
-        # so that the right string type can be passed to functions that
-        # require the 'native' string type for that python version. On
-        # Python 2, encode it with the filesystem encoding.
-        if PY2:
-            self.filepath_native_string = self.filepath.encode(sys.getfilesystemencoding())
-        else:
-            self.filepath_native_string = self.filepath
-        
         # Add user script directory to the pythonpath:
-        sys.path.insert(0, os.path.dirname(self.filepath_native_string))
+        sys.path.insert(0, os.path.dirname(self.filepath))
         
         # Create a module for the user's routine, and insert it into sys.modules as the
         # __main__ module:
-        self.routine_module = ModuleType(b'__main__' if PY2 else '__main__')
-        self.routine_module.__file__ = self.filepath_native_string
+        self.routine_module = ModuleType('__main__')
+        self.routine_module.__file__ = self.filepath
         # Save the dict so we can reset the module to a clean state later:
         self.routine_module_clean_dict = self.routine_module.__dict__.copy()
         sys.modules[self.routine_module.__name__] = self.routine_module
@@ -335,24 +321,9 @@ class AnalysisWorker(object):
                         dont_inherit=True,
                     )
                     exec(code, self.routine_module.__dict__)
-        except:
+        except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
-            del traceback_lines[1]
-            # Avoiding a list comprehension here so as to avoid this
-            # python bug in earlier versions of 2.7 (fixed in 2.7.9):
-            # https://bugs.python.org/issue21591
-            message = ''
-            for line in traceback_lines:
-                if PY2:
-                    # errors='replace' is for Windows filenames present in the
-                    # traceback that are not UTF8. They will not display
-                    # correctly, but that's the best we can do - the traceback
-                    # may contain code from the file in a different encoding,
-                    # so we could have a mixed encoding string. This is only
-                    # a problem for Python 2.
-                    line = line.decode('utf8', errors='replace')
-                message += line
-            sys.stderr.write(message)
+            print('\n'.join(traceback_lines[1:]), file=sys.stderr)
             return False
         else:
             return True
@@ -440,25 +411,11 @@ class AnalysisWorker(object):
             self.plots[fig] = cls(fig, identifier, self.filepath)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
-            del traceback_lines[1]
-            # Avoiding a list comprehension here so as to avoid this
-            # python bug in earlier versions of 2.7 (fixed in 2.7.9):
-            # https://bugs.python.org/issue21591
             message = """Failed to instantiate custom class for plot "{identifier}".
                 Perhaps lyse.register_plot_class() was called incorrectly from your
                 script? The exception raised was:
                 """.format(identifier=identifier)
-            message = lyse.dedent(message)
-            for line in traceback_lines:
-                if PY2:
-                    # errors='replace' is for Windows filenames present in the
-                    # traceback that are not UTF8. They will not display
-                    # correctly, but that's the best we can do - the traceback
-                    # may contain code from the file in a different encoding,
-                    # so we could have a mixed encoding string. This is only
-                    # a problem for Python 2.
-                    line = line.decode('utf8', errors='replace')
-                message += line
+            message = lyse.dedent(message) + '\n'.join(traceback_lines[1:])
             message += '\n'
             message += 'Due to this error, we used the default lyse.Plot class instead.\n'
             sys.stderr.write(message)
@@ -505,8 +462,6 @@ if __name__ == '__main__':
     # under that name. The user's analysis routine will become the __main__ module
     # '_analysis_subprocess'.
     __name__ = '_analysis_subprocess'
-    if PY2:
-        __name__ = bytes(__name__)
 
     sys.modules[__name__] = sys.modules['__main__']
 

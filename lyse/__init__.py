@@ -11,9 +11,8 @@
 #                                                                   #
 #####################################################################
 
-from __future__ import division, unicode_literals, print_function, absolute_import
-    
-from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot, dict_diff
+from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
+from labscript_utils.dict_diff import dict_diff
 import os
 import socket
 import pickle as pickle
@@ -29,28 +28,11 @@ import types
 
 from .__version__ import __version__
 
-try:
-    from labscript_utils import check_version
-except ImportError:
-    raise ImportError('Require labscript_utils > 2.1.0')
-
-check_version('pandas', '0.21.0', '2.0')
-check_version('zprocess', '2.2.0', '3.0')
-check_version('labscript_utils', '2.14.0', '3.0')
-from labscript_utils import PY2, dedent
+from labscript_utils import dedent
 from labscript_utils.ls_zprocess import zmq_get
-if PY2:
-    str = unicode
 
-
-from labscript_utils import labscript_suite_install_dir
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
 LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
-if not os.path.isdir(LYSE_DIR):
-    # Don't want to continue if we have not found the directory:
-    msg = "Cannot locate the directory lyse is installed in."
-    raise RuntimeError(msg)
-
 
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
@@ -90,7 +72,6 @@ class _RoutineStorage(object):
     from lyse, or the lyse analysis subprocess is restarted, data will not be
     retained. An alternate method should be used to store data if desired in
     these cases."""
-    pass
 
 routine_storage = _RoutineStorage()
 
@@ -136,8 +117,6 @@ class Run(object):
                 # this Run object:
                 frame = inspect.currentframe()
                 __file__ = frame.f_back.f_globals['__file__']
-                if PY2:
-                    __file__ = __file__.decode(sys.getfilesystemencoding())
                 self.group = os.path.basename(__file__).split('.py')[0]
                 with h5py.File(h5_path) as h5_file:
                     if not self.group in h5_file['results']:
@@ -439,8 +418,6 @@ class Sequence(Run):
         frame = inspect.currentframe()
         try:
             __file__ = frame.f_back.f_locals['__file__']
-            if PY2:
-                __file__ = __file__.decode(sys.getfilesystemencoding())
             self.group = os.path.basename(__file__).split('.py')[0]
             with h5py.File(h5_path) as h5_file:
                 if not self.group in h5_file['results']:
