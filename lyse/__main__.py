@@ -1,14 +1,5 @@
-from __future__ import division, unicode_literals, print_function, absolute_import  # Ease the transition to Python 3
-
 import os
 import labscript_utils.excepthook
-
-try:
-    from labscript_utils import check_version
-except ImportError:
-    raise ImportError('Require labscript_utils > 2.1.0')
-
-check_version('labscript_utils', '2.10.0', '3')
 
 # Associate app windows with OS menu shortcuts:
 import desktop_app
@@ -31,6 +22,7 @@ import time
 import traceback
 import pprint
 import ast
+import queue
 
 # 3rd party imports:
 splash.update_text('importing numpy')
@@ -41,15 +33,11 @@ import h5py
 splash.update_text('importing pandas')
 import pandas
 
-splash.update_text('importing Qt')
-check_version('qtutils', '2.2.2', '3.0.0')
-
 splash.update_text('importing labscript suite modules')
-check_version('labscript_utils', '2.12.4', '3')
 
 from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
 import zprocess
-from labscript_utils.labconfig import LabConfig, config_prefix
+from labscript_utils.labconfig import LabConfig
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 from labscript_utils.qtwidgets.outputbox import OutputBox
@@ -64,13 +52,6 @@ from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
-
-from labscript_utils import PY2
-if PY2:
-    str = unicode
-    import Queue as queue
-else:
-    import queue
 from lyse import LYSE_DIR
 
 process_tree = ProcessTree.instance()

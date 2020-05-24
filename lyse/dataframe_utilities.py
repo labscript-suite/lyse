@@ -10,19 +10,10 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-
-from __future__ import division, unicode_literals, print_function, absolute_import
-from labscript_utils import PY2
-if PY2:
-    str = unicode
-    
 import labscript_utils.h5_lock, h5py
 import pandas
-import os
-from numpy import *
 import tzlocal
 import labscript_utils.shared_drive
-from labscript_utils.dict_diff import dict_diff
 from labscript_utils.connections import _ensure_str
 from labscript_utils.properties import get_attributes
 import runmanager
