@@ -2104,7 +2104,7 @@ class Lyse(object):
     def load_configuration(self, filename, restore_window_geometry=True):
         self.last_save_config_file = filename
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
-        save_data = load_appconfig(filename)['lyse_state']
+        save_data = load_appconfig(filename).get('lyse_state', {})
         if 'singleshot' in save_data:
             self.singleshot_routinebox.add_routines(save_data['singleshot'], clear_existing=True)
         if 'lastsingleshotfolder' in save_data:
