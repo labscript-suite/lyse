@@ -2038,17 +2038,17 @@ class Lyse(object):
         save_data = {}
 
         box = self.singleshot_routinebox
-        save_data['SingleShot'] = list(zip([routine.filepath for routine in box.routines],
+        save_data['singleshot'] = list(zip([routine.filepath for routine in box.routines],
                                            [box.model.item(row, box.COL_ACTIVE).checkState() 
                                             for row in range(box.model.rowCount())]))
-        save_data['LastSingleShotFolder'] = box.last_opened_routine_folder
+        save_data['lastsingleshotfolder'] = box.last_opened_routine_folder
         box = self.multishot_routinebox
-        save_data['MultiShot'] = list(zip([routine.filepath for routine in box.routines],
+        save_data['multishot'] = list(zip([routine.filepath for routine in box.routines],
                                           [box.model.item(row, box.COL_ACTIVE).checkState() 
                                            for row in range(box.model.rowCount())]))
-        save_data['LastMultiShotFolder'] = box.last_opened_routine_folder
+        save_data['lastmultishotfolder'] = box.last_opened_routine_folder
 
-        save_data['LastFileBoxFolder'] = self.filebox.last_opened_shots_folder
+        save_data['lastfileboxfolder'] = self.filebox.last_opened_shots_folder
 
         save_data['analysis_paused'] = self.filebox.analysis_paused
         window_size = self.ui.size()
@@ -2104,18 +2104,18 @@ class Lyse(object):
     def load_configuration(self, filename, restore_window_geometry=True):
         self.last_save_config_file = filename
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
-        state = load_appconfig(filename)['lyse_state']
-        if 'SingleShot' in state:
-            self.singleshot_routinebox.add_routines(state['SingleShot'], clear_existing=True)
-        if 'LastSingleShotFolder' in state:
-            self.singleshot_routinebox.last_opened_routine_folder = state['LastSingleShotFolder']
-        if 'MultiShot' in state:
-            self.multishot_routinebox.add_routines(state['MultiShot'], clear_existing=True)
-        if 'LastMultiShotFolder' in state:
-            self.multishot_routinebox.last_opened_routine_folder = state['LastMultiShotFolder']
-        if 'LastFileBoxFolder' in state:
-            self.filebox.last_opened_shots_folder = state['LastFileBoxFolder']
-        if 'analysis_paused' in state and state['analysis_paused']:
+        save_data = load_appconfig(filename)['lyse_state']
+        if 'singleshot' in save_data:
+            self.singleshot_routinebox.add_routines(save_data['singleshot'], clear_existing=True)
+        if 'lastsingleshotfolder' in save_data:
+            self.singleshot_routinebox.last_opened_routine_folder = save_data['lastsingleshotfolder']
+        if 'multishot' in save_data:
+            self.multishot_routinebox.add_routines(save_data['multishot'], clear_existing=True)
+        if 'lastmultishotfolder' in save_data:
+            self.multishot_routinebox.last_opened_routine_folder = save_data['lastmultishotfolder']
+        if 'lastfileboxfolder' in save_data:
+            self.filebox.last_opened_shots_folder = save_data['lastfileboxfolder']
+        if 'analysis_paused' in save_data and save_data['analysis_paused']:
             self.filebox.pause_analysis()
         if restore_window_geometry:
             self.load_window_geometry_configuration(filename)
@@ -2130,10 +2130,10 @@ class Lyse(object):
         """Load only the window geometry from the config file. It's useful to have this
         separate from the rest of load_configuration so that it can be called before the
         window is shown."""
-        state = load_appconfig(filename)['lyse_state']
-        if 'screen_geometry' not in state:
+        save_data = load_appconfig(filename)['lyse_state']
+        if 'screen_geometry' not in save_data:
             return
-        screen_geometry = state['screen_geometry']
+        screen_geometry = save_data['screen_geometry']
         # Only restore the window size and position, and splitter
         # positions if the screen is the same size/same number of monitors
         # etc. This prevents the window moving off the screen if say, the
@@ -2142,16 +2142,16 @@ class Lyse(object):
         # different window size, so better to fall back to defaults:
         current_screen_geometry = get_screen_geometry()
         if current_screen_geometry == screen_geometry:
-            if 'window_size' in state:
-                self.ui.resize(*state['window_size'])
-            if 'window_pos' in state:
-                self.ui.move(*state['window_pos'])
-            if 'splitter' in state:
-                self.ui.splitter.setSizes(state['splitter'])
-            if 'splitter_vertical' in state:
-                self.ui.splitter_vertical.setSizes(state['splitter_vertical'])
-            if 'splitter_horizontal' in state:
-                self.ui.splitter_horizontal.setSizes(state['splitter_horizontal'])
+            if 'window_size' in save_data:
+                self.ui.resize(*save_data['window_size'])
+            if 'window_pos' in save_data:
+                self.ui.move(*save_data['window_pos'])
+            if 'splitter' in save_data:
+                self.ui.splitter.setSizes(save_data['splitter'])
+            if 'splitter_vertical' in save_data:
+                self.ui.splitter_vertical.setSizes(save_data['splitter_vertical'])
+            if 'splitter_horizontal' in save_data:
+                self.ui.splitter_horizontal.setSizes(save_data['splitter_horizontal'])
 
     def setup_config(self):
         required_config_params = {"DEFAULT": ["experiment_name"],
