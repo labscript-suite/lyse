@@ -13,15 +13,12 @@ splash.show()
 splash.update_text('importing standard library modules')
 # stdlib imports
 import sys
-import socket
 import logging
 import threading
 import signal
 import subprocess
 import time
 import traceback
-import pprint
-import ast
 import queue
 
 # 3rd party imports:
@@ -37,7 +34,7 @@ splash.update_text('importing labscript suite modules')
 
 from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
 import zprocess
-from labscript_utils.labconfig import LabConfig
+from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 from labscript_utils.qtwidgets.outputbox import OutputBox
@@ -2067,12 +2064,10 @@ class Lyse(object):
         return save_data
 
     def save_configuration(self, save_file):
-        lyse_config = LabConfig(save_file)
         save_data = self.get_save_data()
         self.last_save_config_file = save_file
         self.last_save_data = save_data
-        for key, value in save_data.items():
-            lyse_config.set('lyse_state', key, pprint.pformat(value))
+        save_appconfig(save_file, {'lyse_state': save_data})
 
     def on_load_configuration_triggered(self):
         save_data = self.get_save_data()
@@ -2109,33 +2104,19 @@ class Lyse(object):
     def load_configuration(self, filename, restore_window_geometry=True):
         self.last_save_config_file = filename
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
-        lyse_config = LabConfig(filename)
-
-        try:
-            self.singleshot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'SingleShot')), clear_existing=True)
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.singleshot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastSingleShotFolder'))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.multishot_routinebox.add_routines(ast.literal_eval(lyse_config.get('lyse_state', 'MultiShot')), clear_existing=True)
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.multishot_routinebox.last_opened_routine_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastMultiShotFolder'))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            self.filebox.last_opened_shots_folder = ast.literal_eval(lyse_config.get('lyse_state', 'LastFileBoxFolder'))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        try:
-            if ast.literal_eval(lyse_config.get('lyse_state', 'analysis_paused')):
-                self.filebox.pause_analysis()
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
+        state = load_appconfig(filename)['lyse_state']
+        if 'SingleShot' in state:
+            self.singleshot_routinebox.add_routines(state['SingleShot'], clear_existing=True)
+        if 'LastSingleShotFolder' in state:
+            self.singleshot_routinebox.last_opened_routine_folder = state['LastSingleShotFolder']
+        if 'MultiShot' in state:
+            self.multishot_routinebox.add_routines(state['MultiShot'], clear_existing=True)
+        if 'LastMultiShotFolder' in state:
+            self.multishot_routinebox.last_opened_routine_folder = state['LastMultiShotFolder']
+        if 'LastFileBoxFolder' in state:
+            self.filebox.last_opened_shots_folder = state['LastFileBoxFolder']
+        if 'analysis_paused' in state and state['analysis_paused']:
+            self.filebox.pause_analysis()
         if restore_window_geometry:
             self.load_window_geometry_configuration(filename)
 
@@ -2149,41 +2130,28 @@ class Lyse(object):
         """Load only the window geometry from the config file. It's useful to have this
         separate from the rest of load_configuration so that it can be called before the
         window is shown."""
-        lyse_config = LabConfig(filename)
-        try:
-            screen_geometry = ast.literal_eval(lyse_config.get('lyse_state', 'screen_geometry'))
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            pass
-        else:
-            # Only restore the window size and position, and splitter
-            # positions if the screen is the same size/same number of monitors
-            # etc. This prevents the window moving off the screen if say, the
-            # position was saved when 2 monitors were plugged in but there is
-            # only one now, and the splitters may not make sense in light of a
-            # different window size, so better to fall back to defaults:
-            current_screen_geometry = get_screen_geometry()
-            if current_screen_geometry == screen_geometry:
-                try:
-                    self.ui.resize(*ast.literal_eval(lyse_config.get('lyse_state', 'window_size')))
-                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                    pass
-                try:
-                    self.ui.move(*ast.literal_eval(lyse_config.get('lyse_state', 'window_pos')))
-                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                    pass
-                try:
-                    self.ui.splitter.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter')))
-                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                    pass
-                try:
-                    self.ui.splitter_vertical.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_vertical')))
-                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                    pass
-                try:
-                    self.ui.splitter_horizontal.setSizes(ast.literal_eval(lyse_config.get('lyse_state', 'splitter_horizontal')))
-                except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                    pass
-
+        state = load_appconfig(filename)['lyse_state']
+        if 'screen_geometry' not in state:
+            return
+        screen_geometry = state['screen_geometry']
+        # Only restore the window size and position, and splitter
+        # positions if the screen is the same size/same number of monitors
+        # etc. This prevents the window moving off the screen if say, the
+        # position was saved when 2 monitors were plugged in but there is
+        # only one now, and the splitters may not make sense in light of a
+        # different window size, so better to fall back to defaults:
+        current_screen_geometry = get_screen_geometry()
+        if current_screen_geometry == screen_geometry:
+            if 'window_size' in state:
+                self.ui.resize(*state['window_size'])
+            if 'window_pos' in state:
+                self.ui.move(*state['window_pos'])
+            if 'splitter' in state:
+                self.ui.splitter.setSizes(state['splitter'])
+            if 'splitter_vertical' in state:
+                self.ui.splitter_vertical.setSizes(state['splitter_vertical'])
+            if 'splitter_horizontal' in state:
+                self.ui.splitter_horizontal.setSizes(state['splitter_horizontal'])
 
     def setup_config(self):
         required_config_params = {"DEFAULT": ["experiment_name"],
