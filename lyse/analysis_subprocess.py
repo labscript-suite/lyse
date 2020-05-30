@@ -21,7 +21,7 @@ import traceback
 import time
 from types import ModuleType
 
-from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV, PYQT5
+from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
@@ -431,11 +431,7 @@ class AnalysisWorker(object):
         
 if __name__ == '__main__':
 
-    import matplotlib
-    if QT_ENV == PYQT5:
-        matplotlib.use("QT5Agg")
-    else:
-        matplotlib.use("QT4Agg")
+    os.environ['MPLBACKEND'] = "qt5agg"
 
     import lyse
     from lyse import LYSE_DIR
@@ -443,10 +439,7 @@ if __name__ == '__main__':
     import lyse.figure_manager
     lyse.figure_manager.install()
 
-    if QT_ENV == PYQT5:
-        from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-    else:
-        from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
     import pylab
     import labscript_utils.h5_lock, h5py
 
