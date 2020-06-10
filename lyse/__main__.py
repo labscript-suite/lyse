@@ -2008,7 +2008,7 @@ class Lyse(object):
             try:
                 default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
             except LabConfig.NoOptionError:
-                self.exp_config.set('DEFAULT', 'app_saved_configs', os.path.join('%(labscript_suite)s', 'userlib', 'app_saved_configs', '%(experiment_name)s'))
+                self.exp_config.set('DEFAULT', 'app_saved_configs', os.path.join('%(labscript_suite)s', 'userlib', 'app_saved_configs', '%(apparatus_name)s'))
                 default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
             if not os.path.exists(default_path):
                 os.makedirs(default_path)
@@ -2154,7 +2154,7 @@ class Lyse(object):
                 self.ui.splitter_horizontal.setSizes(save_data['splitter_horizontal'])
 
     def setup_config(self):
-        required_config_params = {"DEFAULT": ["experiment_name"],
+        required_config_params = {"DEFAULT": ["apparatus_name"],
                                   "programs": ["text_editor",
                                                "text_editor_arguments",
                                                "hdf5_viewer",
