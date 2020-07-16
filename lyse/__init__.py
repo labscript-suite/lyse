@@ -147,7 +147,7 @@ class Run(object):
 
     def set_group(self, groupname):
         self.group = groupname
-        self._create_group_if_not_exists(self.h5_path, '/', 'results')
+        self._create_group_if_not_exists(self.h5_path, '/results', self.group)
         # restore no_write attribute now we have set the group
         if self._no_group is not None and self._no_group[0]:
             self.no_write = self._no_group[1]
