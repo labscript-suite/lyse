@@ -246,6 +246,7 @@ class Run(object):
             if not group:
                 # Save dataset to results group by default
                 group = 'results/' + self.group
+                
             elif not group in h5_file:
                 # Create the group if it doesn't exist
                 h5_file.create_group(group) 
@@ -422,6 +423,11 @@ class Sequence(Run):
             run_paths = run_paths['filepath']
         self.h5_path = h5_path
         self.no_write = no_write
+        try:
+            h5py.File(h5_path, 'r')
+        except:
+            h5py.File(h5_path,'w')
+
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                  
