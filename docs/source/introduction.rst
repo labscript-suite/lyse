@@ -7,7 +7,7 @@ Analysis routines can be either *single-shot* or *multi-shot*. This determines w
 
 Actually things are far less magical than that. The only enforced difference between a single shot routine and a multi-shot routine is a single variable provided to your code when **lyse** runs it. Your code runs in a perfectly clean ``Python`` environment with this one exception: a variable in the global namespace called ``path``, which is a path to an hdf5 file. If you have told **lyse** that your routine is a singleshot one, then this path will point to the hdf5 file for the current shot being analysed. On the other hand, if you've told **lyse** that your routine is a multishot one, then it will be the path to an h5 file that has been selected in **lyse** for saving results to.
 
-The other differences listed above are conventions only [1]_, and pertain to how you use the API that **lyse** provides, which will be different depending on what sort of analysis you're doing.
+The other differences listed above are conventions only (though **lyse**'s design is based around the assumption that you'll follow these conventions most of the time), and pertain to how you use the API that **lyse** provides, which will be different depending on what sort of analysis you're doing.
 
 The **lyse** API
 ~~~~~~~~~~~~~~~~~
@@ -45,7 +45,5 @@ Here's a screenshot of **lyse**:
 6. Here is where shots appear, either having arrived over HTTP of having been added manually via the file browser (by clicking the plus button). Many columns will populate this part of the screen, one for each global and each of the results (as saved by single-shot routines) present in the shots. A high-priority planned feature is to be able to choose exactly which globals and results are displayed. Otherwise this display is overwhelming to the point of uselessness. The data displayed here represents the entirety of what is available to multi-shot routines via the API provided by **lyse**.
 
 7. This is where the output of routines is displayed, errors in red. If you're putting ``print`` statements in your analysis code, here is where to look to see them. Likewise if there's an exception and analysis stops, look here to see why.
-
-.. [1] Though **lyse**'s design is based around the assumption that you'll follow these conventions most of the time.
 
 .. sectionauthor:: Chris Billington
