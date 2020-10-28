@@ -156,14 +156,20 @@ class WebServer(ZMQServer):
         logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
             return 'hello'
-        elif request_data == 'get dataframe':
+        elif type(request_data) is str and request_data.startswith('get dataframe'):
             # infer_objects() picks fixed datatypes for columns that are compatible with
             # fixed datatypes, dramatically speeding up pickling. It is called here
             # rather than when updating the dataframe as calling it during updating may
             # call it needlessly often, whereas it only needs to be called prior to
             # sending the dataframe to a client requesting it, as we're doing now.
             app.filebox.shots_model.infer_objects()
-            return app.filebox.shots_model.dataframe
+            df = app.filebox.shots_model.dataframe
+            # Return only a subset of the dataframe if instructed to do so.
+            arguments = request_data.replace('get dataframe', '').strip()
+            if arguments.startswith('n_sequences='):
+                n_sequences = int(arguments.replace('n_sequences=', ''))
+                df = self._extract_n_sequences_from_df(df, n_sequences)
+            return df
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -180,6 +186,43 @@ class WebServer(ZMQServer):
 
         return ("error: operation not supported. Recognised requests are:\n "
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
+
+    def _extract_n_sequences_from_df(self, df, n_sequences):
+        # If the dataframe is empty, just return it, otherwise accessing columns
+        # below will raise a KeyError.
+        if df.empty:
+            return df
+
+        # Get a list of all unique sequences, each corresponding to one call to
+        # engage in runmanager. Each sequence may contain multiple runs. The
+        # below creates strings to identify sequences. To be from the same
+        # sequence, two shots have to have the same value for 'sequence' (which
+        # makes sure that the time when engage was called are the same to within
+        # 1 second), 'labscript' (must have been generated from the same
+        # labscript), and 'sequence_index' (a counter which keeps track of how
+        # many times engage has been called and resets to 0 at the start of each
+        # day). Typically just the value for sequence, is enough. However it
+        # only records time down to the second, so if engage() is called twice
+        # quickly then two different sequences can end up with the same value
+        # there.
+        sequences = [str(sequence) for sequence in df['sequence']]
+        labscripts = [str(labscript) for labscript in df['labscript']]
+        sequence_indices = [str(index) for index in df['sequence_index']]
+        # Combine into one string.
+        criteria = zip(sequences, labscripts, sequence_indices)
+        indentity_strings = [seq + script + ind for seq, script, ind in criteria]
+
+        # Find the distinct values, maintaining their ordering.
+        unique_identities = np.intersect1d(indentity_strings, indentity_strings)
+
+        # Slice the DataFrame so that only the last n_sequences sequences
+        # remain. Note that slicing unique_identities just returns all of its
+        # entries if n_sequences is greater than its length; it doesn't raise an
+        # error.
+        identities_included = unique_identities[-n_sequences:]
+        df_subset = df[[id in identities_included for id in indentity_strings]]
+
+        return df_subset
 
 
 class LyseMainWindow(QtWidgets.QMainWindow):

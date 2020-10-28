@@ -76,11 +76,20 @@ class _RoutineStorage(object):
 routine_storage = _RoutineStorage()
 
 
-def data(filepath=None, host='localhost', port=_lyse_port, timeout=5):
+def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None):
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
-        df = zmq_get(port, host, 'get dataframe', timeout)
+        command = 'get dataframe'
+        if n_sequences:
+            if type(n_sequences) is int and n_sequences > 0:
+                command = command + ' n_sequences={n_sequences}'.format(n_sequences=n_sequences)
+            else:
+                msg = """n_sequences must be None or an integer greater than 0 but 
+                    was {n_sequences}.""".format(n_sequences=n_sequences)
+                raise ValueError(dedent(msg))
+        df = zmq_get(port, host, command, timeout)
+
         try:
             padding = ('',)*(df.columns.nlevels - 1)
             try:
