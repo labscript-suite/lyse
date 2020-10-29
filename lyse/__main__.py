@@ -152,6 +152,7 @@ def get_screen_geometry():
 
 class WebServer(ZMQServer):
 
+    @inmain_decorator(wait_for_return=True)
     def handler(self, request_data):
         logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
@@ -169,7 +170,15 @@ class WebServer(ZMQServer):
             if arguments.startswith('n_sequences='):
                 n_sequences = int(arguments.replace('n_sequences=', ''))
                 df = self._extract_n_sequences_from_df(df, n_sequences)
-            return df
+            
+            # Returning the dataframe would mean that another thread would
+            # pickle/send it, which could happen partway through changes to the
+            # dataframe in the main thread. Sending it here prevents that thanks
+            # to the inmain_decorator (assuming that all modifications to the
+            # dataframe happen in the main thread). Then return NO_RESPONSE so
+            # that no additional message is sent.
+            self.send(df)
+            return self.NO_RESPONSE
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -183,9 +192,6 @@ class WebServer(ZMQServer):
             # Just assume it's a filepath:
             app.filebox.incoming_queue.put(shared_drive.path_to_local(request_data))
             return "Experiment added successfully\n"
-
-        return ("error: operation not supported. Recognised requests are:\n "
-                "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
         # If the dataframe is empty, just return it, otherwise accessing columns
