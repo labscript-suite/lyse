@@ -19,6 +19,7 @@ import pickle as pickle
 import inspect
 import sys
 import threading
+import shlex
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -76,7 +77,7 @@ class _RoutineStorage(object):
 routine_storage = _RoutineStorage()
 
 
-def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None):
+def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None, filter_kwargs=None):
     """Get data from the lyse dataframe or a file.
     
     This function allows for either extracting information from a run's hdf5
@@ -126,14 +127,22 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
-        command = 'get dataframe'
+        command_list = ['get_dataframe']
         if n_sequences is not None:
             if type(n_sequences) is int and n_sequences >= 0:
-                command = command + ' n_sequences={n_sequences}'.format(n_sequences=n_sequences)
+                command_list.append('--n_sequences {n_sequences}'.format(n_sequences=n_sequences))
             else:
                 msg = """n_sequences must be None or an integer greater than 0 but 
                     was {n_sequences}.""".format(n_sequences=n_sequences)
                 raise ValueError(dedent(msg))
+        if filter_kwargs is not None:
+            if type(filter_kwargs) is dict:
+                command_list.append('--filter_kwargs ' + shlex.quote(repr(filter_kwargs)))
+            else:
+                msg = """filter must be None or a dictionary but was 
+                    {filter_kwargs}.""".format(filter_kwargs=filter_kwargs)
+                raise ValueError(dedent(msg))
+        command = ' '.join(command_list)
         df = zmq_get(port, host, command, timeout)
 
         try:
