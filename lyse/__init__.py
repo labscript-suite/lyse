@@ -103,15 +103,19 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             42519 if the labconfig has no such entry.
         timeout (float, optional): The timeout, in seconds, for the
             communication with lyse. Defaults to 5.
-        n_sequences (int, optional): The number of sequences to include in the
-            returned dataframe where one sequence corresponds to one call to
-            engage in runmanager. The dataframe rows for the most recent
-            `n_sequences` sequences are returned. If set to `None`, then all
-            rows are returned. Defaults to `None`.
+        n_sequences (int, optional): The maximum number of sequences to include
+            in the returned dataframe where one sequence corresponds to one call
+            to engage in runmanager. The dataframe rows for the most recent
+            `n_sequences` sequences are returned. If the dataframe contains
+            fewer than `n_sequences` sequences, then all rows will be returned.
+            If set to `None`, then all rows are returned. Defaults to `None`.
 
     Raises:
         ValueError: If `n_sequences` isn't `None` or a nonnegative integer, then
-            a `ValueError` is raised.
+            a `ValueError` is raised. Note that no `ValueError` is raised if
+            `n_sequences` is greater than the number of sequences available. In
+            that case as all available sequences are returned, i.e. the entire
+            lyse dataframe is returned.
 
     Returns:
         (pandas series or dataframe): If `filepath` is provided, then a pandas
