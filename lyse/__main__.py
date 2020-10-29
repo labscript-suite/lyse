@@ -219,7 +219,10 @@ class WebServer(ZMQServer):
         # remain. Note that slicing unique_identities just returns all of its
         # entries if n_sequences is greater than its length; it doesn't raise an
         # error.
-        identities_included = unique_identities[-n_sequences:]
+        if n_sequences == 0:
+            identities_included = []
+        else:
+            identities_included = unique_identities[-n_sequences:]
         df_subset = df[[id in identities_included for id in indentity_strings]]
 
         return df_subset

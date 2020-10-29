@@ -81,8 +81,8 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
         return _get_singleshot(filepath)
     else:
         command = 'get dataframe'
-        if n_sequences:
-            if type(n_sequences) is int and n_sequences > 0:
+        if n_sequences is not None:
+            if type(n_sequences) is int and n_sequences >= 0:
                 command = command + ' n_sequences={n_sequences}'.format(n_sequences=n_sequences)
             else:
                 msg = """n_sequences must be None or an integer greater than 0 but 
