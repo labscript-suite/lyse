@@ -85,6 +85,17 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
     then data will be read from that file and returned as a pandas series. If
     `filepath` is not provided then the dataframe in lyse, or a portion of it,
     will be returned.
+    
+    Often only part of the lyse dataframe is needed, so the `n_sequences` and
+    `filter_kwargs` arguments provide ways to restrict what parts of the lyse
+    dataframe are returned. The dataframe can be quite large, so only requesting
+    a small part of it can speed up the execution of `lyse.data()` noticeably.
+    Setting `n_sequences` makes this function return only the rows of the lyse
+    dataframe that correspond to the `n_sequences` most recent sequences, where
+    one sequence corresponds to one call to engage in runmanager. Additionally,
+    the `Dataframe.filter()` method can be called on the dataframe before it is
+    transmitted, and the arguments specified in `filter_kwargs` are passed to
+    that method.
 
     Args:
         filepath (str, optional): The path to a run's hdf5 file. If a value
@@ -110,6 +121,13 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             `n_sequences` sequences are returned. If the dataframe contains
             fewer than `n_sequences` sequences, then all rows will be returned.
             If set to `None`, then all rows are returned. Defaults to `None`.
+        filter_kwargs (dict, optional): A dictionary of keyword arguments to
+            pass to the `Dataframe.filter()` method before the lyse dataframe is
+            returned. For example to call `filter()` with `like='temperature'`,
+            set `filter_kwargs` to `{'like':'temperature'}`. If set to `None`
+            then `Dataframe.filter()` will not be called. See
+            `Dataframe.filter()`'s documentation for more information. Defaults
+            to `None`.
 
     Raises:
         ValueError: If `n_sequences` isn't `None` or a nonnegative integer, then
