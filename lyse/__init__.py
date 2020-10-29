@@ -77,6 +77,48 @@ routine_storage = _RoutineStorage()
 
 
 def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None):
+    """Get data from the lyse dataframe or a file.
+    
+    This function allows for either extracting information from a run's hdf5
+    file, or retrieving data from lyse's dataframe. If `filepath` is provided
+    then data will be read from that file and returned as a pandas series. If
+    `filepath` is not provided then the dataframe in lyse, or a portion of it,
+    will be returned.
+
+    Args:
+        filepath (str, optional): The path to a run's hdf5 file. If a value
+            other than `None` is provided, then this function will return a
+            pandas series containing data associated with the run. In particular
+            it will contain the globals, singleshot results, multishot results,
+            etc. that would appear in the run's row in the Lyse dataframe, but
+            the values will be read from the file rather than extracted from the
+            lyse dataframe. If `filepath` is `None, then this function will
+            instead return a section of the lyse dataframe. Note that if
+            `filepath` is not None, then the other arguments will be ignored.
+            Defaults to `None`.
+        host (str, optional): The address of the computer running lyse. Defaults
+            to `'localhost'`.
+        port (int, optional): The port on which lyse is listening. Defaults to
+            the entry for lyse's port in the labconfig, with a fallback value of
+            42519 if the labconfig has no such entry.
+        timeout (float, optional): The timeout, in seconds, for the
+            communication with lyse. Defaults to 5.
+        n_sequences (int, optional): The number of sequences to include in the
+            returned dataframe where one sequence corresponds to one call to
+            engage in runmanager. The dataframe rows for the most recent
+            `n_sequences` sequences are returned. If set to `None`, then all
+            rows are returned. Defaults to `None`.
+
+    Raises:
+        ValueError: If `n_sequences` isn't `None` or a nonnegative integer, then
+            a `ValueError` is raised.
+
+    Returns:
+        (pandas series or dataframe): If `filepath` is provided, then a pandas
+            series with the data read from that file is returned. If `filepath`
+            is omitted or set to `None` then the lyse dataframe, or a subset of
+            it, is returned.
+    """    
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
