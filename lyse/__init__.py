@@ -169,7 +169,8 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             # to reply with an error message.
             msg = """The lyse server does not support n_sequences or filter_kwargs.
                 Call this function without providing those arguments to communicate
-                with this server."""
+                with this server, or upgrade the version of lyse running on the
+                server."""
             raise ValueError(dedent(msg))
         # Ensure conversion to multiindex is done, which needs to be done here
         # if the server is running an outdated version of lyse.
