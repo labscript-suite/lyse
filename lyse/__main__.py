@@ -52,7 +52,7 @@ from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
-from lyse import LYSE_DIR
+from lyse import LYSE_DIR, _rangeindex_to_multiindex
 
 process_tree = ProcessTree.instance()
 
@@ -184,6 +184,7 @@ class WebServer(ZMQServer):
             # sending the dataframe to a client requesting it, as we're doing now.
             app.filebox.shots_model.infer_objects()
             df = app.filebox.shots_model.dataframe
+            df = _rangeindex_to_multiindex(df, inplace=False)
 
             # Return only a subset of the dataframe if instructed to do so.
             if n_sequences is not None:

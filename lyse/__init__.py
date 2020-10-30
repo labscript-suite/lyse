@@ -162,24 +162,37 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
                 raise ValueError(dedent(msg))
         command = ' '.join(command_list)
         df = zmq_get(port, host, command, timeout)
-
-        try:
-            padding = ('',)*(df.columns.nlevels - 1)
-            try:
-                integer_indexing = _labconfig.getboolean('lyse', 'integer_indexing')
-            except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-                integer_indexing = False
-            if integer_indexing:
-                df.set_index(['sequence_index', 'run number', 'run repeat'], inplace=True, drop=False)
-            else:
-                df.set_index([('sequence',) + padding,('run time',) + padding], inplace=True, drop=False)
-                df.index.names = ['sequence', 'run time']
-        except KeyError:
-            # Empty DataFrame or index column not found, so fall back to RangeIndex instead
-            pass
+        # Ensure conversion to multiindex is done, which needs to be done here
+        # if the server is running an old version of lyse.
+        _rangeindex_to_multiindex(df, inplace=True)
         df.sort_index(inplace=True)
         return df
-        
+
+def _rangeindex_to_multiindex(df, inplace):
+    if isinstance(df.index, pandas.MultiIndex):
+        # The dataframe has already been converted.
+        return df
+    try:
+        padding = ('',)*(df.columns.nlevels - 1)
+        try:
+            integer_indexing = _labconfig.getboolean('lyse', 'integer_indexing')
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+            integer_indexing = False
+        if integer_indexing:
+            out = df.set_index(['sequence_index', 'run number', 'run repeat'], inplace=inplace, drop=False)
+            # out is None if inplace is True, and is the new dataframe is inplace is False.
+            if not inplace:
+                df = out
+        else:
+            out = df.set_index([('sequence',) + padding,('run time',) + padding], inplace=inplace, drop=False)
+            if not inplace:
+                df = out
+            df.index.names = ['sequence', 'run time']
+    except KeyError:
+        # Empty DataFrame or index column not found, so fall back to RangeIndex instead
+        pass
+    return df
+
 def globals_diff(run1, run2, group=None):
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
