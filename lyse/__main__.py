@@ -20,9 +20,6 @@ import subprocess
 import time
 import traceback
 import queue
-import argparse
-import shlex
-import ast
 
 # 3rd party imports:
 splash.update_text('importing numpy')
@@ -155,28 +152,13 @@ def get_screen_geometry():
 
 class WebServer(ZMQServer):
 
-    def __init__(self, *args, **kwargs):
-        ZMQServer.__init__(self, *args, **kwargs)
-        # Add parser for interpretting options for get_dataframe
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--n_sequences', type=int)
-        parser.add_argument('--filter_kwargs', type=str)
-        self._command_parser = parser
-
     @inmain_decorator(wait_for_return=True)
     def handler(self, request_data):
         logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
             return 'hello'
-        elif type(request_data) is str and request_data.startswith('get_dataframe'):
-            # Parse any arguments.
-            command_args = shlex.split(request_data)[1:]  # Strip leading 'get_dataframe'.
-            parsed_args = self._command_parser.parse_args(command_args)
-            n_sequences = parsed_args.n_sequences
-            filter_kwargs = parsed_args.filter_kwargs
-            if filter_kwargs is not None:
-                filter_kwargs = ast.literal_eval(filter_kwargs)
-
+        elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:
+            _, n_sequences, filter_kwargs = request_data
             # infer_objects() picks fixed datatypes for columns that are compatible with
             # fixed datatypes, dramatically speeding up pickling. It is called here
             # rather than when updating the dataframe as calling it during updating may
@@ -200,6 +182,13 @@ class WebServer(ZMQServer):
             # that no additional message is sent.
             self.send(df)
             return self.NO_RESPONSE
+        elif request_data == 'get dataframe':
+            # Ensure backwards compatability with clients using outdated
+            # versions of lyse.
+            app.filebox.shots_model.infer_objects()
+            df = app.filebox.shots_model.dataframe
+            self.send(df)
+            return self.NO_RESPONSE
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -213,6 +202,9 @@ class WebServer(ZMQServer):
             # Just assume it's a filepath:
             app.filebox.incoming_queue.put(shared_drive.path_to_local(request_data))
             return "Experiment added successfully\n"
+
+        return ("error: operation not supported. Recognised requests are:\n "
+                "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
         # If the dataframe is empty, just return it, otherwise accessing columns

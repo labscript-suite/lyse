@@ -19,7 +19,6 @@ import pickle as pickle
 import inspect
 import sys
 import threading
-import shlex
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -145,25 +144,35 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
     if filepath is not None:
         return _get_singleshot(filepath)
     else:
-        command_list = ['get_dataframe']
         if n_sequences is not None:
-            if type(n_sequences) is int and n_sequences >= 0:
-                command_list.append('--n_sequences {n_sequences}'.format(n_sequences=n_sequences))
-            else:
+            if not (type(n_sequences) is int and n_sequences >= 0):
                 msg = """n_sequences must be None or an integer greater than 0 but 
                     was {n_sequences}.""".format(n_sequences=n_sequences)
                 raise ValueError(dedent(msg))
         if filter_kwargs is not None:
-            if type(filter_kwargs) is dict:
-                command_list.append('--filter_kwargs ' + shlex.quote(repr(filter_kwargs)))
-            else:
+            if type(filter_kwargs) is not dict:
                 msg = """filter must be None or a dictionary but was 
                     {filter_kwargs}.""".format(filter_kwargs=filter_kwargs)
                 raise ValueError(dedent(msg))
-        command = ' '.join(command_list)
+
+        # Allow sending 'get dataframe' (without the enclosing list) if
+        # n_sequences and filter_kwargs aren't provided. This is for backwards
+        # compatability in case the server is running an outdated version of
+        # lyse.
+        if n_sequences is None and filter_kwargs is None:
+            command = 'get dataframe'
+        else:
+            command = ('get dataframe', n_sequences, filter_kwargs)
         df = zmq_get(port, host, command, timeout)
+        if isinstance(df, str) and df.startswith('error: operation not supported'):
+            # Sending a tuple for command to an outdated lyse servers causes it
+            # to reply with an error message.
+            msg = """The lyse server does not support n_sequences or filter_kwargs.
+                Call this function without providing those arguments to communicate
+                with this server."""
+            raise ValueError(dedent(msg))
         # Ensure conversion to multiindex is done, which needs to be done here
-        # if the server is running an old version of lyse.
+        # if the server is running an outdated version of lyse.
         _rangeindex_to_multiindex(df, inplace=True)
         df.sort_index(inplace=True)
         return df
