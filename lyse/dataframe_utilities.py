@@ -66,6 +66,10 @@ def get_nested_dict_from_shot(filepath):
             row['run repeat'] = h5_file.attrs['run repeat']
         except KeyError:
             row['run repeat'] = 0
+        try:
+            row['n_runs'] = h5_file.attrs['n_runs']
+        except KeyError:
+            row['n_runs'] = float('nan')
         return row
             
 def flatten_dict(dictionary, keys=tuple()):
