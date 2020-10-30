@@ -174,7 +174,6 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
         # Ensure conversion to multiindex is done, which needs to be done here
         # if the server is running an outdated version of lyse.
         _rangeindex_to_multiindex(df, inplace=True)
-        df.sort_index(inplace=True)
         return df
 
 def _rangeindex_to_multiindex(df, inplace):
@@ -200,6 +199,7 @@ def _rangeindex_to_multiindex(df, inplace):
     except KeyError:
         # Empty DataFrame or index column not found, so fall back to RangeIndex instead
         pass
+    df.sort_index(inplace=True)
     return df
 
 def globals_diff(run1, run2, group=None):
