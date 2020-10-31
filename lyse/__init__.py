@@ -125,8 +125,8 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             returned. For example to call `filter()` with `like='temperature'`,
             set `filter_kwargs` to `{'like':'temperature'}`. If set to `None`
             then `Dataframe.filter()` will not be called. See
-            `Dataframe.filter()`'s documentation for more information. Defaults
-            to `None`.
+            :meth:`pandas:pandas.DataFrame.filter` for more information.
+            Defaults to `None`.
 
     Raises:
         ValueError: If `n_sequences` isn't `None` or a nonnegative integer, then
