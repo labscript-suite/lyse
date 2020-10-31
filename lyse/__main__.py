@@ -152,43 +152,24 @@ def get_screen_geometry():
 
 class WebServer(ZMQServer):
 
-    @inmain_decorator(wait_for_return=True)
     def handler(self, request_data):
         logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
             return 'hello'
         elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:
             _, n_sequences, filter_kwargs = request_data
-            # infer_objects() picks fixed datatypes for columns that are compatible with
-            # fixed datatypes, dramatically speeding up pickling. It is called here
-            # rather than when updating the dataframe as calling it during updating may
-            # call it needlessly often, whereas it only needs to be called prior to
-            # sending the dataframe to a client requesting it, as we're doing now.
-            app.filebox.shots_model.infer_objects()
-            df = app.filebox.shots_model.dataframe
-            df = _rangeindex_to_multiindex(df, inplace=False)
-
+            df = self._retrieve_dataframe()
+            df = _rangeindex_to_multiindex(df, inplace=True)
             # Return only a subset of the dataframe if instructed to do so.
             if n_sequences is not None:
                 df = self._extract_n_sequences_from_df(df, n_sequences)
             if filter_kwargs is not None:
                 df = df.filter(**filter_kwargs)
-            
-            # Returning the dataframe would mean that another thread would
-            # pickle/send it, which could happen partway through changes to the
-            # dataframe in the main thread. Sending it here prevents that thanks
-            # to the inmain_decorator (assuming that all modifications to the
-            # dataframe happen in the main thread). Then return NO_RESPONSE so
-            # that no additional message is sent.
-            self.send(df)
-            return self.NO_RESPONSE
+            return df
         elif request_data == 'get dataframe':
             # Ensure backwards compatability with clients using outdated
             # versions of lyse.
-            app.filebox.shots_model.infer_objects()
-            df = app.filebox.shots_model.dataframe
-            self.send(df)
-            return self.NO_RESPONSE
+            return self._retrieve_dataframe()
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -205,6 +186,17 @@ class WebServer(ZMQServer):
 
         return ("error: operation not supported. Recognised requests are:\n "
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
+
+    @inmain_decorator(wait_for_return=True)
+    def _retrieve_dataframe(self):
+        # infer_objects() picks fixed datatypes for columns that are compatible with
+        # fixed datatypes, dramatically speeding up pickling. It is called here
+        # rather than when updating the dataframe as calling it during updating may
+        # call it needlessly often, whereas it only needs to be called prior to
+        # sending the dataframe to a client requesting it, as we're doing now.
+        app.filebox.shots_model.infer_objects()
+        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        return df
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
         # If the dataframe is empty, just return it, otherwise accessing columns
