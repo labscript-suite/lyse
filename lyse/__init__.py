@@ -136,10 +136,10 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             lyse dataframe is returned.
 
     Returns:
-        (pandas series or dataframe): If `filepath` is provided, then a pandas
-            series with the data read from that file is returned. If `filepath`
-            is omitted or set to `None` then the lyse dataframe, or a subset of
-            it, is returned.
+        :obj:`pandas:pandas.DataFrame` or :obj:`pandas:pandas.Series`: If
+            `filepath` is provided, then a pandas series with the data read from
+            that file is returned. If `filepath` is omitted or set to `None`
+            then the lyse dataframe, or a subset of it, is returned.
     """    
     if filepath is not None:
         return _get_singleshot(filepath)
