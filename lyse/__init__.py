@@ -167,7 +167,12 @@ class Run(object):
                 msg = "Cannot create group; this run is read-only."
                 raise PermissionError(msg)
             with h5py.File(h5_path, 'r+') as h5_file:
-                h5_file[location].create_group(groupname)
+                # Catch the ValueError raised if the group was created by
+                # something else between the check above and now. 
+                try:
+                    h5_file[location].create_group(groupname)
+                except ValueError:
+                    pass
 
     def set_group(self, groupname):
         """Set the default hdf5 file group for saving results.
