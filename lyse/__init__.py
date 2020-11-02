@@ -149,7 +149,7 @@ class Run(object):
             # 'Run.set_group(groupname), specifying the name of the group '
             # 'you would like to save results to. This normally comes from '
             # 'the filename of your script, but since you\'re in interactive '
-            # 'mode, there is no scipt name.\n')
+            # 'mode, there is no script name.\n')
             pass
 
     def _create_group_if_not_exists(self, h5_path, location, groupname):
@@ -202,16 +202,16 @@ class Run(object):
     def get_trace(self,name):
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not name in h5_file['data']['traces']:
-                raise Exception('The trace \'%s\' doesn not exist'%name)
+                raise Exception('The trace \'%s\' does not exist'%name)
             trace = h5_file['data']['traces'][name]
             return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
 
     def get_result_array(self,group,name):
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not group in h5_file['results']:
-                raise Exception('The result group \'%s\' doesn not exist'%group)
+                raise Exception('The result group \'%s\' does not exist'%group)
             if not name in h5_file['results'][group]:
-                raise Exception('The result array \'%s\' doesn not exist'%name)
+                raise Exception('The result array \'%s\' does not exist'%name)
             return array(h5_file['results'][group][name])
             
     def get_result(self, group, name):
@@ -321,7 +321,7 @@ class Run(object):
     def save_results(self, *args, **kwargs):
         """Iteratively call save_result() on multiple results.
         Assumes arguments are ordered such that each result to be saved is
-        preceeded by the name of the attribute to save it under.
+        preceded by the name of the attribute to save it under.
         Keywords arguments are passed to each call of save_result()."""
         names = args[::2]
         values = args[1::2]
@@ -340,7 +340,7 @@ class Run(object):
     def save_result_arrays(self, *args, **kwargs):
         """Iteratively call save_result_array() on multiple data sets. 
         Assumes arguments are ordered such that each dataset to be saved is 
-        preceeded by the name to save it as. 
+        preceded by the name to save it as. 
         All keyword arguments are passed to each call of save_result_array()."""
         names = args[::2]
         values = args[1::2]
@@ -485,7 +485,7 @@ class Sequence(Run):
             'Sequence.set_group(groupname), specifying the name of the group '
             'you would like to save results to. This normally comes from '
             'the filename of your script, but since you\'re in interactive '
-            'mode, there is no scipt name. Opening in read only mode for '
+            'mode, there is no script name. Opening in read only mode for '
             'the moment.\n')
             self.no_write = True
         
