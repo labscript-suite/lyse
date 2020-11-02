@@ -102,6 +102,31 @@ def globals_diff(run1, run2, group=None):
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
 class Run(object):
+    """A class for saving/retrieving data to/from a run's hdf5 file.
+
+    This class implements methods that allow the user to retrieve data from a
+    run's hdf5 file such as images, traces, and the values of globals. It also
+    provides methods for saving and retrieving results from analysis.
+
+    Args:
+        h5_path (str): The path, including file name and extension, to the hdf5
+            file for a run.
+        no_write (bool, optional): Set to `True` to prevent editing the run
+            file. Note that doing so prohibits the ability to save results to
+            the file. Defaults to `False`.
+
+    Attributes:
+        h5_path (str): The value provided for `h5_path` during instantiation.
+        no_write (bool): The value provided for `no_write` during instantiation.
+        group (str): The group in the hdf5 file in which results are saved by
+            default. When a `Run` instance is created from within a lyse
+            singleshot or multishot routine, `group` will be set to the name of
+            the running routine. If created from outside a lyse script it will
+            be set to `None`. To change the default group for saving results,
+            use the `set_group()` method. Note that if `self.group` is `None`
+            and no value is provided for the optional `group` argument used by
+            the `save...()` methods, a `ValueError` will be raised.
+    """
     def __init__(self,h5_path,no_write=False):
         self.no_write = no_write
         self.group = None
