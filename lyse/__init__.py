@@ -145,6 +145,18 @@ class Run(object):
                 h5_file[location].create_group(groupname)
 
     def set_group(self, groupname):
+        """Set the default hdf5 file group for saving results.
+
+        The `save...()` methods will save their results to `self.group` if an
+        explicit value for their optional `group` argument is not given. This
+        method updates `self.group`, making sure to create the group in the hdf5
+        file if it does not already exist.
+
+        Args:
+            groupname (str): The name of the hdf5 file group in which to save
+                results by default. The group will be created in the
+                `'/results'` group of the hdf5 file.
+        """
         self._create_group_if_not_exists(self.h5_path, '/results', groupname)
         self.group = groupname
 
