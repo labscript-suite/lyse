@@ -104,7 +104,7 @@ def globals_diff(run1, run2, group=None):
 class Run(object):
     def __init__(self,h5_path,no_write=False):
         self.no_write = no_write
-        self._no_group = None
+        self.group = None
         self.h5_path = h5_path
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
@@ -116,21 +116,17 @@ class Run(object):
                 # this Run object:
                 frame = inspect.currentframe()
                 __file__ = frame.f_back.f_globals['__file__']
-                self.group = os.path.basename(__file__).split('.py')[0]
-                self._create_group_if_not_exists(h5_path, 'results', self.group)
+                group = os.path.basename(__file__).split('.py')[0]
+                self._create_group_if_not_exists(h5_path, 'results', group)
+                self.group = group
         except KeyError:
             # sys.stderr.write('Warning: to write results, call '
             # 'Run.set_group(groupname), specifying the name of the group '
             # 'you would like to save results to. This normally comes from '
             # 'the filename of your script, but since you\'re in interactive '
-            # 'mode, there is no scipt name. Opening in read only mode for '
-            # 'the moment.\n')
-            
-            # Backup the value of self.no_write for restoration once the group
-            # is set
-            self._no_group = (True, self.no_write)
-            self.no_write = True
-            
+            # 'mode, there is no scipt name.\n')
+            pass
+
     def _create_group_if_not_exists(self, h5_path, location, groupname):
         """Creates a group in the HDF5 file at `location` if it does not exist.
         
@@ -142,16 +138,15 @@ class Run(object):
             if not groupname in h5_file[location]:
                 create_group = True
         if create_group:
+            if self.no_write:
+                msg = "Cannot create group; this run is read-only."
+                raise PermissionError(msg)
             with h5py.File(h5_path, 'r+') as h5_file:
                 h5_file[location].create_group(groupname)
 
     def set_group(self, groupname):
+        self._create_group_if_not_exists(self.h5_path, '/results', groupname)
         self.group = groupname
-        self._create_group_if_not_exists(self.h5_path, '/results', self.group)
-        # restore no_write attribute now we have set the group
-        if self._no_group is not None and self._no_group[0]:
-            self.no_write = self._no_group[1]
-            self._no_group = None
 
     def trace_names(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
@@ -213,6 +208,12 @@ class Run(object):
                             'single Run object is used')
         with h5py.File(self.h5_path,'a') as h5_file:
             if not group:
+                if self.group is None:
+                    msg = """Cannot save result; no default group set. Either
+                        specify a value for this method's optional group
+                        argument, or set a default value using the set_group()
+                        method."""
+                    raise ValueError(dedent(msg))
                 # Save to analysis results group by default
                 group = 'results/' + self.group
             elif not group in h5_file:
@@ -244,6 +245,12 @@ class Run(object):
         with h5py.File(self.h5_path, 'a') as h5_file:
             attrs = {}
             if not group:
+                if self.group is None:
+                    msg = """Cannot save result; no default group set. Either
+                        specify a value for this method's optional group
+                        argument, or set a default value using the set_group()
+                        method."""
+                    raise ValueError(dedent(msg))
                 # Save dataset to results group by default
                 group = 'results/' + self.group
             elif not group in h5_file:
