@@ -124,9 +124,9 @@ class Run(object):
                      
         try:
             if not self.no_write:
-                # The group were this run's results will be stored in the h5 file
-                # will be the name of the python script which is instantiating
-                # this Run object:
+                # The group where this run's results will be stored in the h5
+                # file will be the name of the python script which is
+                # instantiating this Run object:
                 frame = inspect.currentframe()
                 __file__ = frame.f_back.f_globals['__file__']
                 group = os.path.basename(__file__).split('.py')[0]
