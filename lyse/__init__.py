@@ -238,10 +238,43 @@ class Run(object):
         return results        
             
     def save_result(self, name, value, group=None, overwrite=True):
-        """Save a result to h5 file. Defaults are to save to the active group 
-        in the 'results' group and overwrite an existing result.
-        Note that the result is saved as an attribute of 'results/group' and
-        overwriting attributes causes h5 file size bloat."""
+        """Save a result to the hdf5 file.
+
+        With the default argument values this method saves to `self.group` in
+        the `'/results'` group and overwrites any existing value. Note that the
+        result is saved as an attribute and overwriting attributes causes hdf5
+        file size bloat.
+
+        Args:
+            name (str): The name of the result. This will be the name of the
+                attribute added to the hdf5 file's group.
+            value (any): The value of the result, which will be saved as the
+                value of the hdf5 group's attribute set by `name`. However note
+                that when saving large arrays, it is better to use the
+                `self.save_result_array()` method which will store the results
+                as a dataset in the hdf5 file.
+            group (str, optional): The group in the hdf5 file to which the
+                result will be saved as an attribute. If set to `None`, then the
+                result will be saved to `self.group` in `'/results'`. Note that
+                if a value is passed for `group` here then it will NOT have
+                `'/result'` prepended to it. This is in contrast to using the
+                default group set with `self.set_group()`; when the default
+                group is set with that method it WILL have `'/results'`
+                prepended to it when before saving results. Defaults to `None`.
+            overwrite (bool, optional): Sets whether or not to overwrite the
+                previous value if the attribute already exists. If set to
+                `False` and the attribute already exists, an `Exception` is
+                raised. Defaults to `True`.
+
+        Raises:
+            Exception: An `Exception` is raised if `self.no_write` is `True`
+                because saving the result would edit the file.
+            ValueError: A `ValueError` is raised if `self.group` is `None` and
+                no value is provided for `group` because the method then doesn't
+                know where to save the result.
+            Exception: An `Exception` is raised if an attribute with name `name`
+                already exists but `overwrite` is set to `False`.
+        """
         if self.no_write:
             raise Exception('This run is read-only. '
                             'You can\'t save results to runs through a '
@@ -324,10 +357,31 @@ class Run(object):
         return results
         
     def save_results(self, *args, **kwargs):
-        """Iteratively call save_result() on multiple results.
-        Assumes arguments are ordered such that each result to be saved is
-        preceded by the name of the attribute to save it under.
-        Keywords arguments are passed to each call of save_result()."""
+        """Save multiple results to the hdf5 file.
+
+        This method Iteratively call `self.save_result()` on multiple results.
+        It assumes arguments are ordered such that each result to be saved is
+        preceded by the name of the attribute to save it under. Keywords
+        arguments are passed to each call of `self.save_result()`.
+
+        Args:
+            *args: The names and values of results to be saved. The first entry
+                should be a string giving the name of the first result, and the
+                second entry should be the value for that result. After that,
+                an arbitrary number of additional pairs of result name strings
+                and values can be included, e.g.
+                `'name0', value0, 'name1', value1,...`.
+            **kwargs: Keyword arguments are passed to `self.save_result()`. Note
+                that the names and values of keyword arguments are NOT saved as
+                results to the hdf5 file; they are only used to provide values
+                for the optional arguments of `self.save_result()`.
+
+        Examples:
+            >>> run = Run('path/to/an/hdf5/file.h5')  # doctest: +SKIP
+            >>> a = 5
+            >>> b = 2.48
+            >>> run.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
+        """
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
