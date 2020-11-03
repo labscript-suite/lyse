@@ -279,10 +279,10 @@ class Run(object):
                 results anywhere in the hdf5 file. This is in contrast to using
                 the default group set with `self.set_group()`; when the default
                 group is set with that method it WILL have `'/results'`
-                prepended to it when before saving results. Defaults to `None`.
+                prepended to it when saving results. Defaults to `None`.
             overwrite (bool, optional): Sets whether or not to overwrite the
                 previous value if the attribute already exists. If set to
-                `False` and the attribute already exists, an `Exception` is
+                `False` and the attribute already exists, a `PermissionError` is
                 raised. Defaults to `True`.
 
         Raises:
