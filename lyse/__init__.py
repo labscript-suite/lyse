@@ -102,18 +102,18 @@ def globals_diff(run1, run2, group=None):
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
 class Run(object):
-    """A class for saving/retrieving data to/from a run's hdf5 file.
+    """A class for saving/retrieving data to/from a shot's hdf5 file.
 
     This class implements methods that allow the user to retrieve data from a
-    run's hdf5 file such as images, traces, and the values of globals. It also
+    shot's hdf5 file such as images, traces, and the values of globals. It also
     provides methods for saving and retrieving results from analysis.
 
     Args:
         h5_path (str): The path, including file name and extension, to the hdf5
-            file for a run.
-        no_write (bool, optional): Set to `True` to prevent editing the run
-            file. Note that doing so prohibits the ability to save results to
-            the file. Defaults to `False`.
+            file for a shot.
+        no_write (bool, optional): Set to `True` to prevent editing the shot's
+            hdf5 file. Note that doing so prohibits the ability to save results
+            to the file. Defaults to `False`.
     """
     def __init__(self,h5_path,no_write=False):
         self.__h5_path = h5_path
