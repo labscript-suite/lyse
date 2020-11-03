@@ -329,9 +329,43 @@ class Run(object):
 
     def save_result_array(self, name, data, group=None, 
                           overwrite=True, keep_attrs=False, **kwargs):
-        """Save data array to h5 file. Defaults are to save to the active 
-        group in the 'results' group and overwrite existing data.
-        Additional keyword arguments are passed directly to h5py.create_dataset()."""
+        """Save an array of data to the hdf5 h5 file.
+
+        With the default argument values this method saves to `self.group` in
+        the `'/results'` group and overwrites any existing value without keeping
+        the dataset's previous attributes. Additional keyword arguments are
+        passed directly to `h5py.create_dataset()`.
+
+        Args:
+            name (str): The name of the result. This will be the name of the
+                dataset added to the hdf5 file.
+            data (:obj:`numpy:numpy.array`): The data to save to the hdf5 file.
+            group (str, optional): The group in the hdf5 file in which the
+                result will be saved as a dataset. If set to `None`, then the
+                result will be saved in `self.group` in `'/results'`. Note that
+                if a value is passed for `group` here then it will NOT have
+                `'/result'` prepended to it which allows the caller to save
+                results anywhere in the hdf5 file. This is in contrast to using
+                the default group set with `self.set_group()`; when the default
+                group is set with that method it WILL have `'/results'`
+                prepended to it when saving results. Defaults to `None`..
+            overwrite (bool, optional): Sets whether or not to overwrite the
+                previous value if the dataset already exists. If set to
+                `False` and the dataset already exists, a `PermissionError` is
+                raised. Defaults to `True`.
+            keep_attrs (bool, optional): Whether or not to keep the dataset's
+                attributes when overwriting it, i.e. if the dataset already
+                existed. Defaults to `False`.
+
+        Raises:
+            PermissionError: A `PermissionError` is raised if `self.no_write` is
+                `True` because saving the result would edit the file.
+            ValueError: A `ValueError` is raised if `self.group` is `None` and
+                no value is provided for `group` because the method then doesn't
+                know where to save the result.
+            PermissionError: A `PermissionError` is raised if a dataset with
+                name `name` already exists but `overwrite` is set to `False`.
+        """
         if self.no_write:
             msg = "Cannot save result; this instance is read-only."
             raise PermissionError(msg)
