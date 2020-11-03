@@ -114,23 +114,11 @@ class Run(object):
         no_write (bool, optional): Set to `True` to prevent editing the run
             file. Note that doing so prohibits the ability to save results to
             the file. Defaults to `False`.
-
-    Attributes:
-        h5_path (str): The value provided for `h5_path` during instantiation.
-        no_write (bool): The value provided for `no_write` during instantiation.
-        group (str): The group in the hdf5 file in which results are saved by
-            default. When a `Run` instance is created from within a lyse
-            singleshot or multishot routine, `group` will be set to the name of
-            the running routine. If created from outside a lyse script it will
-            be set to `None`. To change the default group for saving results,
-            use the `set_group()` method. Note that if `self.group` is `None`
-            and no value is provided for the optional `group` argument used by
-            the `save...()` methods, a `ValueError` will be raised.
     """
     def __init__(self,h5_path,no_write=False):
-        self.no_write = no_write
-        self.group = None
-        self.h5_path = h5_path
+        self.__h5_path = h5_path
+        self.__no_write = no_write
+        self.__group = None
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                      
@@ -142,8 +130,7 @@ class Run(object):
                 frame = inspect.currentframe()
                 __file__ = frame.f_back.f_globals['__file__']
                 group = os.path.basename(__file__).split('.py')[0]
-                self._create_group_if_not_exists(h5_path, 'results', group)
-                self.group = group
+                self.set_group(group)
         except KeyError:
             # sys.stderr.write('Warning: to write results, call '
             # 'Run.set_group(groupname), specifying the name of the group '
@@ -151,6 +138,37 @@ class Run(object):
             # 'the filename of your script, but since you\'re in interactive '
             # 'mode, there is no script name.\n')
             pass
+
+    @property
+    def h5_path(self):
+        """str: The value provided for `h5_path` during instantiation."""
+        return self.__h5_path
+
+    @property
+    def no_write(self):
+        """bool: The value provided for `no_write` during instantiation."""
+        return self.__no_write
+
+    @property
+    def group(self):
+        """str: The group in the hdf5 file in which results are saved by default.
+        
+            When a `Run` instance is created from within a lyse singleshot or
+            multishot routine, `group` will be set to the name of the running
+            routine. If created from outside a lyse script it will be set to
+            `None`. To change the default group for saving results, use the
+            `set_group()` method. Note that if `self.group` is `None` and no
+            value is provided for the optional `group` argument used by the
+            `save...()` methods, a `ValueError` will be raised.
+            
+            Attempting to directly set `self.group`'s value will automatically
+            call `self.set_group()`.
+        """
+        return self.__group
+
+    @group.setter
+    def group(self, value):
+        self.set_group(value)
 
     def _create_group_if_not_exists(self, h5_path, location, groupname):
         """Creates a group in the HDF5 file at `location` if it does not exist.
@@ -188,7 +206,7 @@ class Run(object):
                 `'/results'` group of the hdf5 file.
         """
         self._create_group_if_not_exists(self.h5_path, '/results', groupname)
-        self.group = groupname
+        self.__group = groupname
 
     def trace_names(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
