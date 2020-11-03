@@ -257,8 +257,9 @@ class Run(object):
                 result will be saved as an attribute. If set to `None`, then the
                 result will be saved to `self.group` in `'/results'`. Note that
                 if a value is passed for `group` here then it will NOT have
-                `'/result'` prepended to it. This is in contrast to using the
-                default group set with `self.set_group()`; when the default
+                `'/result'` prepended to it which allows the caller to save
+                results anywhere in the hdf5 file. This is in contrast to using
+                the default group set with `self.set_group()`; when the default
                 group is set with that method it WILL have `'/results'`
                 prepended to it when before saving results. Defaults to `None`.
             overwrite (bool, optional): Sets whether or not to overwrite the
