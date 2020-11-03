@@ -317,7 +317,7 @@ class Run(object):
                         group=group,
                         name=name,
                     )
-                raise PermissionError(dedent(msg))                 
+                raise PermissionError(dedent(msg))
             set_attributes(h5_file[group], {name: value})
             
         if spinning_top:
