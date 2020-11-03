@@ -385,7 +385,6 @@ class Run(object):
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
-            print('saving %s =' % name, value)
             self.save_result(name, value, **kwargs)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
