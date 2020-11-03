@@ -286,20 +286,17 @@ class Run(object):
                 raised. Defaults to `True`.
 
         Raises:
-            Exception: An `Exception` is raised if `self.no_write` is `True`
-                because saving the result would edit the file.
+            PermissionError: A `PermissionError` is raised if `self.no_write` is
+                `True` because saving the result would edit the file.
             ValueError: A `ValueError` is raised if `self.group` is `None` and
                 no value is provided for `group` because the method then doesn't
                 know where to save the result.
-            Exception: An `Exception` is raised if an attribute with name `name`
-                already exists but `overwrite` is set to `False`.
+            PermissionError: A `PermissionError` is raised if an attribute with
+                name `name` already exists but `overwrite` is set to `False`.
         """
         if self.no_write:
-            raise Exception('This run is read-only. '
-                            'You can\'t save results to runs through a '
-                            'Sequence object. Per-run analysis should be done '
-                            'in single-shot analysis routines, in which a '
-                            'single Run object is used')
+            msg = "Cannot save result; this instance is read-only."
+            raise PermissionError(msg)
         with h5py.File(self.h5_path,'a') as h5_file:
             if not group:
                 if self.group is None:
@@ -314,8 +311,13 @@ class Run(object):
                 # Create the group if it doesn't exist
                 h5_file.create_group(group) 
             if name in h5_file[group].attrs and not overwrite:
-                raise Exception('Attribute %s exists in group %s. ' \
-                                'Use overwrite=True to overwrite.' % (name, group))                   
+                msg = """Cannot save result; group '{group}' already has
+                    attribute '{name}' and overwrite is set to False. Set
+                    overwrite=True to overwrite the existing value.""".format(
+                        group=group,
+                        name=name,
+                    )
+                raise PermissionError(dedent(msg))                 
             set_attributes(h5_file[group], {name: value})
             
         if spinning_top:
