@@ -116,9 +116,9 @@ class Run(object):
             to the file. Defaults to `False`.
     """
     def __init__(self,h5_path,no_write=False):
-        self.__h5_path = h5_path
-        self.__no_write = no_write
-        self.__group = None
+        self._h5_path = h5_path
+        self._no_write = no_write
+        self._group = None
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                      
@@ -142,12 +142,12 @@ class Run(object):
     @property
     def h5_path(self):
         """str: The value provided for `h5_path` during instantiation."""
-        return self.__h5_path
+        return self._h5_path
 
     @property
     def no_write(self):
         """bool: The value provided for `no_write` during instantiation."""
-        return self.__no_write
+        return self._no_write
 
     @property
     def group(self):
@@ -164,7 +164,7 @@ class Run(object):
             Attempting to directly set `self.group`'s value will automatically
             call `self.set_group()`.
         """
-        return self.__group
+        return self._group
 
     @group.setter
     def group(self, value):
@@ -206,7 +206,7 @@ class Run(object):
                 `'/results'` group of the hdf5 file.
         """
         self._create_group_if_not_exists(self.h5_path, '/results', groupname)
-        self.__group = groupname
+        self._group = groupname
 
     def trace_names(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
