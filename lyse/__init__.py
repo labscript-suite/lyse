@@ -333,11 +333,8 @@ class Run(object):
         group in the 'results' group and overwrite existing data.
         Additional keyword arguments are passed directly to h5py.create_dataset()."""
         if self.no_write:
-            raise Exception('This run is read-only. '
-                            'You can\'t save results to runs through a '
-                            'Sequence object. Per-run analysis should be done '
-                            'in single-shot analysis routines, in which a '
-                            'single Run object is used')
+            msg = "Cannot save result; this instance is read-only."
+            raise PermissionError(msg)
         with h5py.File(self.h5_path, 'a') as h5_file:
             attrs = {}
             if not group:
@@ -359,8 +356,14 @@ class Run(object):
                         attrs = dict(h5_file[group][name].attrs)
                     del h5_file[group][name]
                 else:
-                    raise Exception('Dataset %s exists. Use overwrite=True to overwrite.' % 
-                                     group + '/' + name)
+                    msg = """Cannot save result; group '{group}' already has
+                        dataset '{name}' and overwrite is set to False. Set
+                        overwrite=True to overwrite the existing
+                        value.""".format(
+                            group=group,
+                            name=name,
+                        )
+                    raise PermissionError(dedent(msg))
             h5_file[group].create_dataset(name, data=data, **kwargs)
             for key, val in attrs.items():
                 h5_file[group][name].attrs[key] = val
