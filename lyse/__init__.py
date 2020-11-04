@@ -126,10 +126,19 @@ class Run(object):
             if not self.no_write:
                 # The group where this run's results will be stored in the h5
                 # file will be the name of the python script which is
-                # instantiating this Run object:
-                frame = inspect.currentframe()
-                __file__ = frame.f_back.f_globals['__file__']
-                group = os.path.basename(__file__).split('.py')[0]
+                # instantiating this Run object. Iterate from innermost caller
+                # to outermost. The name of the script will be one frame in
+                # from analysis_subprocess.py.
+                group = None
+                inner_frame = inspect.currentframe()
+                inner_file_name = self._frame_to_file_name(inner_frame)
+                while group is None:
+                    outer_frame = inner_frame.f_back
+                    outer_file_name = self._frame_to_file_name(outer_frame)
+                    if outer_file_name == 'analysis_subprocess':
+                        group = inner_file_name
+                    inner_frame = outer_frame
+                    inner_file_name = outer_file_name
                 self.set_group(group)
         except KeyError:
             # sys.stderr.write('Warning: to write results, call '
@@ -138,6 +147,11 @@ class Run(object):
             # 'the filename of your script, but since you\'re in interactive '
             # 'mode, there is no script name.\n')
             pass
+
+    def _frame_to_file_name(self, frame):
+        file_path = frame.f_globals['__file__']
+        file_name = os.path.basename(file_path).split('.py')[0]
+        return file_name
 
     @property
     def h5_path(self):
@@ -590,31 +604,13 @@ class Sequence(Run):
             else:
                 with h5py.File(h5_path, 'a') as f:
                     pass
-        self._h5_path = h5_path
-        self._no_write = no_write
-        self._group = None
-        if not self.no_write:
-            self._create_group_if_not_exists(h5_path, '/', 'results')
+
+        super().__init__(h5_path, no_write=no_write)
 
         if isinstance(run_paths, pandas.DataFrame):
             run_paths = run_paths['filepath']      
         self.runs = {path: Run(path,no_write=True) for path in run_paths}
 
-        # The group where the results will be stored in the h5 file will be the
-        # name of the python script which is instantiating this Sequence object:
-        frame = inspect.currentframe()
-        try:
-            __file__ = frame.f_back.f_locals['__file__']
-            group = os.path.basename(__file__).split('.py')[0]
-            self.set_group(group)
-        except KeyError:
-            # sys.stderr.write('Warning: to write results, call '
-            # 'Sequence.set_group(groupname), specifying the name of the group '
-            # 'you would like to save results to. This normally comes from '
-            # 'the filename of your script, but since you\'re in interactive '
-            # 'mode, there is no script name.\n')
-            pass
-        
     def get_trace(self,*args):
         return {path:run.get_trace(*args) for path,run in self.runs.items()}
         
