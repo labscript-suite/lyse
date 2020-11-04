@@ -10,6 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
+import copy
 import os
 from pathlib import Path
 from m2r import MdInclude
@@ -49,6 +50,23 @@ extensions = [
 ]
 
 autodoc_typehints = 'description'
+
+# mock missing site packages methods
+import site
+mock_site_methods = {
+    # Format:
+    #   method name: return value
+    'getusersitepackages': '',
+    'getsitepackages': []
+}
+__fn = None
+for __name, __rval in mock_site_methods.items():
+    if not hasattr(site, __name):
+        __fn = lambda *args, __rval=copy.deepcopy(__rval), **kwargs: __rval
+        setattr(site, __name, __fn)
+del __name
+del __rval
+del __fn
 
 # Prefix each autosectionlabel with the name of the document it is in and a colon
 autosectionlabel_prefix_document = True
