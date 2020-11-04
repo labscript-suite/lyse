@@ -129,15 +129,24 @@ class Run(object):
                 # instantiating this Run object. Iterate from innermost caller
                 # to outermost. The name of the script will be one frame in
                 # from analysis_subprocess.py.
+                analysis_subprocess_path = os.path.join(
+                    LYSE_DIR,
+                    'analysis_subprocess.py',
+                )
                 group = None
                 inner_frame = inspect.currentframe()
-                inner_file_name = self._frame_to_file_name(inner_frame)
+                inner_path = self._frame_to_path(inner_frame)
+                inner_file_name = self._path_to_file_name(inner_path)
                 while group is None:
+                    # self._frame_to_path() will raise a KeyError if this loop
+                    # reaches the outermost caller.
                     outer_frame = inner_frame.f_back
-                    outer_file_name = self._frame_to_file_name(outer_frame)
-                    if outer_file_name == 'analysis_subprocess':
+                    outer_path = self._frame_to_path(outer_frame)
+                    outer_file_name = self._path_to_file_name(outer_path)
+                    if outer_path == analysis_subprocess_path:
                         group = inner_file_name
                     inner_frame = outer_frame
+                    inner_path = outer_path
                     inner_file_name = outer_file_name
                 self.set_group(group)
         except KeyError:
@@ -148,9 +157,12 @@ class Run(object):
             # 'mode, there is no script name.\n')
             pass
 
-    def _frame_to_file_name(self, frame):
-        file_path = frame.f_globals['__file__']
-        file_name = os.path.basename(file_path).split('.py')[0]
+    def _frame_to_path(self, frame):
+        path = frame.f_globals['__file__']
+        return path
+
+    def _path_to_file_name(self, path):
+        file_name = os.path.basename(path).split('.py')[0]
         return file_name
 
     @property
