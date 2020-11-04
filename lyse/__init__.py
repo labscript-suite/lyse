@@ -153,16 +153,16 @@ class Run(object):
     def group(self):
         """str: The group in the hdf5 file in which results are saved by default.
         
-            When a `Run` instance is created from within a lyse singleshot or
-            multishot routine, `group` will be set to the name of the running
-            routine. If created from outside a lyse script it will be set to
-            `None`. To change the default group for saving results, use the
-            `set_group()` method. Note that if `self.group` is `None` and no
-            value is provided for the optional `group` argument used by the
-            `save...()` methods, a `ValueError` will be raised.
-            
-            Attempting to directly set `self.group`'s value will automatically
-            call `self.set_group()`.
+        When a `Run` instance is created from within a lyse singleshot or
+        multishot routine, `group` will be set to the name of the running
+        routine. If created from outside a lyse script it will be set to `None`.
+        To change the default group for saving results, use the `set_group()`
+        method. Note that if `self.group` is `None` and no value is provided for
+        the optional `group` argument used by the `save...()` methods, a
+        `ValueError` will be raised.
+        
+        Attempting to directly set `self.group`'s value will automatically call
+        `self.set_group()`.
         """
         return self._group
 
