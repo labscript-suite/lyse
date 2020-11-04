@@ -578,32 +578,42 @@ class Run(object):
         
 class Sequence(Run):
     def __init__(self, h5_path, run_paths, no_write=False):
-        if isinstance(run_paths, pandas.DataFrame):
-            run_paths = run_paths['filepath']
-        self.h5_path = h5_path
-        self.no_write = no_write
+        # Ensure file exists without affecting its last modification time if it
+        # already exists.
+        try:
+            with h5py.File(h5_path, 'r') as f:
+                pass
+        except OSError:
+            if no_write:
+                msg = "Cannot create the hdf5 file; this instance is read-only."
+                raise PermissionError(msg)
+            else:
+                with h5py.File(h5_path, 'a') as f:
+                    pass
+        self._h5_path = h5_path
+        self._no_write = no_write
+        self._group = None
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
-                 
+
+        if isinstance(run_paths, pandas.DataFrame):
+            run_paths = run_paths['filepath']      
         self.runs = {path: Run(path,no_write=True) for path in run_paths}
-        
-        # The group were the results will be stored in the h5 file will
-        # be the name of the python script which is instantiating this
-        # Sequence object:
+
+        # The group where the results will be stored in the h5 file will be the
+        # name of the python script which is instantiating this Sequence object:
         frame = inspect.currentframe()
         try:
             __file__ = frame.f_back.f_locals['__file__']
-            self.group = os.path.basename(__file__).split('.py')[0]
-            if not self.no_write:
-                self._create_group_if_not_exists(h5_path, 'results', self.group)
+            group = os.path.basename(__file__).split('.py')[0]
+            self.set_group(group)
         except KeyError:
-            sys.stderr.write('Warning: to write results, call '
-            'Sequence.set_group(groupname), specifying the name of the group '
-            'you would like to save results to. This normally comes from '
-            'the filename of your script, but since you\'re in interactive '
-            'mode, there is no script name. Opening in read only mode for '
-            'the moment.\n')
-            self.no_write = True
+            # sys.stderr.write('Warning: to write results, call '
+            # 'Sequence.set_group(groupname), specifying the name of the group '
+            # 'you would like to save results to. This normally comes from '
+            # 'the filename of your script, but since you\'re in interactive '
+            # 'mode, there is no script name.\n')
+            pass
         
     def get_trace(self,*args):
         return {path:run.get_trace(*args) for path,run in self.runs.items()}
