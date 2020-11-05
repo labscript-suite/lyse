@@ -207,35 +207,100 @@ def globals_diff(run1, run2, group=None):
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
 class Run(object):
+    """A class for saving/retrieving data to/from a shot's hdf5 file.
+
+    This class implements methods that allow the user to retrieve data from a
+    shot's hdf5 file such as images, traces, and the values of globals. It also
+    provides methods for saving and retrieving results from analysis.
+
+    Args:
+        h5_path (str): The path, including file name and extension, to the hdf5
+            file for a shot.
+        no_write (bool, optional): Set to `True` to prevent editing the shot's
+            hdf5 file. Note that doing so prohibits the ability to save results
+            to the file. Defaults to `False`.
+    """
     def __init__(self,h5_path,no_write=False):
-        self.no_write = no_write
-        self._no_group = None
-        self.h5_path = h5_path
+        self.__h5_path = h5_path
+        self.__no_write = no_write
+        self.__group = None
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                      
         try:
             if not self.no_write:
-                # The group were this run's results will be stored in the h5 file
-                # will be the name of the python script which is instantiating
-                # this Run object:
-                frame = inspect.currentframe()
-                __file__ = frame.f_back.f_globals['__file__']
-                self.group = os.path.basename(__file__).split('.py')[0]
-                self._create_group_if_not_exists(h5_path, 'results', self.group)
+                # The group where this run's results will be stored in the h5
+                # file will be the name of the python script which is
+                # instantiating this Run object. Iterate from innermost caller
+                # to outermost. The name of the script will be one frame in
+                # from analysis_subprocess.py.
+                analysis_subprocess_path = os.path.join(
+                    LYSE_DIR,
+                    'analysis_subprocess.py',
+                )
+                group = None
+                inner_frame = inspect.currentframe()
+                inner_path = self._frame_to_path(inner_frame)
+                inner_file_name = self._path_to_file_name(inner_path)
+                while group is None:
+                    # self._frame_to_path() will raise a KeyError if this loop
+                    # reaches the outermost caller.
+                    outer_frame = inner_frame.f_back
+                    outer_path = self._frame_to_path(outer_frame)
+                    outer_file_name = self._path_to_file_name(outer_path)
+                    if outer_path == analysis_subprocess_path:
+                        group = inner_file_name
+                    inner_frame = outer_frame
+                    inner_path = outer_path
+                    inner_file_name = outer_file_name
+                self.set_group(group)
         except KeyError:
             # sys.stderr.write('Warning: to write results, call '
             # 'Run.set_group(groupname), specifying the name of the group '
             # 'you would like to save results to. This normally comes from '
             # 'the filename of your script, but since you\'re in interactive '
-            # 'mode, there is no scipt name. Opening in read only mode for '
-            # 'the moment.\n')
-            
-            # Backup the value of self.no_write for restoration once the group
-            # is set
-            self._no_group = (True, self.no_write)
-            self.no_write = True
-            
+            # 'mode, there is no script name.\n')
+            pass
+
+    def _frame_to_path(self, frame):
+        path = frame.f_globals['__file__']
+        return path
+
+    def _path_to_file_name(self, path):
+        file_name = os.path.basename(path).split('.py')[0]
+        return file_name
+
+    @property
+    def h5_path(self):
+        """str: The value provided for `h5_path` during instantiation."""
+        return self.__h5_path
+
+    @property
+    def no_write(self):
+        """bool: The value provided for `no_write` during instantiation."""
+        return self.__no_write
+
+    @property
+    def group(self):
+        """str: The group in the hdf5 file in which results are saved by default.
+        
+        When a `Run` instance is created from within a lyse singleshot or
+        multishot routine, `group` will be set to the name of the running
+        routine. If created from outside a lyse script it will be set to `None`.
+        To change the default group for saving results, use the `set_group()`
+        method. Note that if `self.group` is `None` and no value is provided for
+        the optional `group` argument used by the `save...()` methods, a
+        `ValueError` will be raised.
+        
+        Attempting to directly set `self.group`'s value will automatically call
+        `self.set_group()`.
+        """
+        return self.__group
+
+    @group.setter
+    def group(self, value):
+        self.set_group(value)
+
     def _create_group_if_not_exists(self, h5_path, location, groupname):
         """Creates a group in the HDF5 file at `location` if it does not exist.
         
@@ -247,16 +312,32 @@ class Run(object):
             if not groupname in h5_file[location]:
                 create_group = True
         if create_group:
+            if self.no_write:
+                msg = "Cannot create group; this run is read-only."
+                raise PermissionError(msg)
             with h5py.File(h5_path, 'r+') as h5_file:
-                h5_file[location].create_group(groupname)
+                # Catch the ValueError raised if the group was created by
+                # something else between the check above and now. 
+                try:
+                    h5_file[location].create_group(groupname)
+                except ValueError:
+                    pass
 
     def set_group(self, groupname):
-        self.group = groupname
-        self._create_group_if_not_exists(self.h5_path, '/results', self.group)
-        # restore no_write attribute now we have set the group
-        if self._no_group is not None and self._no_group[0]:
-            self.no_write = self._no_group[1]
-            self._no_group = None
+        """Set the default hdf5 file group for saving results.
+
+        The `save...()` methods will save their results to `self.group` if an
+        explicit value for their optional `group` argument is not given. This
+        method updates `self.group`, making sure to create the group in the hdf5
+        file if it does not already exist.
+
+        Args:
+            groupname (str): The name of the hdf5 file group in which to save
+                results by default. The group will be created in the
+                `'/results'` group of the hdf5 file.
+        """
+        self._create_group_if_not_exists(self.h5_path, '/results', groupname)
+        self.__group = groupname
 
     def trace_names(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
@@ -275,16 +356,16 @@ class Run(object):
     def get_trace(self,name):
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not name in h5_file['data']['traces']:
-                raise Exception('The trace \'%s\' doesn not exist'%name)
+                raise Exception('The trace \'%s\' does not exist'%name)
             trace = h5_file['data']['traces'][name]
             return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
 
     def get_result_array(self,group,name):
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not group in h5_file['results']:
-                raise Exception('The result group \'%s\' doesn not exist'%group)
+                raise Exception('The result group \'%s\' does not exist'%group)
             if not name in h5_file['results'][group]:
-                raise Exception('The result array \'%s\' doesn not exist'%name)
+                raise Exception('The result array \'%s\' does not exist'%name)
             return array(h5_file['results'][group][name])
             
     def get_result(self, group, name):
@@ -306,26 +387,68 @@ class Run(object):
         return results        
             
     def save_result(self, name, value, group=None, overwrite=True):
-        """Save a result to h5 file. Defaults are to save to the active group 
-        in the 'results' group and overwrite an existing result.
-        Note that the result is saved as an attribute of 'results/group' and
-        overwriting attributes causes h5 file size bloat."""
+        """Save a result to the hdf5 file.
+
+        With the default argument values this method saves to `self.group` in
+        the `'/results'` group and overwrites any existing value. Note that the
+        result is saved as an attribute and overwriting attributes causes hdf5
+        file size bloat.
+
+        Args:
+            name (str): The name of the result. This will be the name of the
+                attribute added to the hdf5 file's group.
+            value (any): The value of the result, which will be saved as the
+                value of the hdf5 group's attribute set by `name`. However note
+                that when saving large arrays, it is better to use the
+                `self.save_result_array()` method which will store the results
+                as a dataset in the hdf5 file.
+            group (str, optional): The group in the hdf5 file to which the
+                result will be saved as an attribute. If set to `None`, then the
+                result will be saved to `self.group` in `'/results'`. Note that
+                if a value is passed for `group` here then it will NOT have
+                `'/result'` prepended to it which allows the caller to save
+                results anywhere in the hdf5 file. This is in contrast to using
+                the default group set with `self.set_group()`; when the default
+                group is set with that method it WILL have `'/results'`
+                prepended to it when saving results. Defaults to `None`.
+            overwrite (bool, optional): Sets whether or not to overwrite the
+                previous value if the attribute already exists. If set to
+                `False` and the attribute already exists, a `PermissionError` is
+                raised. Defaults to `True`.
+
+        Raises:
+            PermissionError: A `PermissionError` is raised if `self.no_write` is
+                `True` because saving the result would edit the file.
+            ValueError: A `ValueError` is raised if `self.group` is `None` and
+                no value is provided for `group` because the method then doesn't
+                know where to save the result.
+            PermissionError: A `PermissionError` is raised if an attribute with
+                name `name` already exists but `overwrite` is set to `False`.
+        """
         if self.no_write:
-            raise Exception('This run is read-only. '
-                            'You can\'t save results to runs through a '
-                            'Sequence object. Per-run analysis should be done '
-                            'in single-shot analysis routines, in which a '
-                            'single Run object is used')
+            msg = "Cannot save result; this instance is read-only."
+            raise PermissionError(msg)
         with h5py.File(self.h5_path,'a') as h5_file:
             if not group:
+                if self.group is None:
+                    msg = """Cannot save result; no default group set. Either
+                        specify a value for this method's optional group
+                        argument, or set a default value using the set_group()
+                        method."""
+                    raise ValueError(dedent(msg))
                 # Save to analysis results group by default
                 group = 'results/' + self.group
             elif not group in h5_file:
                 # Create the group if it doesn't exist
                 h5_file.create_group(group) 
             if name in h5_file[group].attrs and not overwrite:
-                raise Exception('Attribute %s exists in group %s. ' \
-                                'Use overwrite=True to overwrite.' % (name, group))                   
+                msg = """Cannot save result; group '{group}' already has
+                    attribute '{name}' and overwrite is set to False. Set
+                    overwrite=True to overwrite the existing value.""".format(
+                        group=group,
+                        name=name,
+                    )
+                raise PermissionError(dedent(msg))
             set_attributes(h5_file[group], {name: value})
             
         if spinning_top:
@@ -337,18 +460,55 @@ class Run(object):
 
     def save_result_array(self, name, data, group=None, 
                           overwrite=True, keep_attrs=False, **kwargs):
-        """Save data array to h5 file. Defaults are to save to the active 
-        group in the 'results' group and overwrite existing data.
-        Additional keyword arguments are passed directly to h5py.create_dataset()."""
+        """Save an array of data to the hdf5 h5 file.
+
+        With the default argument values this method saves to `self.group` in
+        the `'/results'` group and overwrites any existing value without keeping
+        the dataset's previous attributes. Additional keyword arguments are
+        passed directly to `h5py.create_dataset()`.
+
+        Args:
+            name (str): The name of the result. This will be the name of the
+                dataset added to the hdf5 file.
+            data (:obj:`numpy:numpy.array`): The data to save to the hdf5 file.
+            group (str, optional): The group in the hdf5 file in which the
+                result will be saved as a dataset. If set to `None`, then the
+                result will be saved in `self.group` in `'/results'`. Note that
+                if a value is passed for `group` here then it will NOT have
+                `'/result'` prepended to it which allows the caller to save
+                results anywhere in the hdf5 file. This is in contrast to using
+                the default group set with `self.set_group()`; when the default
+                group is set with that method it WILL have `'/results'`
+                prepended to it when saving results. Defaults to `None`..
+            overwrite (bool, optional): Sets whether or not to overwrite the
+                previous value if the dataset already exists. If set to
+                `False` and the dataset already exists, a `PermissionError` is
+                raised. Defaults to `True`.
+            keep_attrs (bool, optional): Whether or not to keep the dataset's
+                attributes when overwriting it, i.e. if the dataset already
+                existed. Defaults to `False`.
+
+        Raises:
+            PermissionError: A `PermissionError` is raised if `self.no_write` is
+                `True` because saving the result would edit the file.
+            ValueError: A `ValueError` is raised if `self.group` is `None` and
+                no value is provided for `group` because the method then doesn't
+                know where to save the result.
+            PermissionError: A `PermissionError` is raised if a dataset with
+                name `name` already exists but `overwrite` is set to `False`.
+        """
         if self.no_write:
-            raise Exception('This run is read-only. '
-                            'You can\'t save results to runs through a '
-                            'Sequence object. Per-run analysis should be done '
-                            'in single-shot analysis routines, in which a '
-                            'single Run object is used')
+            msg = "Cannot save result; this instance is read-only."
+            raise PermissionError(msg)
         with h5py.File(self.h5_path, 'a') as h5_file:
             attrs = {}
             if not group:
+                if self.group is None:
+                    msg = """Cannot save result; no default group set. Either
+                        specify a value for this method's optional group
+                        argument, or set a default value using the set_group()
+                        method."""
+                    raise ValueError(dedent(msg))
                 # Save dataset to results group by default
                 group = 'results/' + self.group
             elif not group in h5_file:
@@ -361,8 +521,14 @@ class Run(object):
                         attrs = dict(h5_file[group][name].attrs)
                     del h5_file[group][name]
                 else:
-                    raise Exception('Dataset %s exists. Use overwrite=True to overwrite.' % 
-                                     group + '/' + name)
+                    msg = """Cannot save result; group '{group}' already has
+                        dataset '{name}' and overwrite is set to False. Set
+                        overwrite=True to overwrite the existing
+                        value.""".format(
+                            group=group,
+                            name=name,
+                        )
+                    raise PermissionError(dedent(msg))
             h5_file[group].create_dataset(name, data=data, **kwargs)
             for key, val in attrs.items():
                 h5_file[group][name].attrs[key] = val
@@ -380,14 +546,34 @@ class Run(object):
         return results
         
     def save_results(self, *args, **kwargs):
-        """Iteratively call save_result() on multiple results.
-        Assumes arguments are ordered such that each result to be saved is
-        preceeded by the name of the attribute to save it under.
-        Keywords arguments are passed to each call of save_result()."""
+        """Save multiple results to the hdf5 file.
+
+        This method Iteratively call `self.save_result()` on multiple results.
+        It assumes arguments are ordered such that each result to be saved is
+        preceded by the name of the attribute to save it under. Keywords
+        arguments are passed to each call of `self.save_result()`.
+
+        Args:
+            *args: The names and values of results to be saved. The first entry
+                should be a string giving the name of the first result, and the
+                second entry should be the value for that result. After that,
+                an arbitrary number of additional pairs of result name strings
+                and values can be included, e.g.
+                `'name0', value0, 'name1', value1,...`.
+            **kwargs: Keyword arguments are passed to `self.save_result()`. Note
+                that the names and values of keyword arguments are NOT saved as
+                results to the hdf5 file; they are only used to provide values
+                for the optional arguments of `self.save_result()`.
+
+        Examples:
+            >>> run = Run('path/to/an/hdf5/file.h5')  # doctest: +SKIP
+            >>> a = 5
+            >>> b = 2.48
+            >>> run.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
+        """
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
-            print('saving %s =' % name, value)
             self.save_result(name, value, **kwargs)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
@@ -401,7 +587,7 @@ class Run(object):
     def save_result_arrays(self, *args, **kwargs):
         """Iteratively call save_result_array() on multiple data sets. 
         Assumes arguments are ordered such that each dataset to be saved is 
-        preceeded by the name to save it as. 
+        preceded by the name to save it as. 
         All keyword arguments are passed to each call of save_result_array()."""
         names = args[::2]
         values = args[1::2]
@@ -523,33 +709,25 @@ class Run(object):
         
 class Sequence(Run):
     def __init__(self, h5_path, run_paths, no_write=False):
-        if isinstance(run_paths, pandas.DataFrame):
-            run_paths = run_paths['filepath']
-        self.h5_path = h5_path
-        self.no_write = no_write
-        if not self.no_write:
-            self._create_group_if_not_exists(h5_path, '/', 'results')
-                 
-        self.runs = {path: Run(path,no_write=True) for path in run_paths}
-        
-        # The group were the results will be stored in the h5 file will
-        # be the name of the python script which is instantiating this
-        # Sequence object:
-        frame = inspect.currentframe()
+        # Ensure file exists without affecting its last modification time if it
+        # already exists.
         try:
-            __file__ = frame.f_back.f_locals['__file__']
-            self.group = os.path.basename(__file__).split('.py')[0]
-            if not self.no_write:
-                self._create_group_if_not_exists(h5_path, 'results', self.group)
-        except KeyError:
-            sys.stderr.write('Warning: to write results, call '
-            'Sequence.set_group(groupname), specifying the name of the group '
-            'you would like to save results to. This normally comes from '
-            'the filename of your script, but since you\'re in interactive '
-            'mode, there is no scipt name. Opening in read only mode for '
-            'the moment.\n')
-            self.no_write = True
-        
+            with h5py.File(h5_path, 'r') as f:
+                pass
+        except OSError:
+            if no_write:
+                msg = "Cannot create the hdf5 file; this instance is read-only."
+                raise PermissionError(msg)
+            else:
+                with h5py.File(h5_path, 'a') as f:
+                    pass
+
+        super().__init__(h5_path, no_write=no_write)
+
+        if isinstance(run_paths, pandas.DataFrame):
+            run_paths = run_paths['filepath']      
+        self.runs = {path: Run(path,no_write=True) for path in run_paths}
+
     def get_trace(self,*args):
         return {path:run.get_trace(*args) for path,run in self.runs.items()}
         
