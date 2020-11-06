@@ -711,7 +711,11 @@ class Shot(object):
 
 class Run(Shot):
     def __init__(self, *args, **kwargs):
-        warnings.warn("The 'Run' class has been renamed to 'Shot' (but is otherwise compatible). 'Run' will be removed in lyse v4.0. Please update your analysis code to use the 'Shot` class", DeprecationWarning)
+        msg = """The 'Run' class has been renamed to 'Shot' (but is otherwise 
+            compatible). 'Run' will be removed in lyse v4.0. Please update your 
+            analysis code to use the 'Shot' class.
+            """
+        warnings.warn(dedent(msg), DeprecationWarning)
         super().__init__(*args, **kwargs)
 
     def globals_diff(self, other_run, group=None):
@@ -741,9 +745,14 @@ class Sequence(Shot):
         
     @property
     def runs(self):
-        warnings.warn("The 'runs' attribute has been renamed to 'shots'. 'runs' will be removed in lyse v4.0. Please update your analysis code to use the 'shots` attribute", DeprecationWarning)
+        msg = """The 'runs' attribute has been renamed to 'shots'. 'runs' will be
+            removed in lyse v4.0. Please update your analysis code to use the 'shots'
+            attribute.
+            """
+        warnings.warn(dedent(msg), DeprecationWarning)
         return copy.copy(self.__shots)
 
+    @property
     def shots(self):
         return copy.copy(self.__shots)
 
