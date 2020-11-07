@@ -692,8 +692,15 @@ class Run(object):
                 temp_dict = dict(obj.attrs)
                 for key, val in temp_dict.items():
                     units_dict[key] = val
-        with h5py.File(self.h5_path, 'r') as h5_file:
-            h5_file['globals'].visititems(append_units)
+        if group:
+            try:
+                with h5py.File(self.h5_path, 'r') as h5_file:
+                    h5_file['globals'][group].visititems(append_units)
+            except KeyError:
+                pass
+        else:
+            with h5py.File(self.h5_path, 'r') as h5_file:
+                h5_file['globals'].visititems(append_units)
         return units_dict
 
     def globals_groups(self):
