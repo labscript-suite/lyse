@@ -686,6 +686,28 @@ class Run(object):
         return expansion_dict
                    
     def get_units(self, group=None):
+        """Get the units of globals.
+
+        This method retrieves the values in the "Units" column of runmanager for
+        this shot. The values are returned in a dictionary where the keys are
+        the names of globals and the values are the corresponding units.
+
+        Args:
+            group (str, optional): The name of the globals group for which the
+                units will be retrieved. Globals and units from other globals
+                groups will not be included in the returned dictionary. If set
+                to `None` then all globals from all globals groups will be
+                returned. If `group` is set to a value that isn't the name of a
+                globals group, then an empty dictionary will be returned, but no
+                error will be raised. Defaults to `None`.
+
+        Returns:
+            dict: A dictionary in which each key is a string giving the name of
+            a global, and each value is a string specifying the corresponding
+            value in the "Units" column of runmanager. An empty dictionary will
+            be returned if `group` is set to a value that isn't the name of a
+            globals group.
+        """
         units_dict = {}
         def append_units(name, obj):
             if 'units' in name:
