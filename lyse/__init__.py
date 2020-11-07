@@ -708,22 +708,21 @@ class Run(object):
             be returned if `group` is set to a value that isn't the name of a
             globals group.
         """
-        units_dict = {}
+        path = 'globals'
+        if group is not None:
+            path = path + '/{group}'.format(group=group)
+        units = {}
+        # Define method that when applied to an hdf5 group adds all of its
+        # globals and units to the units dict.
         def append_units(name, obj):
             if 'units' in name:
-                temp_dict = dict(obj.attrs)
-                for key, val in temp_dict.items():
-                    units_dict[key] = val
-        if group:
-            try:
-                with h5py.File(self.h5_path, 'r') as h5_file:
-                    h5_file['globals'][group].visititems(append_units)
-            except KeyError:
-                pass
-        else:
+                units.update(dict(obj.attrs))
+        try:
             with h5py.File(self.h5_path, 'r') as h5_file:
-                h5_file['globals'].visititems(append_units)
-        return units_dict
+                h5_file[path].visititems(append_units)
+        except KeyError:
+            pass
+        return units
 
     def globals_groups(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
