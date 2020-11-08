@@ -745,6 +745,10 @@ class Sequence(Shot):
         
     @property
     def runs(self):
+        """This property is deprecated and will be removed in lyse v4.0
+        
+        Use the :attr:`shots` attribute instead.
+        """
         msg = """The 'runs' attribute has been renamed to 'shots'. 'runs' will be
             removed in lyse v4.0. Please update your analysis code to use the 'shots'
             attribute.
@@ -754,6 +758,10 @@ class Sequence(Shot):
 
     @property
     def shots(self):
+        """A dictionary containing :class:`Shot` instances.
+        
+        The dictionary is keyed by filepaths specified in the :code:`shot_paths`
+        argument at instantiation time."""
         return copy.copy(self.__shots)
 
     def get_trace(self,*args):
