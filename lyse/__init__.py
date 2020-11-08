@@ -686,15 +686,43 @@ class Run(object):
         return expansion_dict
                    
     def get_units(self, group=None):
-        units_dict = {}
+        """Get the units of globals.
+
+        This method retrieves the values in the "Units" column of runmanager for
+        this shot. The values are returned in a dictionary where the keys are
+        the names of globals and the values are the corresponding units.
+
+        Args:
+            group (str, optional): The name of the globals group for which the
+                units will be retrieved. Globals and units from other globals
+                groups will not be included in the returned dictionary. If set
+                to `None` then all globals from all globals groups will be
+                returned. If `group` is set to a value that isn't the name of a
+                globals group, then an empty dictionary will be returned, but no
+                error will be raised. Defaults to `None`.
+
+        Returns:
+            dict: A dictionary in which each key is a string giving the name of
+            a global, and each value is a string specifying the corresponding
+            value in the "Units" column of runmanager. An empty dictionary will
+            be returned if `group` is set to a value that isn't the name of a
+            globals group.
+        """
+        path = 'globals'
+        if group is not None:
+            path = path + '/{group}'.format(group=group)
+        units = {}
+        # Define method that when applied to an hdf5 group adds all of its
+        # globals and units to the units dict.
         def append_units(name, obj):
             if 'units' in name:
-                temp_dict = dict(obj.attrs)
-                for key, val in temp_dict.items():
-                    units_dict[key] = val
-        with h5py.File(self.h5_path, 'r') as h5_file:
-            h5_file['globals'].visititems(append_units)
-        return units_dict
+                units.update(dict(obj.attrs))
+        try:
+            with h5py.File(self.h5_path, 'r') as h5_file:
+                h5_file[path].visititems(append_units)
+        except KeyError:
+            pass
+        return units
 
     def globals_groups(self):
         with h5py.File(self.h5_path, 'r') as h5_file:
