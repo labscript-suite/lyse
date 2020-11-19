@@ -188,14 +188,18 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
     @inmain_decorator(wait_for_return=True)
+    def _copy_dataframe(self):
+        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        return df
+
     def _retrieve_dataframe(self):
         # infer_objects() picks fixed datatypes for columns that are compatible with
         # fixed datatypes, dramatically speeding up pickling. It is called here
         # rather than when updating the dataframe as calling it during updating may
         # call it needlessly often, whereas it only needs to be called prior to
         # sending the dataframe to a client requesting it, as we're doing now.
-        app.filebox.shots_model.infer_objects()
-        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        df = self._copy_dataframe()
+        df.infer_objects()
         return df
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
