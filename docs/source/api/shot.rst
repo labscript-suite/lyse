@@ -1,10 +1,10 @@
-Run
+Shot
 ==========
 
-.. autoclass:: lyse.Run
+.. autoclass:: lyse.Shot
 	:members:
 	:undoc-members:
 	:inherited-members:
 	:show-inheritance:
 
-	.. automethod:: lyse.Run.__init__
+	.. automethod:: lyse.Shot.__init__

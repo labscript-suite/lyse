@@ -13,12 +13,14 @@
 
 from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
 from labscript_utils.dict_diff import dict_diff
+import copy
 import os
 import socket
 import pickle as pickle
 import inspect
 import sys
 import threading
+import warnings
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -79,7 +81,7 @@ routine_storage = _RoutineStorage()
 def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None, filter_kwargs=None):
     """Get data from the lyse dataframe or a file.
     
-    This function allows for either extracting information from a run's hdf5
+    This function allows for either extracting information from a shots's hdf5
     file, or retrieving data from lyse's dataframe. If `filepath` is provided
     then data will be read from that file and returned as a pandas series. If
     `filepath` is not provided then the dataframe in lyse, or a portion of it,
@@ -97,11 +99,11 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
     that method.
 
     Args:
-        filepath (str, optional): The path to a run's hdf5 file. If a value
+        filepath (str, optional): The path to a shot's hdf5 file. If a value
             other than `None` is provided, then this function will return a
-            pandas series containing data associated with the run. In particular
+            pandas series containing data associated with the shot. In particular
             it will contain the globals, singleshot results, multishot results,
-            etc. that would appear in the run's row in the Lyse dataframe, but
+            etc. that would appear in the shot's row in the Lyse dataframe, but
             the values will be read from the file rather than extracted from the
             lyse dataframe. If `filepath` is `None, then this function will
             instead return a section of the lyse dataframe. Note that if
@@ -203,10 +205,10 @@ def _rangeindex_to_multiindex(df, inplace):
     df.sort_index(inplace=True)
     return df
 
-def globals_diff(run1, run2, group=None):
-    return dict_diff(run1.get_globals(group), run2.get_globals(group))
+def globals_diff(shot1, shot2, group=None):
+    return dict_diff(shot1.get_globals(group), shot2.get_globals(group))
  
-class Run(object):
+class Shot(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
 
     This class implements methods that allow the user to retrieve data from a
@@ -229,9 +231,9 @@ class Run(object):
                      
         try:
             if not self.no_write:
-                # The group where this run's results will be stored in the h5
+                # The group where this shot's results will be stored in the h5
                 # file will be the name of the python script which is
-                # instantiating this Run object. Iterate from innermost caller
+                # instantiating this Shot object. Iterate from innermost caller
                 # to outermost. The name of the script will be one frame in
                 # from analysis_subprocess.py.
                 analysis_subprocess_path = os.path.join(
@@ -256,7 +258,7 @@ class Run(object):
                 self.set_group(group)
         except KeyError:
             # sys.stderr.write('Warning: to write results, call '
-            # 'Run.set_group(groupname), specifying the name of the group '
+            # 'Shot.set_group(groupname), specifying the name of the group '
             # 'you would like to save results to. This normally comes from '
             # 'the filename of your script, but since you\'re in interactive '
             # 'mode, there is no script name.\n')
@@ -284,7 +286,7 @@ class Run(object):
     def group(self):
         """str: The group in the hdf5 file in which results are saved by default.
         
-        When a `Run` instance is created from within a lyse singleshot or
+        When a `Shot` instance is created from within a lyse singleshot or
         multishot routine, `group` will be set to the name of the running
         routine. If created from outside a lyse script it will be set to `None`.
         To change the default group for saving results, use the `set_group()`
@@ -313,7 +315,7 @@ class Run(object):
                 create_group = True
         if create_group:
             if self.no_write:
-                msg = "Cannot create group; this run is read-only."
+                msg = "Cannot create group; this shot is read-only."
                 raise PermissionError(msg)
             with h5py.File(h5_path, 'r+') as h5_file:
                 # Catch the ValueError raised if the group was created by
@@ -566,10 +568,10 @@ class Run(object):
                 for the optional arguments of `self.save_result()`.
 
         Examples:
-            >>> run = Run('path/to/an/hdf5/file.h5')  # doctest: +SKIP
+            >>> shot = Shot('path/to/an/hdf5/file.h5')  # doctest: +SKIP
             >>> a = 5
             >>> b = 2.48
-            >>> run.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
+            >>> shot.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
         """
         names = args[::2]
         values = args[1::2]
@@ -731,12 +733,25 @@ class Run(object):
             except KeyError:
                 return []   
                 
-    def globals_diff(self, other_run, group=None):
-        return globals_diff(self, other_run, group)            
+    def globals_diff(self, other_shot, group=None):
+        return globals_diff(self, other_shot, group)            
     
-        
-class Sequence(Run):
-    def __init__(self, h5_path, run_paths, no_write=False):
+
+class Run(Shot):
+    def __init__(self, *args, **kwargs):
+        msg = """The 'Run' class has been renamed to 'Shot' (but is otherwise 
+            compatible). 'Run' will be removed in lyse v4.0. Please update your 
+            analysis code to use the 'Shot' class.
+            """
+        warnings.warn(dedent(msg), DeprecationWarning)
+        super().__init__(*args, **kwargs)
+
+    def globals_diff(self, other_run, group=None):
+        return globals_diff(self, other_run, group)  
+
+
+class Sequence(Shot):
+    def __init__(self, h5_path, shot_paths, no_write=False):
         # Ensure file exists without affecting its last modification time if it
         # already exists.
         try:
@@ -752,15 +767,36 @@ class Sequence(Run):
 
         super().__init__(h5_path, no_write=no_write)
 
-        if isinstance(run_paths, pandas.DataFrame):
-            run_paths = run_paths['filepath']      
-        self.runs = {path: Run(path,no_write=True) for path in run_paths}
+        if isinstance(shot_paths, pandas.DataFrame):
+            shot_paths = shot_paths['filepath']      
+        self.__shots = {path: Shot(path,no_write=True) for path in shot_paths}
+        
+    @property
+    def runs(self):
+        """This property is deprecated and will be removed in lyse v4.0
+        
+        Use the :attr:`shots` attribute instead.
+        """
+        msg = """The 'runs' attribute has been renamed to 'shots'. 'runs' will be
+            removed in lyse v4.0. Please update your analysis code to use the 'shots'
+            attribute.
+            """
+        warnings.warn(dedent(msg), DeprecationWarning)
+        return copy.copy(self.__shots)
+
+    @property
+    def shots(self):
+        """A dictionary containing :class:`Shot` instances.
+        
+        The dictionary is keyed by filepaths specified in the :code:`shot_paths`
+        argument at instantiation time."""
+        return copy.copy(self.__shots)
 
     def get_trace(self,*args):
-        return {path:run.get_trace(*args) for path,run in self.runs.items()}
+        return {path:shot.get_trace(*args) for path,shot in self.shots.items()}
         
     def get_result_array(self,*args):
-        return {path:run.get_result_array(*args) for path,run in self.runs.items()}
+        return {path:shot.get_result_array(*args) for path,shot in self.shots.items()}
          
     def get_traces(self,*args):
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')

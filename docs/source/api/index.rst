@@ -6,7 +6,7 @@ API Reference
    :maxdepth: 2
 
    lyse_functions
-   run
+   shot
    sequence
    dataframe_utilities
    analysis_subprocess
