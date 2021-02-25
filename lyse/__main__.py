@@ -2243,7 +2243,7 @@ class Lyse(object):
             for sequence in sequences:
                 sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
                 labscript = sequence_df['labscript'].iloc[0]
-                filename = "dataframe_{}_{}.ftr".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                filename = "dataframe_{}_{}.parquet".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
                 sequence_df.infer_objects()
@@ -2255,11 +2255,11 @@ class Lyse(object):
             error_dialog('Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
-        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.ftr')
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.parquet')
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                         'Select dataframe file to load',
                         default,
-                        "dataframe files (*.ftr)")
+                        "dataframe files (*.parquet)")
         if type(file) is tuple:
             file, _ = file
         if not file:
