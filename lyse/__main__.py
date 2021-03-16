@@ -1602,7 +1602,7 @@ class DataFrameModel(QtCore.QObject):
         # Update the Qt model:
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
-            
+        app.filebox.set_add_shots_progress(None, None, None)
 
     @inmain_decorator()
     def get_first_incomplete(self):
