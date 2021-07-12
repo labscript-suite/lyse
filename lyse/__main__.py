@@ -1,3 +1,5 @@
+"""Lyse GUI and supporting code
+"""
 import os
 import labscript_utils.excepthook
 

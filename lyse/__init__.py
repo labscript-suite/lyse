@@ -10,6 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse analysis API
+"""
 
 from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
 from labscript_utils.dict_diff import dict_diff
@@ -103,7 +105,7 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             it will contain the globals, singleshot results, multishot results,
             etc. that would appear in the run's row in the Lyse dataframe, but
             the values will be read from the file rather than extracted from the
-            lyse dataframe. If `filepath` is `None, then this function will
+            lyse dataframe. If `filepath` is `None`, then this function will
             instead return a section of the lyse dataframe. Note that if
             `filepath` is not None, then the other arguments will be ignored.
             Defaults to `None`.
