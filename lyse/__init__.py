@@ -206,6 +206,21 @@ def _rangeindex_to_multiindex(df, inplace):
     return df
 
 def globals_diff(run1, run2, group=None):
+    """Take a diff of the globals between two runs.
+
+    Uses the :obj:`labscript-utils:dict_diff` function.
+
+    Args:
+        run1 (:obj:`Run`): First Run to compare.
+        run2 (:obj:`Run`): Second Run to compare.
+        group (str, optional): When `None` (default), compare all groups.
+            Otherwise, only compare globals in `group`.
+
+    Returns:
+        dict: Dictionary of differences between globals in the form `key:[val1,val2]`
+        pairs. Keys unique to either dictionary are returned as `key:[val1,'-']` or
+        `key:['-',val2]`.
+    """
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
 class Run(object):
@@ -342,6 +357,14 @@ class Run(object):
         self.__group = groupname
 
     def trace_names(self):
+        """Return a list of all saved data traces in Run.
+
+        Raises:
+            KeyError: If the group `'/data/traces/'` does not yet exist.
+
+        Returns:
+            list: List of keys in the h5 file's `'/data/traces/'` group.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             try:
                 return list(h5_file['data']['traces'].keys())
@@ -349,13 +372,35 @@ class Run(object):
                 return []
                 
     def get_attrs(self, group):
-        """Returns all attributes of the specified group as a dictionary."""
+        """Returns all attributes of the specified group as a dictionary.
+
+        Args:
+            group (str): Group for which attributes are desired.
+
+        Raises:
+            Exception: If the `group` does not exist.
+
+        Returns:
+            dict: Dictionary of attributes.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not group in h5_file:
                 raise Exception('The group \'%s\' does not exist'%group)
             return get_attributes(h5_file[group])
 
     def get_trace(self,name):
+        """Return the saved data trace `name`.
+        
+        Args:
+            name (str): Name of saved data trace to get.
+
+        Raises:
+            Exception: If `name` trace does not exist.
+
+        Returns:
+            :obj:`numpy:numpy.ndarray`: Returns 2-D timetrace of times `'t'`
+            and values `'values'`.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not name in h5_file['data']['traces']:
                 raise Exception('The trace \'%s\' does not exist'%name)
@@ -363,6 +408,19 @@ class Run(object):
             return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
 
     def get_result_array(self,group,name):
+        """Returns saved results data.
+
+        Args:
+            group (str): Group to look in for the array. Typically the name of
+                the analysis script that created it.
+            name (str): Name of the results array to return.
+
+        Raises:
+            Exception: If `group` or `name` do not already exist.
+
+        Returns:
+            :obj:`numpy:numpy.ndarray`: Numpy array of the saved data.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not group in h5_file['results']:
                 raise Exception('The result group \'%s\' does not exist'%group)
@@ -371,8 +429,20 @@ class Run(object):
             return array(h5_file['results'][group][name])
             
     def get_result(self, group, name):
-        """Return 'result' in 'results/group' that was saved by 
-        the save_result() method."""
+        """Retrieve result from prior calculation.
+
+        Args:
+            group (str): Group to look in for the result. Typically the name of
+                the analysis script that created it.
+            name (str): Name of the result.
+
+        Raises:
+            Exception: If `group` or `name` do not already exist.
+
+        Returns:
+            : Result with appropriate type, as determined by 
+            :obj:`labscript-utils:labscript_utils.properties.get_attribute`.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not group in h5_file['results']:
                 raise Exception('The result group \'%s\' does not exist'%group)
@@ -381,8 +451,19 @@ class Run(object):
             return get_attribute(h5_file['results'][group], name)
             
     def get_results(self, group, *names):
-        """Iteratively call get_result(group,name) for each name provided.
-        Returns a list of all results in same order as names provided."""
+        """Return multiple results from the same group.
+
+        Iteratively calls get_result(group,name) for each name provided.
+        
+        Args:
+            group (str): Group to look in for the results. Typically the name of
+                            the analysis script that created it.
+            \*names (str): Names of results to retrieve.
+
+        Returns:
+            list: List of the results, in the same order as specified by names.
+            If `names` does not preserve order, return order is not guaranteed.
+        """
         results = []
         for name in names:
             results.append(self.get_result(group,name))
@@ -467,7 +548,7 @@ class Run(object):
         With the default argument values this method saves to `self.group` in
         the `'/results'` group and overwrites any existing value without keeping
         the dataset's previous attributes. Additional keyword arguments are
-        passed directly to `h5py.create_dataset()`.
+        passed directly to :obj:`h5py:h5py.Group.create_dataset`.
 
         Args:
             name (str): The name of the result. This will be the name of the
@@ -536,12 +617,34 @@ class Run(object):
                 h5_file[group][name].attrs[key] = val
 
     def get_traces(self, *names):
+        """Retrieve multiple data traces.
+
+        Iteratively calls :obj:`get_trace`.
+
+        Args:
+            \*names (str): Names of traces to retrieve
+
+        Returns:
+            list: List of numpy arrays.
+        """
         traces = []
         for name in names:
             traces.extend(self.get_trace(name))
         return traces
              
     def get_result_arrays(self, group, *names):
+        """Retrieve multiple result arrays from the same group.
+
+        Iteratively calls :obj:`self.get_result_array(group,name) <get_result_array>`
+        with default arguments.
+
+        Args:
+            group (str): Group to obtain the results from.
+            \*names (str): Result names to retrieve.
+
+        Returns:
+            list: List of results.
+        """
         results = []
         for name in names:
             results.append(self.get_result_array(group, name))
@@ -550,7 +653,8 @@ class Run(object):
     def save_results(self, *args, **kwargs):
         """Save multiple results to the hdf5 file.
 
-        This method Iteratively call `self.save_result()` on multiple results.
+        This method iteratively calls 
+        :obj:`self.save_result() <save_result>` on multiple results.
         It assumes arguments are ordered such that each result to be saved is
         preceded by the name of the attribute to save it under. Keywords
         arguments are passed to each call of `self.save_result()`.
@@ -579,6 +683,19 @@ class Run(object):
             self.save_result(name, value, **kwargs)
             
     def save_results_dict(self, results_dict, uncertainties=False, **kwargs):
+        """Save results dictionary.
+
+        Iteratively calls :obj:`self.save_result(key,value) <save_result>` on
+        the provided dictionary. If uncertainties is `True`, `value` is a two-element
+        list where the second element is the uncertainty in the result and saved with
+        to the same key with `u_` prepended.
+
+        Args:
+            results_dict (dict): Dictionary of results to save. If uncertainties is
+                `False`, form is `{name:value}`. If `True`, for is `{name,[value,uncertainty]}`.
+            uncertainties (bool, optional): Marks if uncertainties are provided.
+            **kwargs: Extra arguments provided to :obj:`save_result`.
+        """
         for name, value in results_dict.items():
             if not uncertainties:
                 self.save_result(name, value, **kwargs)
@@ -587,16 +704,39 @@ class Run(object):
                 self.save_result('u_' + name, value[1], **kwargs)
 
     def save_result_arrays(self, *args, **kwargs):
-        """Iteratively call save_result_array() on multiple data sets. 
+        """Save multiple result arrays.
+
+        Iteratively calls :obj:`save_result_array() <save_result_array>` on multiple data sets. 
         Assumes arguments are ordered such that each dataset to be saved is 
         preceded by the name to save it as. 
-        All keyword arguments are passed to each call of save_result_array()."""
+        All keyword arguments are passed to each call of save_result_array().
+
+        Args:
+            *args: Ordered arguments such that each dataset to be saved is
+                preceded by the name to save it as.
+            **kwargs: Passed through to `save_result_array` as kwargs.
+        """
         names = args[::2]
         values = args[1::2]
         for name, value in zip(names, values):
             self.save_result_array(name, value, **kwargs)
     
     def get_image(self,orientation,label,image):
+        """Get previously saved image from the h5 file.
+
+        h5 path to saved image is `/images/orientation/label/image`
+
+        Args:
+            orientation (str): Orientation label for saved image.
+            label (str): Label of saved image.
+            image (str): Identifier of saved image.
+
+        Raises:
+            Exception: If the image or paths do not exist.
+
+        Returns:
+            :obj:`numpy:numpy.ndarray`: 2-D image array.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not 'images' in h5_file:
                 raise Exception('File does not contain any images')
@@ -609,12 +749,30 @@ class Run(object):
             return array(h5_file['images'][orientation][label][image])
     
     def get_images(self,orientation,label, *images):
+        """Get multiple saved images from orientation and label.
+
+        Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
+        each image argument.
+
+        Args:
+            orientation (str): Orientation label of saved images.
+            label (str): Label of saved images.
+            *images (str): Collection of images to return
+
+        Returns:
+            :obj:`list` of :obj:`numpy:numpy.ndarray`: List of 2-D images.
+        """
         results = []
         for image in images:
             results.append(self.get_image(orientation,label,image))
         return results
         
     def get_all_image_labels(self):
+        """Return all existing images labels in the h5 file.
+
+        Returns:
+            dict: Dictionary of the form `{orientation:[label1,label2]}`
+        """
         images_list = {}
         with h5py.File(self.h5_path, 'r') as h5_file:
             for orientation in h5_file['/images'].keys():
@@ -622,6 +780,16 @@ class Run(object):
         return images_list                
     
     def get_image_attributes(self, orientation):
+        """Return the attributes of a saved orientation image group.
+
+        Args:
+            orientation (str): Orientation label to get attributes of.
+
+        Raises:
+            Exception: If images or orientation group do not exist.
+        Returns:
+            dict: Dictionary of attributes and their values.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             if not 'images' in h5_file:
                 raise Exception('File does not contain any images')
@@ -630,6 +798,15 @@ class Run(object):
             return get_attributes(h5_file['images'][orientation])
 
     def get_globals(self,group=None):
+        """Get globals from the shot.
+
+        Args:
+            group (str, optional): If `None`, return all global variables.
+                If defined, only return globals from `group`.
+
+        Returns:
+            dict: Dictionary of globals and their values.
+        """
         if not group:
             with h5py.File(self.h5_path, 'r') as h5_file:
                 return dict(h5_file['globals'].attrs)
@@ -641,6 +818,12 @@ class Run(object):
                 return {}
 
     def get_globals_raw(self, group=None):
+        """Get the raw global values from the shot.
+
+        Args:
+            group (str, optional): If `None`, return all global variables.
+                If defined, only return globals from `group`. 
+        """
         globals_dict = {}
         with h5py.File(self.h5_path, 'r') as h5_file:
             if group == None:
@@ -676,6 +859,14 @@ class Run(object):
             # return raw_globals
             
     def get_globals_expansion(self):
+        """Get the expansion type of each global.
+
+        This will skip global variables that do not have
+        an expansion.
+
+        Returns:
+            dict: Dcitionary of globals with their expansion type.
+        """
         expansion_dict = {}
         def append_expansion(name, obj):
             if 'expansion' in name:
@@ -727,6 +918,11 @@ class Run(object):
         return units
 
     def globals_groups(self):
+        """Get names of all the globals groups.
+
+        Returns:
+            list: List of global group names.
+        """
         with h5py.File(self.h5_path, 'r') as h5_file:
             try:
                 return list(h5_file['globals'].keys())
@@ -734,11 +930,41 @@ class Run(object):
                 return []   
                 
     def globals_diff(self, other_run, group=None):
+        """Take a diff between this run and another run.
+
+        This calls :obj:`globals_diff(self, other_run, group) <globals_diff>`.
+
+        Args:
+            other_run (:obj:`Run`): Run to compare to.
+            group (str, optional): When `None` (default), compare all globals.
+                Otherwise only compare globals in `group`. 
+
+        Returns:
+            dict: Dictionary of different globals.
+        """
         return globals_diff(self, other_run, group)            
     
         
 class Sequence(Run):
     def __init__(self, h5_path, run_paths, no_write=False):
+        """Generic results storage that is not associated with a specific Run.
+
+        This is typically used to save results from a multi-shot analysis to
+        an independent h5 file.
+
+        Args:
+            h5_path (str): Path to h5 file to save to. If file does not exist,
+                will try to create it assuming `no_write=False`. If file exists,
+                opens a handle to it.
+            run_paths (:obj:`list` or :obj:`pandas:pandas.DataFrame`): List of
+                runs to associate with the sequence. If a dataframe is supplied,
+                will introspect the runs from the `'filepath'` data.
+            no_write (bool, optional): If `True`, opens file in read-only mode.
+
+        Raises:
+            PermissionError: If trying to create a file in read-only mode.
+        """
+
         # Ensure file exists without affecting its last modification time if it
         # already exists.
         try:
@@ -759,28 +985,67 @@ class Sequence(Run):
         self.runs = {path: Run(path,no_write=True) for path in run_paths}
 
     def get_trace(self,*args):
+        """Get the named trace from each run in the sequence.
+
+        Args:
+            *args (str): Name of trace. Passed directly to :obj:`get_trace`.
+
+        Return:
+            dict: Dictonary of path:trace pairs for each run.
+        """
         return {path:run.get_trace(*args) for path,run in self.runs.items()}
         
     def get_result_array(self,*args):
+        """Get the specified result array from each run in the sequence.
+
+        Args:
+            *args (str): Passed directly to :obj:`get_result_array`. Should be
+                `group` and `name` to result to obtain.
+
+        Return:
+            dict: Dictionary of path:result pairs for each run.
+        """
         return {path:run.get_result_array(*args) for path,run in self.runs.items()}
          
     def get_traces(self,*args):
+        """Not implemented!
+
+        Attention:
+            Not implemented, but could be.
+        """
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')
              
     def get_result_arrays(self,*args):
+        """Not implemented!
+
+        Attention:
+            Not implemented, but could be.
+        """
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')
      
     def get_image(self,*args):
+        """Not implemented!
+
+        Attention:
+            Not implemented, but could be.
+        """
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')     
 
 
 def figure_to_clipboard(figure=None, **kwargs):
-    """Copy a matplotlib figure to the clipboard as a png. If figure is None,
+    """Copy a matplotlib figure to the clipboard as a png. 
+
+    If figure is None,
     the current figure will be copied. Copying the figure is implemented by
     calling figure.savefig() and then copying the image data from the
-    resulting file. Any keyword arguments will be passed to the call to
-    savefig(). If bbox_inches keyword arg is not provided,
-    bbox_inches='tight' will be used"""
+    resulting file. If bbox_inches keyword arg is not provided,
+    bbox_inches='tight' will be used.
+
+    Args:
+        figure (:obj:`matplotlib:matplotlib.figure`, optional): 
+            Figure to copy to the clipboard. If `None`, copies the current figure.
+        **kwargs: Passed to `figure.savefig()` as kwargs.
+    """
     
     import matplotlib.pyplot as plt
     from zprocess import start_daemon
