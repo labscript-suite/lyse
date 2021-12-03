@@ -1606,6 +1606,8 @@ class DataFrameModel(QtCore.QObject):
         # Update the Qt model:
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
+
+        app.filebox.set_add_shots_progress(None, None, None)        
             
 
     @inmain_decorator()
@@ -2298,7 +2300,7 @@ class Lyse(object):
 
         filepaths = df["filepath"].tolist()
         changetime_cache = os.path.getmtime(file)
-        need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
+        need_updating = np.where(list(map(lambda x: changed_since(x, changetime_cache), filepaths)))[0]
         need_updating = np.sort(need_updating)[::-1]  # sort in descending order to not remove the wrong items with pop
 
         # Reload the files where changes where made since exporting
