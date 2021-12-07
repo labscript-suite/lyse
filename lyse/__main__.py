@@ -1,3 +1,5 @@
+"""Lyse GUI and supporting code
+"""
 import os
 import labscript_utils.excepthook
 
@@ -20,6 +22,7 @@ import subprocess
 import time
 import traceback
 import queue
+import warnings
 
 # 3rd party imports:
 splash.update_text('importing numpy')
@@ -39,6 +42,7 @@ from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 from labscript_utils.qtwidgets.outputbox import OutputBox
 import labscript_utils.shared_drive as shared_drive
+from labscript_utils import dedent
 
 from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
@@ -49,7 +53,7 @@ from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
-from lyse import LYSE_DIR
+from lyse import LYSE_DIR, _rangeindex_to_multiindex
 
 process_tree = ProcessTree.instance()
 
@@ -156,14 +160,20 @@ class WebServer(ZMQServer):
         logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
             return 'hello'
+        elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:
+            _, n_sequences, filter_kwargs = request_data
+            df = self._retrieve_dataframe()
+            df = _rangeindex_to_multiindex(df, inplace=True)
+            # Return only a subset of the dataframe if instructed to do so.
+            if n_sequences is not None:
+                df = self._extract_n_sequences_from_df(df, n_sequences)
+            if filter_kwargs is not None:
+                df = df.filter(**filter_kwargs)
+            return df
         elif request_data == 'get dataframe':
-            # infer_objects() picks fixed datatypes for columns that are compatible with
-            # fixed datatypes, dramatically speeding up pickling. It is called here
-            # rather than when updating the dataframe as calling it during updating may
-            # call it needlessly often, whereas it only needs to be called prior to
-            # sending the dataframe to a client requesting it, as we're doing now.
-            app.filebox.shots_model.infer_objects()
-            return app.filebox.shots_model.dataframe
+            # Ensure backwards compatability with clients using outdated
+            # versions of lyse.
+            return self._retrieve_dataframe()
         elif isinstance(request_data, dict):
             if 'filepath' in request_data:
                 h5_filepath = shared_drive.path_to_local(request_data['filepath'])
@@ -180,6 +190,61 @@ class WebServer(ZMQServer):
 
         return ("error: operation not supported. Recognised requests are:\n "
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
+
+    @inmain_decorator(wait_for_return=True)
+    def _copy_dataframe(self):
+        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        return df
+
+    def _retrieve_dataframe(self):
+        # infer_objects() picks fixed datatypes for columns that are compatible with
+        # fixed datatypes, dramatically speeding up pickling. It is called here
+        # rather than when updating the dataframe as calling it during updating may
+        # call it needlessly often, whereas it only needs to be called prior to
+        # sending the dataframe to a client requesting it, as we're doing now.
+        df = self._copy_dataframe()
+        df.infer_objects()
+        return df
+
+    def _extract_n_sequences_from_df(self, df, n_sequences):
+        # If the dataframe is empty, just return it, otherwise accessing columns
+        # below will raise a KeyError.
+        if df.empty:
+            return df
+
+        # Get a list of all unique sequences, each corresponding to one call to
+        # engage in runmanager. Each sequence may contain multiple runs. The
+        # below creates strings to identify sequences. To be from the same
+        # sequence, two shots have to have the same value for 'sequence' (which
+        # makes sure that the time when engage was called are the same to within
+        # 1 second), 'labscript' (must have been generated from the same
+        # labscript), and 'sequence_index' (a counter which keeps track of how
+        # many times engage has been called and resets to 0 at the start of each
+        # day). Typically just the value for sequence, is enough. However it
+        # only records time down to the second, so if engage() is called twice
+        # quickly then two different sequences can end up with the same value
+        # there.
+        sequences = [str(sequence) for sequence in df['sequence']]
+        labscripts = [str(labscript) for labscript in df['labscript']]
+        sequence_indices = [str(index) for index in df['sequence_index']]
+        # Combine into one string.
+        criteria = zip(sequences, labscripts, sequence_indices)
+        indentity_strings = [seq + script + ind for seq, script, ind in criteria]
+
+        # Find the distinct values, maintaining their ordering.
+        unique_identities = np.intersect1d(indentity_strings, indentity_strings)
+
+        # Slice the DataFrame so that only the last n_sequences sequences
+        # remain. Note that slicing unique_identities just returns all of its
+        # entries if n_sequences is greater than its length; it doesn't raise an
+        # error.
+        if n_sequences == 0:
+            identities_included = []
+        else:
+            identities_included = unique_identities[-n_sequences:]
+        df_subset = df[[id in identities_included for id in indentity_strings]]
+
+        return df_subset
 
 
 class LyseMainWindow(QtWidgets.QMainWindow):
@@ -1545,6 +1610,8 @@ class DataFrameModel(QtCore.QObject):
         # Update the Qt model:
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
+
+        app.filebox.set_add_shots_progress(None, None, None)        
             
 
     @inmain_decorator()
@@ -2186,23 +2253,23 @@ class Lyse(object):
             for sequence in sequences:
                 sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
                 labscript = sequence_df['labscript'].iloc[0]
-                filename = "dataframe_{}_{}.msg".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                filename = "dataframe_{}_{}.pkl".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
                 sequence_df.infer_objects()
                 for col in sequence_df.columns :
                     if sequence_df[col].dtype == object:
                         sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
-                sequence_df.to_msgpack(os.path.join(save_path, filename))
+                sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
             error_dialog('Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
-        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.msg')
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                         'Select dataframe file to load',
                         default,
-                        "dataframe files (*.msg)")
+                        "dataframe files (*.pkl *.msg)")
         if type(file) is tuple:
             file, _ = file
         if not file:
@@ -2211,7 +2278,22 @@ class Lyse(object):
         # Convert to standard platform specific path, otherwise Qt likes
         # forward slashes:
         file = os.path.abspath(file)
-        df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+        if file.endswith('.msg'):
+            # try to read msgpack in case using older pandas
+            try:
+                df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                # raise a deprecation warning if this succeeds
+                msg = """msgpack support is being dropped by pandas >= 1.0.0.
+                Please resave this dataframe to use the new format."""
+                warnings.warn(dedent(msg),DeprecationWarning)
+            except AttributeError as err:
+                # using newer pandas that can't read msg
+                msg = """msgpack is no longer supported by pandas.
+                To read this dataframe, you must downgrade pandas to < 1.0.0.
+                You can then read this dataframe and resave it with the new format."""
+                raise DeprecationWarning(dedent(msg)) from err
+        else:
+            df = pandas.read_pickle(file).sort_values("run time").reset_index()
                 
         # Check for changes in the shot files since the dataframe was exported
         def changed_since(filepath, time):
@@ -2222,7 +2304,7 @@ class Lyse(object):
 
         filepaths = df["filepath"].tolist()
         changetime_cache = os.path.getmtime(file)
-        need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
+        need_updating = np.where(list(map(lambda x: changed_since(x, changetime_cache), filepaths)))[0]
         need_updating = np.sort(need_updating)[::-1]  # sort in descending order to not remove the wrong items with pop
 
         # Reload the files where changes where made since exporting
