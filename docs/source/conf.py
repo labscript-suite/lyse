@@ -16,6 +16,10 @@ from pathlib import Path
 from m2r import MdInclude
 from recommonmark.transform import AutoStructify
 from jinja2 import FileSystemLoader, Environment
+try:
+    import importlib.metadata as importlib_metadata
+except ImportError:
+    import importlib_metadata
 
 # -- Project information (unique to each project) -------------------------------------
 
@@ -24,7 +28,7 @@ copyright = "2020, labscript suite"
 author = "labscript suite contributors"
 
 # The full version, including alpha/beta/rc tags
-from lyse import __version__ as version  # noqa: E402
+version = importlib_metadata.version('lyse')
 
 release = version
 
