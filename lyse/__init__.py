@@ -388,11 +388,15 @@ class Run(object):
                 raise Exception('The group \'%s\' does not exist'%group)
             return get_attributes(h5_file[group])
 
-    def get_trace(self,name):
+    def get_trace(self, name, raw_data=False):
         """Return the saved data trace `name`.
         
         Args:
             name (str): Name of saved data trace to get.
+            
+        Kwargs:
+            raw_data (bool): option to return the h5_data directly
+            without interperting it as a 2-D time trace.
 
         Raises:
             Exception: If `name` trace does not exist.
@@ -405,7 +409,13 @@ class Run(object):
             if not name in h5_file['data']['traces']:
                 raise Exception('The trace \'%s\' does not exist'%name)
             trace = h5_file['data']['traces'][name]
-            return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
+            
+            if raw_data:
+                data = trace[:]
+            else:
+                data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
+            
+            return data      
 
     def get_result_array(self,group,name):
         """Returns saved results data.
