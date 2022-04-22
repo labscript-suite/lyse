@@ -776,7 +776,26 @@ class Run(object):
         for image in images:
             results.append(self.get_image(orientation,label,image))
         return results
-        
+
+    def get_images_dict(self,orientation,label, *images):
+        """Get multiple saved images from orientation and label.
+
+        Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
+        each image argument.
+
+        Args:
+            orientation (str): Orientation label of saved images.
+            label (str): Label of saved images.
+            *images (str): Collection of images to return
+
+        Returns:
+            :obj:`dict` of :obj:`numpy:numpy.ndarray`: Dictionary of 2-D images.
+        """
+        results = self.get_images(orientation,label, *images)
+
+        return {k:v for k,v in zip(images, results)}
+
+
     def get_all_image_labels(self):
         """Return all existing images labels in the h5 file.
 
