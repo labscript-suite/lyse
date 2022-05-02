@@ -393,10 +393,8 @@ class Run(object):
         
         Args:
             name (str): Name of saved data trace to get.
-            
-        Kwargs:
-            raw_data (bool): option to return the h5_data directly
-            without interperting it as a 2-D time trace.
+            raw_data (bool, optional): option to return the h5_data directly 
+                without interpreting it as a 2-D time trace.
 
         Raises:
             Exception: If `name` trace does not exist.
@@ -411,11 +409,11 @@ class Run(object):
             trace = h5_file['data']['traces'][name]
             
             if raw_data:
-                data = trace[:]
+                data = trace[()]
             else:
                 data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
             
-            return data      
+            return data
 
     def get_result_array(self,group,name):
         """Returns saved results data.
