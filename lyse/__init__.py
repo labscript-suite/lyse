@@ -729,7 +729,7 @@ class Run(object):
         for name, value in zip(names, values):
             self.save_result_array(name, value, **kwargs)
     
-    def get_image(self,orientation,label,image):
+    def get_image(self, orientation, label, image):
         """Get previously saved image from the h5 file.
 
         h5 path to saved image is `/images/orientation/label/image`
@@ -756,7 +756,7 @@ class Run(object):
                 raise Exception('Image \'%s\' not found in file'%image)
             return array(h5_file['images'][orientation][label][image])
     
-    def get_images(self,orientation,label, *images):
+    def get_images(self, orientation, label, *images):
         """Get multiple saved images from orientation and label.
 
         Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
@@ -775,7 +775,7 @@ class Run(object):
             results.append(self.get_image(orientation,label,image))
         return results
 
-    def get_images_dict(self,orientation,label, *images):
+    def get_images_dict(self, orientation, label, *images):
         """Get multiple saved images from orientation and label.
 
         Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
