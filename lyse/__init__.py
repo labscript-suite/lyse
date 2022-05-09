@@ -407,6 +407,22 @@ class Run(object):
             trace = h5_file['data']['traces'][name]
             return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
 
+    def get_waits(self):
+        """Return the time out status of waits.
+
+        Raises:
+            Exception: If the experiment has no waits.
+
+        Returns:
+            :obj:`numpy:numpy.ndarray`: Returns 2-D timetrace of times `'time'`
+            and time out status `'timed_out'`.
+        """
+        with h5py.File(self.h5_path,'r') as h5_file:
+            if not 'waits' in h5_file['data']:
+                raise Exception('The shot has no waits')
+            trace=h5_file['data']['waits']
+            return array((trace['time'],trace['timed_out']),dtype=float)  
+        
     def get_result_array(self,group,name):
         """Returns saved results data.
 
