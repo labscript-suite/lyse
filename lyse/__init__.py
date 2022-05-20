@@ -25,7 +25,7 @@ import threading
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
 import pandas
-from numpy import array, ndarray
+from numpy import array, ndarray, where
 import types
 
 from .__version__ import __version__
@@ -407,21 +407,42 @@ class Run(object):
             trace = h5_file['data']['traces'][name]
             return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
 
+    def get_wait(self,name):
+        """Returns the wait paramteres: label, timeout, duration, and time out status.
+
+        Args:
+            name (str): Name of the wait to get.
+
+        Raises:
+            KeyError if `name` wait does not exist.
+
+        Returns:
+            tuple: Tuple of the wait parameters.
+        """
+        with h5py.File(self.h5_path,'r') as h5_file:
+            if not 'data' in h5_file:
+                raise Exception('The shot has no data group')
+            name=name.encode()
+            if not name in h5_file['data']['waits']['label']:
+                raise Exception('The wait \'%s\' does not exist'%name.decode())
+            name_index, =where(h5_file['data']['waits']['label']==name)[0]
+            return h5_file['data']['waits'][name_index]
+
     def get_waits(self):
-        """Return the time out status of waits.
+        """Returns the parameters of all waits in the experiment.
 
         Raises:
             Exception: If the experiment has no waits.
 
         Returns:
-            :obj:`numpy:numpy.ndarray`: Returns 2-D timetrace of times `'time'`
-            and time out status `'timed_out'`.
+            :obj:`numpy:numpy.ndarray`: Returns 2D structured numpy array of the waits and their parameters.
         """
         with h5py.File(self.h5_path,'r') as h5_file:
+            if not 'data' in h5_file:
+                raise Exception('The shot has no data group')
             if not 'waits' in h5_file['data']:
                 raise Exception('The shot has no waits')
-            trace=h5_file['data']['waits']
-            return array((trace['time'],trace['timed_out']),dtype=float)  
+            return h5_file['data']['waits'][()]
         
     def get_result_array(self,group,name):
         """Returns saved results data.
