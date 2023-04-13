@@ -140,4 +140,4 @@ def install():
     figuremanager = FigureManager()
     matplotlib.pyplot.figure = figuremanager
     matplotlib.pyplot.close = figuremanager.close
-    matplotlib.pyplot.show = figuremanager.show
+    matplotlib.pyplot.show = lambda: figuremanager.show

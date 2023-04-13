@@ -25,7 +25,7 @@ import threading
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
 import pandas
-from numpy import array, ndarray
+from numpy import array, ndarray, where
 import types
 
 from .__version__ import __version__
@@ -388,11 +388,13 @@ class Run(object):
                 raise Exception('The group \'%s\' does not exist'%group)
             return get_attributes(h5_file[group])
 
-    def get_trace(self,name):
+    def get_trace(self, name, raw_data=False):
         """Return the saved data trace `name`.
         
         Args:
             name (str): Name of saved data trace to get.
+            raw_data (bool, optional): option to return the h5_data directly 
+                without interpreting it as a 2-D time trace.
 
         Raises:
             Exception: If `name` trace does not exist.
@@ -405,8 +407,51 @@ class Run(object):
             if not name in h5_file['data']['traces']:
                 raise Exception('The trace \'%s\' does not exist'%name)
             trace = h5_file['data']['traces'][name]
-            return array(trace['t'],dtype=float),array(trace['values'],dtype=float)         
+            
+            if raw_data:
+                data = trace[()]
+            else:
+                data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
+            
+            return data
 
+    def get_wait(self,name):
+        """Returns the wait paramteres: label, timeout, duration, and time out status.
+
+        Args:
+            name (str): Name of the wait to get.
+
+        Raises:
+            KeyError if `name` wait does not exist.
+
+        Returns:
+            tuple: Tuple of the wait parameters.
+        """
+        with h5py.File(self.h5_path,'r') as h5_file:
+            if not 'data' in h5_file:
+                raise Exception('The shot has no data group')
+            name=name.encode()
+            if not name in h5_file['data']['waits']['label']:
+                raise Exception('The wait \'%s\' does not exist'%name.decode())
+            name_index, =where(h5_file['data']['waits']['label']==name)[0]
+            return h5_file['data']['waits'][name_index]
+
+    def get_waits(self):
+        """Returns the parameters of all waits in the experiment.
+
+        Raises:
+            Exception: If the experiment has no waits.
+
+        Returns:
+            :obj:`numpy:numpy.ndarray`: Returns 2D structured numpy array of the waits and their parameters.
+        """
+        with h5py.File(self.h5_path,'r') as h5_file:
+            if not 'data' in h5_file:
+                raise Exception('The shot has no data group')
+            if not 'waits' in h5_file['data']:
+                raise Exception('The shot has no waits')
+            return h5_file['data']['waits'][()]
+        
     def get_result_array(self,group,name):
         """Returns saved results data.
 
@@ -721,7 +766,7 @@ class Run(object):
         for name, value in zip(names, values):
             self.save_result_array(name, value, **kwargs)
     
-    def get_image(self,orientation,label,image):
+    def get_image(self, orientation, label, image):
         """Get previously saved image from the h5 file.
 
         h5 path to saved image is `/images/orientation/label/image`
@@ -748,7 +793,7 @@ class Run(object):
                 raise Exception('Image \'%s\' not found in file'%image)
             return array(h5_file['images'][orientation][label][image])
     
-    def get_images(self,orientation,label, *images):
+    def get_images(self, orientation, label, *images):
         """Get multiple saved images from orientation and label.
 
         Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
@@ -766,7 +811,26 @@ class Run(object):
         for image in images:
             results.append(self.get_image(orientation,label,image))
         return results
-        
+
+    def get_images_dict(self, orientation, label, *images):
+        """Get multiple saved images from orientation and label.
+
+        Iteratively calls :obj:`self.get_image(orientation,label,image) <get_image>` for
+        each image argument.
+
+        Args:
+            orientation (str): Orientation label of saved images.
+            label (str): Label of saved images.
+            *images (str): Collection of images to return
+
+        Returns:
+            :obj:`dict` of :obj:`numpy:numpy.ndarray`: Dictionary of 2-D images.
+        """
+        results = self.get_images(orientation,label, *images)
+
+        return {k:v for k,v in zip(images, results)}
+
+
     def get_all_image_labels(self):
         """Return all existing images labels in the h5 file.
 
