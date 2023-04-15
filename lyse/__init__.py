@@ -335,12 +335,9 @@ class Run(object):
         """
 
         # ensure no_write is respected
-        if self.no_write:
-            if mode == 'r':
-                pass
-            else:
-                msg = f'Cannot open file with a write mode; this run is read-only'
-                raise PermissionError(msg)
+        if self.no_write and mode != 'r':
+            msg = f'Cannot open file with a write mode; this run is read-only'
+            raise PermissionError(msg)
             
         # ensure file is not already opened
         if self.__h5_file is not None:
@@ -374,12 +371,9 @@ class Run(object):
             @functools.wraps(func)
             def wrapper(self, *args, **kwargs):
 
-                if self.no_write:
-                    if mode == 'r':
-                        pass
-                    else:
-                        msg = f'Cannot perform operation {func.__name__:s}; this run is read-only'
-                        raise PermissionError(msg)
+                if self.no_write and mode != 'r':
+                    msg = f'Cannot perform operation {func.__name__:s}; this run is read-only'
+                    raise PermissionError(msg)
 
                 if self.__h5_file is None:
                     with self.open(mode):
