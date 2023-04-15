@@ -225,6 +225,50 @@ def globals_diff(run1, run2, group=None):
     """
     return dict_diff(run1.get_globals(group), run2.get_globals(group))
  
+def open_file(mode):
+    """Decorator for lyse functions to allow using previously opened file with context manager.
+    
+    If multiple read/write operations happen on a Run in a single shot,
+    opening the h5file once via the context manager `open`
+    can speed up the analysis execution time by limiting the number of times
+    the file must be opened/closed.
+
+    Note that an opened :class:`h5py:h5py.File` can only be in modes `'r'` or `'r+'`.
+    All other mode opening options differ in file creation logic only.
+    In particular, all mode opening options except `'r'` are considered
+    `'r+'` once the file is open.
+
+    Args:
+        mode (str): which :class:`h5py:h5py.File` mode to open the h5 file with.
+            Must be 'r', 'a', 'r+', 'w', 'w-', or 'x'.
+            Lyse typically only uses 'r' and 'r+'.
+
+    Raises:
+        PermissionError: If the Run is set as read-only but a write mode is requested
+    """
+    def decorator_open_file(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+
+            if self.no_write and mode != 'r':
+                msg = f'Cannot perform operation {func.__name__:s}; this run is read-only'
+                raise PermissionError(msg)
+
+            if self.__h5_file is None:
+                with self.open(mode):
+                    return func(self, *args, **kwargs)
+            else:
+                if (self.__h5_file.mode == 'r') and (mode != 'r'):
+                    msg = (f"Cannot perform operation {func.__name__:s}; "
+                        + f"requested mode {mode:s} not compatible with "
+                        + f"h5_file's mode {self.__h5_file.mode:s}")
+                    raise PermissionError(msg)
+                else:
+                    return func(self, *args, **kwargs)
+            
+        return wrapper
+    return decorator_open_file
+
 class Run(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
 
@@ -352,50 +396,6 @@ class Run(object):
                 yield None
             finally:
                 self.__h5_file = None
-            
-    def open_file(mode):
-        """Decorator for lyse functions to allow using previously opened file with context manager.
-        
-        If multiple read/write operations happen on a Run in a single shot,
-        opening the h5file once via the context manager `open`
-        can speed up the analysis execution time by limiting the number of times
-        the file must be opened/closed.
-
-        Note that an opened :class:`h5py:h5py.File` can only be in modes `'r'` or `'r+'`.
-        All other mode opening options differ in file creation logic only.
-        In particular, all mode opening options except `'r'` are considered
-        `'r+'` once the file is open.
-
-        Args:
-            mode (str): which :class:`h5py:h5py.File` mode to open the h5 file with.
-                Must be 'r', 'a', 'r+', 'w', 'w-', or 'x'.
-                Lyse typically only uses 'r' and 'r+'.
-
-        Raises:
-            PermissionError: If the Run is set as read-only but a write mode is requested
-        """
-        def decorator_open_file(func):
-            @functools.wraps(func)
-            def wrapper(self, *args, **kwargs):
-
-                if self.no_write and mode != 'r':
-                    msg = f'Cannot perform operation {func.__name__:s}; this run is read-only'
-                    raise PermissionError(msg)
-
-                if self.__h5_file is None:
-                    with self.open(mode):
-                        return func(self, *args, **kwargs)
-                else:
-                    if (self.__h5_file.mode == 'r') and (mode != 'r'):
-                        msg = (f"Cannot perform operation {func.__name__:s}; "
-                            + f"requested mode {mode:s} not compatible with "
-                            + f"h5_file's mode {self.__h5_file.mode:s}")
-                        raise PermissionError(msg)
-                    else:
-                        return func(self, *args, **kwargs)
-                
-            return wrapper
-        return decorator_open_file
 
     @property
     def group(self):
