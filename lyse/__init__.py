@@ -347,12 +347,12 @@ class Run(object):
             msg = 'h5_file already opened'
             raise PermissionError(msg)
         
-        self.__h5_file = h5py.File(self.h5_path, mode)
-        try:
-            yield None
-        finally:
-            self.__h5_file.close()
-            self.__h5_file = None
+        with h5py.File(self.h5_path, mode) as f:
+            self.__h5_file = f
+            try:
+                yield None
+            finally:
+                self.__h5_file = None
             
     def open_file(mode):
         """Wrapper for lyse functions to allow using previously opened file with context manager.
