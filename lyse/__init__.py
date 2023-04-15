@@ -426,7 +426,7 @@ class Run(object):
         the file is actually written to."""
         create_group = False
         with h5py.File(h5_path, 'r') as h5_file:
-            if not groupname in h5_file[location]:
+            if groupname not in h5_file[location]:
                 create_group = True
         if create_group:
             if self.no_write:
@@ -484,7 +484,7 @@ class Run(object):
         Returns:
             dict: Dictionary of attributes.
         """
-        if not group in self.h5_file:
+        if group not in self.h5_file:
             raise Exception('The group \'%s\' does not exist'%group)
         return get_attributes(self.h5_file[group])
 
@@ -504,7 +504,7 @@ class Run(object):
             :obj:`numpy:numpy.ndarray`: Returns 2-D timetrace of times `'t'`
             and values `'values'`.
         """
-        if not name in self.h5_file['data']['traces']:
+        if name not in self.h5_file['data']['traces']:
             raise Exception('The trace \'%s\' does not exist'%name)
         trace = self.h5_file['data']['traces'][name]
         
@@ -531,7 +531,7 @@ class Run(object):
         if not 'data' in self.h5_file:
             raise Exception('The shot has no data group')
         name=name.encode()
-        if not name in self.h5_file['data']['waits']['label']:
+        if name not in self.h5_file['data']['waits']['label']:
             raise Exception('The wait \'%s\' does not exist'%name.decode())
         name_index, =where(self.h5_file['data']['waits']['label']==name)[0]
         return self.h5_file['data']['waits'][name_index]
@@ -546,9 +546,9 @@ class Run(object):
         Returns:
             :obj:`numpy:numpy.ndarray`: Returns 2D structured numpy array of the waits and their parameters.
         """
-        if not 'data' in self.h5_file:
+        if 'data' not in self.h5_file:
             raise Exception('The shot has no data group')
-        if not 'waits' in self.h5_file['data']:
+        if 'waits' not in self.h5_file['data']:
             raise Exception('The shot has no waits')
         return self.h5_file['data']['waits'][()]
 
@@ -567,9 +567,9 @@ class Run(object):
         Returns:
             :obj:`numpy:numpy.ndarray`: Numpy array of the saved data.
         """
-        if not group in self.h5_file['results']:
+        if group not in self.h5_file['results']:
             raise Exception('The result group \'%s\' does not exist'%group)
-        if not name in self.h5_file['results'][group]:
+        if name not in self.h5_file['results'][group]:
             raise Exception('The result array \'%s\' does not exist'%name)
         return array(self.h5_file['results'][group][name])
 
@@ -589,9 +589,9 @@ class Run(object):
             : Result with appropriate type, as determined by 
             :obj:`labscript-utils:labscript_utils.properties.get_attribute`.
         """
-        if not group in self.h5_file['results']:
+        if group not in self.h5_file['results']:
             raise Exception('The result group \'%s\' does not exist'%group)
-        if not name in self.h5_file['results'][group].attrs.keys():
+        if name not in self.h5_file['results'][group].attrs.keys():
             raise Exception('The result \'%s\' does not exist'%name)
         return get_attribute(self.h5_file['results'][group], name)
 
@@ -664,7 +664,7 @@ class Run(object):
                 raise ValueError(dedent(msg))
             # Save to analysis results group by default
             group = 'results/' + self.group
-        elif not group in self.h5_file:
+        elif group not in self.h5_file:
             # Create the group if it doesn't exist
             self.h5_file.create_group(group) 
         if name in self.h5_file[group].attrs and not overwrite:
@@ -735,7 +735,7 @@ class Run(object):
                 raise ValueError(dedent(msg))
             # Save dataset to results group by default
             group = 'results/' + self.group
-        elif not group in self.h5_file:
+        elif group not in self.h5_file:
             # Create the group if it doesn't exist
             self.h5_file.create_group(group) 
         if name in self.h5_file[group]:
@@ -884,13 +884,13 @@ class Run(object):
         Returns:
             :obj:`numpy:numpy.ndarray`: 2-D image array.
         """
-        if not 'images' in self.h5_file:
+        if 'images' not in self.h5_file:
             raise Exception('File does not contain any images')
-        if not orientation in self.h5_file['images']:
+        if orientation not in self.h5_file['images']:
             raise Exception('File does not contain any images with orientation \'%s\''%orientation)
-        if not label in self.h5_file['images'][orientation]:
+        if label not in self.h5_file['images'][orientation]:
             raise Exception('File does not contain any images with label \'%s\''%label)
-        if not image in self.h5_file['images'][orientation][label]:
+        if image not in self.h5_file['images'][orientation][label]:
             raise Exception('Image \'%s\' not found in file'%image)
         return array(self.h5_file['images'][orientation][label][image])
 
@@ -957,9 +957,9 @@ class Run(object):
         Returns:
             dict: Dictionary of attributes and their values.
         """
-        if not 'images' in self.h5_file:
+        if 'images' not in self.h5_file:
             raise Exception('File does not contain any images')
-        if not orientation in self.h5_file['images']:
+        if orientation not in self.h5_file['images']:
             raise Exception('File does not contain any images with orientation \'%s\''%orientation)
         return get_attributes(self.h5_file['images'][orientation])
 
@@ -1225,7 +1225,7 @@ def figure_to_clipboard(figure=None, **kwargs):
     from zprocess import start_daemon
     import tempfile
 
-    if not 'bbox_inches' in kwargs:
+    if 'bbox_inches' not in kwargs:
         kwargs['bbox_inches'] = 'tight'
                
     if figure is None:
