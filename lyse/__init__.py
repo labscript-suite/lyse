@@ -307,21 +307,20 @@ class Run(object):
     
     @contextlib.contextmanager
     def open(self, mode):
-        """Opens the Run's h5 file for successive reads/writes.
+        """Context manager to open the Run's h5 file for successive reads/writes.
 
-        Intended to be used as a context manager.
         Supports all h5 modes, though only `'r'` and `'r+'`/`'a'` are typically
         used within lyse itself.
 
         Args:
-            mode (str): which mode to open the h5 file with.
+            mode (str): which :class:`h5py:h5py.File` mode to open the h5 file with.
                 Must be 'r', 'a', 'r+', 'w', 'w-', or 'x'.
-                Lyse typically only uses 'r' and 'a'.
+                Lyse typically only uses 'r' and 'r+'.
 
         Examples:
             >>> from lyse import *
             >>> shot = Run(path)
-            >>> with shot.open('a'):
+            >>> with shot.open('r+'):
             >>>     # shot processing that requires reads/writes
             >>>     t, vals = shot.get_trace('my_trace')
             >>>     results = vals**2
@@ -355,17 +354,22 @@ class Run(object):
                 self.__h5_file = None
             
     def open_file(mode):
-        """Wrapper for lyse functions to allow using previously opened file with context manager.
+        """Decorator for lyse functions to allow using previously opened file with context manager.
         
         If multiple read/write operations happen on a Run in a single shot,
         opening the h5file once via the context manager `open`
         can speed up the analysis execution time by limiting the number of times
         the file must be opened/closed.
 
+        Note that an opened :class:`h5py:h5py.File` can only be in modes `'r'` or `'r+'`.
+        All other mode opening options differ in file creation logic only.
+        In particular, all mode opening options except `'r'` are considered
+        `'r+'` once the file is open.
+
         Args:
-            mode (str): which mode to open the h5 file with.
+            mode (str): which :class:`h5py:h5py.File` mode to open the h5 file with.
                 Must be 'r', 'a', 'r+', 'w', 'w-', or 'x'.
-                Lyse typically only uses 'r' and 'a'.
+                Lyse typically only uses 'r' and 'r+'.
 
         Raises:
             PermissionError: If the Run is set as read-only but a write mode is requested
