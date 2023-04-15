@@ -336,13 +336,16 @@ class Run(object):
 
         # ensure no_write is respected
         if self.no_write and mode != 'r':
-            msg = f'Cannot open file with a write mode; this run is read-only'
+            msg = 'Cannot open file with a write mode; this run is read-only'
             raise PermissionError(msg)
             
-        # ensure file is not already opened
+        # check if file is already open, do nothing if modes compatible
         if self.__h5_file is not None:
-            msg = 'h5_file already opened'
-            raise PermissionError(msg)
+            # ensure no-write is respected
+            if (self.__h5_file.mode == 'r') and (mode != 'r'):
+                msg = 'Cannot open file with a write mode; this run is read-only'
+                raise PermissionError(msg)
+            return None
         
         with h5py.File(self.h5_path, mode) as f:
             self.__h5_file = f
