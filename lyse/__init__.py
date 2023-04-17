@@ -344,13 +344,13 @@ class Run(object):
             if (self.__h5_file.mode == 'r') and (mode != 'r'):
                 msg = 'Cannot open file with a write mode; this run is read-only'
                 raise PermissionError(msg)
-            yield None
+            yield self.__h5_file
             return
         
         with h5py.File(self.h5_path, mode) as f:
             self.__h5_file = f
             try:
-                yield None
+                yield self.__h5_file
             finally:
                 self.__h5_file = None
             
