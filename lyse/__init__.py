@@ -317,6 +317,9 @@ class Run(object):
                 Must be 'r', 'a', 'r+', 'w', 'w-', or 'x'.
                 Lyse typically only uses 'r' and 'r+'.
 
+        Yields:
+            :class:`h5py:h5py.File`: Handle to the opened h5 file.
+
         Examples:
             >>> from lyse import *
             >>> shot = Run(path)
