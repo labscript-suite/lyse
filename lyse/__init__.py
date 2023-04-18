@@ -18,7 +18,7 @@ from labscript_utils.dict_diff import dict_diff
 import os
 import socket
 import pickle as pickle
-import inspect
+from pathlib import Path
 import sys
 import threading
 
@@ -244,48 +244,14 @@ class Run(object):
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                      
-        try:
-            if not self.no_write:
-                # The group where this run's results will be stored in the h5
-                # file will be the name of the python script which is
-                # instantiating this Run object. Iterate from innermost caller
-                # to outermost. The name of the script will be one frame in
-                # from analysis_subprocess.py.
-                analysis_subprocess_path = os.path.join(
-                    LYSE_DIR,
-                    'analysis_subprocess.py',
-                )
-                group = None
-                inner_frame = inspect.currentframe()
-                inner_path = self._frame_to_path(inner_frame)
-                inner_file_name = self._path_to_file_name(inner_path)
-                while group is None:
-                    # self._frame_to_path() will raise a KeyError if this loop
-                    # reaches the outermost caller.
-                    outer_frame = inner_frame.f_back
-                    outer_path = self._frame_to_path(outer_frame)
-                    outer_file_name = self._path_to_file_name(outer_path)
-                    if outer_path == analysis_subprocess_path:
-                        group = inner_file_name
-                    inner_frame = outer_frame
-                    inner_path = outer_path
-                    inner_file_name = outer_file_name
-                self.set_group(group)
-        except KeyError:
-            # sys.stderr.write('Warning: to write results, call '
-            # 'Run.set_group(groupname), specifying the name of the group '
-            # 'you would like to save results to. This normally comes from '
-            # 'the filename of your script, but since you\'re in interactive '
-            # 'mode, there is no script name.\n')
-            pass
-
-    def _frame_to_path(self, frame):
-        path = frame.f_globals['__file__']
-        return path
-
-    def _path_to_file_name(self, path):
-        file_name = os.path.basename(path).split('.py')[0]
-        return file_name
+        # The group where this run's results will be stored in the h5 file will be the
+        # name of the python script which is instantiating this Run object. If the user
+        # is running interactively or in an unusual environment such that the __main__
+        # module isn't in sys.modules or doesn't have a non-None __file__ attribute,
+        # then self.group will not be set.
+        main_module_path = getattr(sys.modules.get('__main__'), '__file__', None)
+        if not self.no_write and main_module_path is not None:
+            self.set_group(Path(main_module_path).stem)
 
     @property
     def h5_path(self):
