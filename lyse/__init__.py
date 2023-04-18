@@ -365,22 +365,45 @@ class Run(object):
                 Lyse typically only uses 'r' and 'r+'.
 
         Yields:
-            :class:`h5py:h5py.File`: Handle to the opened h5 file.
+            :class:`~.Run`: Handle to opened `Run` object.
+
+        Raises:
+            PermissionError: If the Run is set as read-only but a write mode is requested
 
         Examples:
+            
+            Trivial example that selectively opens the file during analysis.
+            For better performance, it would be better to combine
+            these two openings into one.
+
             >>> from lyse import *
             >>> shot = Run(path)
-            >>> with shot.open('r+'):
+            >>> with shot.open('r'):
             >>>     # shot processing that requires reads/writes
-            >>>     t, vals = shot.get_trace('my_trace')
+            >>>     _, vals = shot.get_trace('my_trace')
+            >>> with shot.open('r+')
             >>>     results = vals**2
             >>>     shot.save_result_array('my_result', results)
+            >>>     _, vals2 = shot.get_trace('my_other_trace')
+            >>>     shot.save_result('my_result2', vals2.mean())
             >>> # Shot processing that doesn't require h5 reads/writes
             >>> print(f'Max of results is {results.max():.3f}')
             Max of results is 5.003
 
-        Raises:
-            PermissionError: If the Run is set as read-only but a write mode is requested
+            Open and create the shot handle for the whole analysis
+            in a single line.
+
+            >>> from lyse import *
+            >>> with Run(path).open('r+') as shot:
+            >>>     # shot processing that requires reads/writes
+            >>>     t, vals = shots.get_trace('my_trace')
+            >>>     results = vals**2
+            >>>     shot.save_result_array('my_result', results)
+            >>>     # Shot processing that doesn't require h5 reads/writes
+            >>>     # could be outside the context
+            >>>     print(f'Max of results is {results.max():.3f}')
+            Max of results is 5.003
+
         """
 
         # ensure no_write is respected
@@ -394,13 +417,13 @@ class Run(object):
             if (self.__h5_file.mode == 'r') and (mode != 'r'):
                 msg = 'Cannot open file with a write mode; this run is read-only'
                 raise PermissionError(msg)
-            yield self.__h5_file
+            yield self
             return
         
         with h5py.File(self.h5_path, mode) as f:
             self.__h5_file = f
             try:
-                yield self.__h5_file
+                yield self
             finally:
                 self.__h5_file = None
 
