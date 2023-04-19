@@ -381,7 +381,7 @@ class Run(object):
             >>> with shot.open('r'):
             >>>     # shot processing that requires reads/writes
             >>>     _, vals = shot.get_trace('my_trace')
-            >>> with shot.open('r+')
+            >>> with shot.open('r+'):
             >>>     results = vals**2
             >>>     shot.save_result_array('my_result', results)
             >>>     _, vals2 = shot.get_trace('my_other_trace')
@@ -396,7 +396,7 @@ class Run(object):
             >>> from lyse import *
             >>> with Run(path).open('r+') as shot:
             >>>     # shot processing that requires reads/writes
-            >>>     t, vals = shots.get_trace('my_trace')
+            >>>     t, vals = shot.get_trace('my_trace')
             >>>     results = vals**2
             >>>     shot.save_result_array('my_result', results)
             >>>     # Shot processing that doesn't require h5 reads/writes

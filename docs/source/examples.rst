@@ -67,7 +67,7 @@ Single shot analysis with global file opening
 	with Run(path).open('r+') as shot:
 
 		# Obtaining a trace:
-		t, mot_fluorecence = run.get_trace('mot fluorecence')
+		t, mot_fluorecence = shot.get_trace('mot fluorecence')
 
 		# Now we might do some analysis on this data. Say we've written a
 		# linear fit function (or we're calling some other libaries linear
