@@ -53,6 +53,38 @@ An analysis on a single shot
 	# shots in a multishot analysis:
 	run.save_result('mot loadrate', c)
 
+Single shot analysis with global file opening
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+	from lyse import *
+
+	# Instantiate Run object and open
+	# Globally opening the shot keeps the h5 file open
+	# This prevents excessive opening and closing of the file
+	# which can slow down the analysis
+	with Run(path).open('r+') as shot:
+
+		# Obtaining a trace:
+		t, mot_fluorecence = shot.get_trace('mot fluorecence')
+
+		# Now we might do some analysis on this data. Say we've written a
+		# linear fit function (or we're calling some other libaries linear
+		# fit function):
+		m, c = linear_fit(t, mot_fluorecence)
+		int_tot = mot_fluorecence.sum()
+		mf_min = mot_fluorecence.min()
+		mf_max = mot_fluorecence.max()
+
+		normalised_fluorecence = normalise_response(mot_fluorecence)
+
+		# We might wish to save this result so that we can compare it across
+		# shots in a multishot analysis:
+		shot.save_result('mot loadrate', c)
+		shot.save_result('mot integrated', int_tot)
+		shot.save_results('mot fl min', mf_min, 'mot fl max', mf_max)
+		shot.save_result_array('norm mot fluorecence', normalised_fluorecence)
 
 An analysis on multiple shots
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
