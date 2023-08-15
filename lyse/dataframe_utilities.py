@@ -22,7 +22,7 @@ import runmanager
 def asdatetime(timestr):
     if isinstance(timestr, bytes):
         timestr = timestr.decode('utf-8')
-    tz = tzlocal.get_localzone().zone
+    tz = tzlocal.get_localzone()
     return pandas.Timestamp(timestr, tz=tz)
 
 def get_nested_dict_from_shot(filepath):
