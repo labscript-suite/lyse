@@ -16,7 +16,7 @@ import tzlocal
 import labscript_utils.shared_drive
 from labscript_utils.connections import _ensure_str
 from labscript_utils.properties import get_attributes
-import runmanager
+from labscript_utils.shot_utils import get_shot_globals
 
 
 def asdatetime(timestr):
@@ -26,7 +26,7 @@ def asdatetime(timestr):
     return pandas.Timestamp(timestr, tz=tz)
 
 def get_nested_dict_from_shot(filepath):
-    row = runmanager.get_shot_globals(filepath)
+    row = get_shot_globals(filepath)
     with h5py.File(filepath,'r') as h5_file:
         if 'results' in h5_file:
             for groupname in h5_file['results']:
