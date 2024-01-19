@@ -1103,7 +1103,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 progress_bar_option.textVisible = True
 
                 # Set the progress and text values of the style option.
-                progress_bar_option.progress = status_percent
+                progress_bar_option.progress = int(status_percent)
                 progress_bar_option.text = '%d%%' % status_percent
 
                 # Draw the progress bar onto the view.
