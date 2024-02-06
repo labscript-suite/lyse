@@ -231,6 +231,15 @@ class Plot(object):
 
 class AnalysisWorker(object):
     def __init__(self, filepath, to_parent, from_parent):
+
+        '''
+        loader = UiLoader()
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), AnalysisWorkerWindow())
+
+        self.worker = AnalysisWorker(filepath, to_parent, from_parent)
+
+        self.ui.show()'''
+
         self.to_parent = to_parent
         self.from_parent = from_parent
         self.filepath = filepath
@@ -427,8 +436,13 @@ class AnalysisWorker(object):
 
     def reset_figs(self):
         pass
-        
-        
+
+
+class AnalysisWorkerWindow(QtWidgets.QMainWindow):
+
+    def __init__(self, *args, **kwargs):
+        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+
 if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
@@ -464,6 +478,8 @@ if __name__ == '__main__':
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
+
     worker = AnalysisWorker(filepath, to_parent, from_parent)
+
     qapplication.exec_()
         
