@@ -26,6 +26,7 @@ from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+from labscript_utils.qtwidgets.outputbox import OutputBox
 import qtutils.icons
 
 import multiprocessing
@@ -230,18 +231,7 @@ class Plot(object):
 
 
 class AnalysisWorker(object):
-    def __init__(self, filepath, to_parent, from_parent):
-
-        '''
-        loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), AnalysisWorkerWindow())
-
-        self.worker = AnalysisWorker(filepath, to_parent, from_parent)
-
-        self.ui.show()'''
-
-        self.to_parent = to_parent
-        self.from_parent = from_parent
+    def __init__(self, filepath):
         self.filepath = filepath
 
         # Add user script directory to the pythonpath:
@@ -261,35 +251,6 @@ class AnalysisWorker(object):
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
-        
-        # Start the thread that listens for instructions from the
-        # parent process:
-        self.mainloop_thread = threading.Thread(target=self.mainloop)
-        self.mainloop_thread.daemon = True
-        self.mainloop_thread.start()
-        
-    def mainloop(self):
-        # HDF5 prints lots of errors by default, for things that aren't
-        # actually errors. These are silenced on a per thread basis,
-        # and automatically silenced in the main thread when h5py is
-        # imported. So we'll silence them in this thread too:
-        h5py._errors.silence_errors()
-        while True:
-            task, data = self.from_parent.get()
-            with kill_lock:
-                if task == 'quit':
-                    inmain(qapplication.quit)
-                elif task == 'analyse':
-                    path = data
-                    success = self.do_analysis(path)
-                    if success:
-                        if lyse._delay_flag:
-                            lyse.delay_event.wait()
-                        self.to_parent.put(['done', lyse._updated_data])
-                    else:
-                        self.to_parent.put(['error', lyse._updated_data])
-                else:
-                    self.to_parent.put(['error','invalid task %s'%str(task)])
         
     @inmain_decorator()
     def do_analysis(self, path):
@@ -438,10 +399,64 @@ class AnalysisWorker(object):
         pass
 
 
-class AnalysisWorkerWindow(QtWidgets.QMainWindow):
+class LyseWorkerWindow(QtWidgets.QWidget):
 
     def __init__(self, *args, **kwargs):
-        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+        QtWidgets.QWidget.__init__(self, *args, **kwargs)
+
+    def closeEvent(self, event):
+        print("Ignoring closeEvent")
+        
+        # return QtWidgets.QWidget.closeEvent(self, event)
+
+        event.ignore()
+
+class LyseWorker():
+    def __init__(self, filepath, to_parent, from_parent):
+        self.to_parent = to_parent
+        self.from_parent = from_parent
+
+        loader = UiLoader()
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), LyseWorkerWindow())
+        self.ui.setWindowTitle(f"Lyse analysis window: {os.path.basename(filepath)}")
+        
+        self.output_box = OutputBox(self.ui.verticalLayout_canvas)
+
+        self.worker = AnalysisWorker(filepath)
+
+        # Start the thread that listens for instructions from the
+        # parent process:
+        self.mainloop_thread = threading.Thread(target=self.mainloop)
+        self.mainloop_thread.daemon = True
+        self.mainloop_thread.start()
+
+        self.ui.show()
+
+    def mainloop(self):
+        # HDF5 prints lots of errors by default, for things that aren't
+        # actually errors. These are silenced on a per thread basis,
+        # and automatically silenced in the main thread when h5py is
+        # imported. So we'll silence them in this thread too:
+        h5py._errors.silence_errors()
+        while True:
+            task, data = self.from_parent.get()
+            with kill_lock:
+                if task == 'quit':
+                    print("Quit message recieved!")
+                    inmain(qapplication.quit)
+                elif task == 'analyse':
+                    path = data
+                    success = self.worker.do_analysis(path)
+                    if success:
+                        if lyse._delay_flag:
+                            lyse.delay_event.wait()
+                        self.to_parent.put(['done', lyse._updated_data])
+                    else:
+                        self.to_parent.put(['error', lyse._updated_data])
+                else:
+                    self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    
 
 if __name__ == '__main__':
 
@@ -479,7 +494,7 @@ if __name__ == '__main__':
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
 
-    worker = AnalysisWorker(filepath, to_parent, from_parent)
+    worker = LyseWorker(filepath, to_parent, from_parent)
 
     qapplication.exec_()
         
