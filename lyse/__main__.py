@@ -1971,6 +1971,7 @@ class Lyse(object):
         self.ui.actionSave_dataframe_as.triggered.connect(lambda: self.on_save_dataframe_triggered(True))
         self.ui.actionSave_dataframe.triggered.connect(lambda: self.on_save_dataframe_triggered(False))
         self.ui.actionLoad_dataframe.triggered.connect(self.on_load_dataframe_triggered)
+        self.ui.actionQuit.triggered.connect(self.ui.closeEvent)
 
         self.ui.resize(1600, 900)
 
