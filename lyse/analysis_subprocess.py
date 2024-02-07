@@ -50,7 +50,7 @@ class Plot(object):
         self.identifier = identifier
 
         self.tab = QtWidgets.QWidget()
-        tabWidget_canvas.addTab(self.tab, f"{identifier} {filepath}") 
+        tabWidget_canvas.addTab(self.tab, f"Figure {identifier}") 
 
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), self.tab)
@@ -387,8 +387,7 @@ class LyseWorkerWindow(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self, *args, **kwargs)
 
     def closeEvent(self, event):
-        print("Ignoring closeEvent")
-        
+        self.hide()
         event.ignore()
 
 class LyseWorker():
