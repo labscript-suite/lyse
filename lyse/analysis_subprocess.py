@@ -418,6 +418,10 @@ class LyseWorker():
         self.output_box.write(f'{self.title} started.')
         self.ui.hide()
 
+    @inmain_decorator()
+    def _show(self):
+        self.ui.show()
+
     def parentloop(self):
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
@@ -430,7 +434,7 @@ class LyseWorker():
                 if task == 'quit':
                     inmain(qapplication.quit)
                 elif task == 'analyse':
-                    self.ui.show()
+                    self._show()
                     path = data
                     success = self.worker.do_analysis(path)
                     if success:
