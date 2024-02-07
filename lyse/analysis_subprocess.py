@@ -406,8 +406,8 @@ class LyseWorker():
         self.worker = AnalysisWorker(filepath, self.ui.tabWidget_canvas)
 
         # Setup for output capturing
-        # sys.stdout = WriteStream(self.output_box)
         sys.stdout = self.output_box
+        sys.stderr = self.output_box
 
         # Start the thread that listens for instructions from the
         # parent process:
