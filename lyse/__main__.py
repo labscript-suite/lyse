@@ -315,7 +315,7 @@ class AnalysisRoutine(object):
 
         child_handles = process_tree.subprocess(
             worker_path,
-            output_redirection_port=self.output_box_port,
+            # output_redirection_port=self.output_box_port, # IBS Change maybe make an option.
             startup_timeout=30,
         )
         

@@ -19,6 +19,7 @@ import os
 import threading
 import traceback
 import time
+import queue
 from types import ModuleType
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
@@ -398,7 +399,6 @@ class AnalysisWorker(object):
     def reset_figs(self):
         pass
 
-
 class LyseWorkerWindow(QtWidgets.QWidget):
 
     def __init__(self, *args, **kwargs):
@@ -407,32 +407,36 @@ class LyseWorkerWindow(QtWidgets.QWidget):
     def closeEvent(self, event):
         print("Ignoring closeEvent")
         
-        # return QtWidgets.QWidget.closeEvent(self, event)
-
         event.ignore()
 
 class LyseWorker():
     def __init__(self, filepath, to_parent, from_parent):
         self.to_parent = to_parent
         self.from_parent = from_parent
+        self.title = f"Lyse analysis worker {os.path.basename(filepath)}"
 
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), LyseWorkerWindow())
-        self.ui.setWindowTitle(f"Lyse analysis window: {os.path.basename(filepath)}")
+        self.ui.setWindowTitle(self.title)
         
         self.output_box = OutputBox(self.ui.verticalLayout_canvas)
 
         self.worker = AnalysisWorker(filepath)
 
+        # Setup for output capturing
+        # sys.stdout = WriteStream(self.output_box)
+        sys.stdout = self.output_box
+
         # Start the thread that listens for instructions from the
         # parent process:
-        self.mainloop_thread = threading.Thread(target=self.mainloop)
-        self.mainloop_thread.daemon = True
-        self.mainloop_thread.start()
+        self.parentloop_thread = threading.Thread(target=self.parentloop)
+        self.parentloop_thread.daemon = True
+        self.parentloop_thread.start()           
 
         self.ui.show()
+        self.output_box.write(f'{self.title} started.')
 
-    def mainloop(self):
+    def parentloop(self):
         # HDF5 prints lots of errors by default, for things that aren't
         # actually errors. These are silenced on a per thread basis,
         # and automatically silenced in the main thread when h5py is
@@ -442,7 +446,6 @@ class LyseWorker():
             task, data = self.from_parent.get()
             with kill_lock:
                 if task == 'quit':
-                    print("Quit message recieved!")
                     inmain(qapplication.quit)
                 elif task == 'analyse':
                     path = data
@@ -455,8 +458,6 @@ class LyseWorker():
                         self.to_parent.put(['error', lyse._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
-
-    
 
 if __name__ == '__main__':
 
