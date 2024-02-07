@@ -92,7 +92,7 @@ QToolButton:hover:checked {
    </property>
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>
-     <widget class="QSplitter" name="splitter_2">
+     <widget class="QSplitter" name="splitter_vertical">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
         <horstretch>0</horstretch>

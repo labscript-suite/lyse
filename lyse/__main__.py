@@ -1976,8 +1976,7 @@ class Lyse(object):
         self.ui.resize(1600, 900)
 
         # Set the splitters to appropriate fractions of their maximum size:
-        self.ui.splitter_horizontal.setSizes([1000, 600])
-        self.ui.splitter_vertical.setSizes([300, 600])
+        self.ui.splitter_vertical.setSizes([300, 600, 300])
 
         # autoload a config file, if labconfig is set to do so:
         try:
