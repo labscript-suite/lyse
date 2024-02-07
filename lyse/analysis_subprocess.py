@@ -418,7 +418,7 @@ class LyseWorker():
         self.title = f"Lyse analysis worker {os.path.basename(filepath)}"
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), LyseWorkerWindow())
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow())
         self.ui.setWindowTitle(self.title)
         
         self.output_box = OutputBox(self.ui.verticalLayout_outputbox)
