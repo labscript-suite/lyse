@@ -69,12 +69,14 @@ class PlotWindow(QtWidgets.QWidget):
         
 
 class Plot(object):
-    def __init__(self, figure, identifier, filepath):
+    def __init__(self, figure, identifier, filepath, tabWidget_canvas):
         self.identifier = identifier
-        loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow(self))
 
-        self.set_window_title(identifier, filepath)
+        self.tab = QtWidgets.QWidget()
+        tabWidget_canvas.addTab(self.tab, f"{identifier} {filepath}") 
+
+        loader = UiLoader()
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), self.tab)
 
         # figure.tight_layout()
         self.figure = figure
@@ -234,8 +236,11 @@ class Plot(object):
 
 
 class AnalysisWorker(object):
-    def __init__(self, filepath):
+    def __init__(self, filepath, tabWidget_canvas):
         self.filepath = filepath
+
+        # This is a tab widget where all of the figures will go.
+        self.tabWidget_canvas = tabWidget_canvas
 
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
@@ -381,7 +386,7 @@ class AnalysisWorker(object):
             if not issubclass(cls, Plot): 
                 raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
-            self.plots[fig] = cls(fig, identifier, self.filepath)
+            self.plots[fig] = cls(fig, identifier, self.filepath, self.tabWidget_canvas)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             message = """Failed to instantiate custom class for plot "{identifier}".
@@ -394,7 +399,7 @@ class AnalysisWorker(object):
             sys.stderr.write(message)
 
             # instantiate plot using original Base class so that we always get a plot
-            self.plots[fig] = Plot(fig, identifier, self.filepath)
+            self.plots[fig] = Plot(fig, identifier, self.filepath, self.tabWidget_canvas)
 
         return self.plots[fig]
 
@@ -423,7 +428,7 @@ class LyseWorker():
         
         self.output_box = OutputBox(self.ui.verticalLayout_outputbox)
 
-        self.worker = AnalysisWorker(filepath)
+        self.worker = AnalysisWorker(filepath, self.ui.tabWidget_canvas)
 
         # Setup for output capturing
         # sys.stdout = WriteStream(self.output_box)
