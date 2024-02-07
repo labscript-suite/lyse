@@ -2097,7 +2097,7 @@ class Lyse(object):
         self.save_configuration(save_file)
 
     def only_window_geometry_is_different(self, current_data, old_data):
-        ui_keys = ['window_size', 'window_pos', 'splitter', 'splitter_vertical', 'splitter_horizontal']
+        ui_keys = ['window_size', 'window_pos', 'splitter', 'splitter_vertical']
         compare = [current_data[key] == old_data[key] for key in current_data.keys() if key not in ui_keys]
         return all(compare)
 
@@ -2127,7 +2127,6 @@ class Lyse(object):
         save_data['screen_geometry'] = get_screen_geometry()
         save_data['splitter'] = self.ui.splitter.sizes()
         save_data['splitter_vertical'] = self.ui.splitter_vertical.sizes()
-        save_data['splitter_horizontal'] = self.ui.splitter_horizontal.sizes()
         return save_data
 
     def save_configuration(self, save_file):
@@ -2217,8 +2216,6 @@ class Lyse(object):
                 self.ui.splitter.setSizes(save_data['splitter'])
             if 'splitter_vertical' in save_data:
                 self.ui.splitter_vertical.setSizes(save_data['splitter_vertical'])
-            if 'splitter_horizontal' in save_data:
-                self.ui.splitter_horizontal.setSizes(save_data['splitter_horizontal'])
 
     def setup_config(self):
         required_config_params = {"DEFAULT": ["apparatus_name"],
