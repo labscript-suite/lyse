@@ -32,6 +32,8 @@ import qtutils.icons
 
 import multiprocessing
 
+# the new tab is at tabWidget_canvas
+
 # Associate app windows with OS menu shortcuts:
 import desktop_app
 desktop_app.set_process_appid('lyse')
@@ -419,7 +421,7 @@ class LyseWorker():
         self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), LyseWorkerWindow())
         self.ui.setWindowTitle(self.title)
         
-        self.output_box = OutputBox(self.ui.verticalLayout_canvas)
+        self.output_box = OutputBox(self.ui.verticalLayout_outputbox)
 
         self.worker = AnalysisWorker(filepath)
 
