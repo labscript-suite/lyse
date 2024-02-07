@@ -45,29 +45,6 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
-
-class PlotWindowCloseEvent(QtGui.QCloseEvent):
-    def __init__(self, force, *args, **kwargs):
-        QtGui.QCloseEvent.__init__(self, *args, **kwargs)
-        self.force = force
-
-class PlotWindow(QtWidgets.QWidget):
-    # A signal for when the window manager has created a new window for this widget:
-    close_signal = Signal()
-
-    def __init__(self, plot, *args, **kwargs):
-        self.__plot = plot
-        QtWidgets.QWidget.__init__(self, *args, **kwargs)
-
-    def closeEvent(self, event):
-        self.hide()
-        if isinstance(event, PlotWindowCloseEvent) and event.force:
-            self.__plot.on_close()
-            event.accept()
-        else:
-            event.ignore()
-        
-
 class Plot(object):
     def __init__(self, figure, identifier, filepath, tabWidget_canvas):
         self.identifier = identifier
@@ -349,9 +326,6 @@ class AnalysisWorker(object):
                 if type(plot) != cls or plot.identifier != identifier:
                     window_state = plot.get_window_state()
 
-                    # Create a custom CloseEvent to force close the plot window
-                    event = PlotWindowCloseEvent(True)
-                    QtCore.QCoreApplication.instance().postEvent(plot.ui, event)
                     # Delete the plot
                     del self.plots[fig]
 
@@ -441,8 +415,8 @@ class LyseWorker():
         self.parentloop_thread.daemon = True
         self.parentloop_thread.start()           
 
-        self.ui.show()
         self.output_box.write(f'{self.title} started.')
+        self.ui.hide()
 
     def parentloop(self):
         # HDF5 prints lots of errors by default, for things that aren't
@@ -456,6 +430,7 @@ class LyseWorker():
                 if task == 'quit':
                     inmain(qapplication.quit)
                 elif task == 'analyse':
+                    self.ui.show()
                     path = data
                     success = self.worker.do_analysis(path)
                     if success:
