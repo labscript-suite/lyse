@@ -241,6 +241,7 @@ class AnalysisWorker(object):
 
         # This is a tab widget where all of the figures will go.
         self.tabWidget_canvas = tabWidget_canvas
+        self.tabWidget_canvas.setMinimumHeight(256)
 
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
