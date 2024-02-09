@@ -20,6 +20,7 @@ import threading
 import traceback
 import time
 import queue
+import inspect
 from types import ModuleType
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
@@ -476,6 +477,31 @@ if __name__ == '__main__':
 
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
+
+    # Learn how to introspect what the child process did.
+
+    # Actually run the user's analysis!
+
+    initial_globals = {}
+    initial_locals = {}
+
+    with open(filepath) as f:
+        code = compile(
+            f.read(),
+            filepath,
+            'exec',
+            dont_inherit=True,
+        )
+        exec(code, initial_globals, initial_locals)
+
+    # These are the potential classes that have been introduced.
+    options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
+    if len(options) != 1:
+        raise ValueError(f"Script {filepath} contaions {len(options)} valid analysis classes.  Only 1 is allowed.")
+
+    # Great!  We have a way of defining the user supplied object :)  Not so sure about the module reload stuff.  That is TBD.
+
+    print(options)
 
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
