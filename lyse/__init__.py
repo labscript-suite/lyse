@@ -513,7 +513,7 @@ class Run(object):
 
     @open_file('r')
     def get_wait(self, name):
-        """Returns the wait paramteres: label, timeout, duration, and time out status.
+        """Returns the wait parameters: label, timeout, duration, and time out status.
 
         Args:
             name (str): Name of the wait to get.
@@ -600,7 +600,7 @@ class Run(object):
         Args:
             group (str): Group to look in for the results. Typically the name of
                             the analysis script that created it.
-            \*names (str): Names of results to retrieve.
+            *names (str): Names of results to retrieve.
 
         Returns:
             list: List of the results, in the same order as specified by names.
@@ -760,7 +760,7 @@ class Run(object):
         Iteratively calls :obj:`get_trace`.
 
         Args:
-            \*names (str): Names of traces to retrieve
+            *names (str): Names of traces to retrieve
 
         Returns:
             list: List of numpy arrays.
@@ -779,7 +779,7 @@ class Run(object):
 
         Args:
             group (str): Group to obtain the results from.
-            \*names (str): Result names to retrieve.
+            *names (str): Result names to retrieve.
 
         Returns:
             list: List of results.
