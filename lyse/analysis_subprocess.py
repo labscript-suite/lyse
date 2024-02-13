@@ -472,33 +472,18 @@ if __name__ == '__main__':
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
-    # Introspect type of analysis
-    filetype, filepath = get_analysis_type(filepath)
-
-    if filetype == "INVALID":
-        # invalid analysis.
-        msg = f'invalid file path {filepath}'
-        to_parent.put(['error', msg])
-        raise ValueError(msg)
-
-    to_parent.put(['starting', ''])
-
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
 
-    if filetype == "OLD":
-        # Rename this module to _analysis_subprocess and put it in sys.modules
-        # under that name. The user's analysis routine will become the __main__ module
-        # '_analysis_subprocess'.
-        __name__ = '_analysis_subprocess'
+    # Rename this module to _analysis_subprocess and put it in sys.modules
+    # under that name. The user's analysis routine will become the __main__ module
+    # '_analysis_subprocess'.
+    __name__ = '_analysis_subprocess'
 
-        sys.modules[__name__] = sys.modules['__main__']
+    sys.modules[__name__] = sys.modules['__main__']
 
-        worker = LyseWorker(filepath, to_parent, from_parent, qapplication)
-
-    elif filetype == "GUI_1.0":
-        pass
+    worker = LyseWorker(filepath, to_parent, from_parent, qapplication)
 
     qapplication.exec_()
 

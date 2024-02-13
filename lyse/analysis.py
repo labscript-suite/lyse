@@ -4,11 +4,12 @@ classes that drive the basic operation of lyse analysis workers
 
 import os
 import time
-from qtutils.qt import QtCore, QtGui
-import lyse
 
+from qtutils.qt import QtCore, QtGui
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 
+import lyse
+from lyse.ui_helpers import RoutineBoxData
 
 class ClassicAnalysisRoutine(object):
 
@@ -22,10 +23,10 @@ class ClassicAnalysisRoutine(object):
         self.model = model
         self.output_box_port = output_box_port
         
-        self.COL_ACTIVE = lyse.RoutineBox.COL_ACTIVE
-        self.COL_STATUS = lyse.RoutineBox.COL_STATUS
-        self.COL_NAME = lyse.RoutineBox.COL_NAME
-        self.ROLE_FULLPATH = lyse.RoutineBox.ROLE_FULLPATH
+        self.COL_ACTIVE = RoutineBoxData.COL_ACTIVE
+        self.COL_STATUS = RoutineBoxData.COL_STATUS
+        self.COL_NAME = RoutineBoxData.COL_NAME
+        self.ROLE_FULLPATH = RoutineBoxData.ROLE_FULLPATH
         
         self.error = False
         self.done = False
