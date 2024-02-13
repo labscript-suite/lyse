@@ -123,17 +123,6 @@ def scientific_notation(x, sigfigs=4, mode='eng'):
                 result += thinspace + times + thinspace + '10' + superscript
     return result
 
-
-def get_screen_geometry(qapplication):
-    """Return the a list of the geometries of each screen: each a tuple of
-    left, top, width and height"""
-    geoms = []
-    desktop = qapplication.desktop()
-    for i in range(desktop.screenCount()):
-        sg = desktop.screenGeometry(i)
-        geoms.append((sg.left(), sg.top(), sg.width(), sg.height()))
-    return geoms
-
 def get_analysis_type(filepath):
     """
     returns: filetype, filepath
@@ -2029,9 +2018,10 @@ class Lyse(object):
 
         save_data['window_pos'] = (window_pos.x(), window_pos.y())
 
-        save_data['screen_geometry'] = get_screen_geometry(self.qapplication)
+        save_data['screen_geometry'] = lyse.ui_helpers.get_screen_geometry(self.qapplication)
         save_data['splitter'] = self.ui.splitter.sizes()
         save_data['splitter_vertical'] = self.ui.splitter_vertical.sizes()
+
         return save_data
 
     def save_configuration(self, save_file):
@@ -2111,7 +2101,7 @@ class Lyse(object):
         # position was saved when 2 monitors were plugged in but there is
         # only one now, and the splitters may not make sense in light of a
         # different window size, so better to fall back to defaults:
-        current_screen_geometry = get_screen_geometry(self.qapplication)
+        current_screen_geometry = lyse.ui_helpers.get_screen_geometry(self.qapplication)
         if current_screen_geometry == screen_geometry:
             if 'window_size' in save_data:
                 self.ui.resize(*save_data['window_size'])

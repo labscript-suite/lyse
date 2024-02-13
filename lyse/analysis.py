@@ -58,8 +58,13 @@ class ClassicAnalysisRoutine(object):
         )
         
         to_worker, from_worker, worker = child_handles
+        
         # Tell the worker what script it with be executing:
         to_worker.put(self.filepath)
+
+        # Tell worker where to save UI data
+        to_worker.put(self.app.last_save_config_file)
+
         return to_worker, from_worker, worker
         
     def do_analysis(self, filepath):

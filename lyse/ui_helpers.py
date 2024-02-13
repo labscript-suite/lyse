@@ -12,3 +12,13 @@ class RoutineBoxData():
     # This is how we will reorder the model's rows instead of
     # using remove/insert.
     ROLE_SORTINDEX = QtCore.Qt.UserRole + 2
+
+def get_screen_geometry(qapplication):
+    """Return the a list of the geometries of each screen: each a tuple of
+    left, top, width and height"""
+    geoms = []
+    desktop = qapplication.desktop()
+    for i in range(desktop.screenCount()):
+        sg = desktop.screenGeometry(i)
+        geoms.append((sg.left(), sg.top(), sg.width(), sg.height()))
+    return geoms

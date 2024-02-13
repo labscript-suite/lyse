@@ -31,9 +31,11 @@ from qtutils.qt.QtCore import pyqtSlot as Slot
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
+from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
 from labscript_utils.qtwidgets.outputbox import OutputBox
 from labscript_utils.modulewatcher import ModuleWatcher
 import lyse
+import lyse.ui_helpers
 
 # Associate app windows with OS menu shortcuts:
 import desktop_app
@@ -385,41 +387,59 @@ class AnalysisWorker(object):
 
 class LyseWorkerWindow(QtWidgets.QWidget):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app, *args, **kwargs):
+        self.app = app
+
         QtWidgets.QWidget.__init__(self, *args, **kwargs)
 
     def closeEvent(self, event):
         self.hide()
         event.ignore()
 
-
 class LyseWorker():
-    def __init__(self, filepath, to_parent, from_parent, qapplication):
-        self.to_parent = to_parent
-        self.from_parent = from_parent
+    def __init__(self, process_tree, qapplication):
+
+        # Interprocess communication setup
+        self.to_parent = process_tree.to_parent
+        self.from_parent = process_tree.from_parent
+        self.kill_lock = process_tree.kill_lock
+
+        # File name from parent
+        self.filepath = self.from_parent.get()
+        file = os.path.splitext(os.path.basename(self.filepath))[0] # file with no path and no extension
+        self.title = f"Lyse_analysis_{file}"
+
+        # Config location from parent
+        lyse_config_file = self.from_parent.get() # this will be the lyse config file
+        self.save_config_file = os.path.join(os.path.dirname(lyse_config_file), f"{file}.ini")
+
+        # Set a meaningful client id for zlock
+        process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(self.filepath))
+
+        # GUI setup
         self.qapplication = qapplication
-        self.title = f"Lyse analysis worker {os.path.basename(filepath)}"
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow())
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow(self))
         self.ui.setWindowTitle(self.title)
         
         self.ui.output_box = OutputBox(self.ui.verticalLayout_outputbox)
 
-        self.worker = AnalysisWorker(filepath, self.ui.tabWidget_canvas)
+        self.worker = AnalysisWorker(self.filepath, self.ui.tabWidget_canvas)
 
         # Setup for output capturing
         sys.stdout = self.ui.output_box
         sys.stderr = self.ui.output_box
 
-        # Start the thread that listens for instructions from the
-        # parent process:
+        # Start the thread that listens for instructions from the parent process:
         self.parentloop_thread = threading.Thread(target=self.parentloop)
         self.parentloop_thread.daemon = True
         self.parentloop_thread.start()           
 
+        self.load_configuration()
+
         self.ui.output_box.write(f'{self.title} started.')
-        self.ui.hide()
+        self.ui.show()
 
     @inmain_decorator()
     def _show(self):
@@ -433,9 +453,9 @@ class LyseWorker():
         h5py._errors.silence_errors()
         while True:
             task, data = self.from_parent.get()
-            with kill_lock:
+            with self.kill_lock:
                 if task == 'quit':
-                    self.qapplication.quit()
+                    self.quit()
                 elif task == 'analyse':
                     self._show()
                     path = data
@@ -448,6 +468,58 @@ class LyseWorker():
                         self.to_parent.put(['error', lyse._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    @inmain_decorator()
+    def quit(self):
+        self.save_configuration()
+        self.qapplication.quit()
+
+    @inmain_decorator()
+    def get_save_data(self):
+        save_data = {}
+
+        window_size = self.ui.size()
+        save_data['window_size'] = (window_size.width(), window_size.height())
+
+        window_pos = self.ui.pos()
+        save_data['window_pos'] = (window_pos.x(), window_pos.y())
+
+        save_data['screen_geometry'] = lyse.ui_helpers.get_screen_geometry(self.qapplication)
+        # save_data['splitter'] = self.ui.splitter.sizes()
+        save_data['splitter_bottom'] = self.ui.splitter_bottom.sizes()
+        
+        return save_data
+
+    def save_configuration(self):
+        save_data = self.get_save_data()
+        save_appconfig(self.save_config_file, {f'{self.title}_state': save_data})
+
+    def load_configuration(self):
+
+        save_data = load_appconfig(self.save_config_file)[f'{self.title}_state']
+
+        if 'screen_geometry' not in save_data:
+            return
+        
+        screen_geometry = save_data['screen_geometry']
+
+        # Only restore the window size and position, and splitter
+        # positions if the screen is the same size/same number of monitors
+        # etc. This prevents the window moving off the screen if say, the
+        # position was saved when 2 monitors were plugged in but there is
+        # only one now, and the splitters may not make sense in light of a
+        # different window size, so better to fall back to defaults:
+
+        current_screen_geometry = lyse.ui_helpers.get_screen_geometry(self.qapplication)
+        if current_screen_geometry == screen_geometry:
+            if 'window_size' in save_data:
+                self.ui.resize(*save_data['window_size'])
+
+            if 'window_pos' in save_data:
+                self.ui.move(*save_data['window_pos'])
+
+            if 'splitter_bottom' in save_data:
+                self.ui.splitter_bottom.setSizes(save_data['splitter_bottom'])
 
 if __name__ == '__main__':
 
@@ -462,13 +534,6 @@ if __name__ == '__main__':
     import labscript_utils.h5_lock, h5py
 
     process_tree = ProcessTree.connect_to_parent()
-    to_parent = process_tree.to_parent
-    from_parent = process_tree.from_parent
-    kill_lock = process_tree.kill_lock
-    filepath = from_parent.get()
-
-    # Set a meaningful client id for zlock
-    process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
@@ -481,7 +546,7 @@ if __name__ == '__main__':
 
     sys.modules[__name__] = sys.modules['__main__']
 
-    worker = LyseWorker(filepath, to_parent, from_parent, qapplication)
+    worker = LyseWorker(process_tree, qapplication)
 
     qapplication.exec_()
 
