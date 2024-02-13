@@ -7,9 +7,11 @@ import time
 
 from qtutils.qt import QtCore, QtGui
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
+import qtutils.icons
 
 import lyse
 from lyse.ui_helpers import RoutineBoxData
+
 
 class ClassicAnalysisRoutine(object):
 

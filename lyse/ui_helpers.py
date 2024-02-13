@@ -1,4 +1,4 @@
-from qtutils.qt import QtCore, QtGui, QtWidgets
+from qtutils.qt import QtCore
 
 class RoutineBoxData():
     
