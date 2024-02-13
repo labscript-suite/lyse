@@ -55,19 +55,15 @@ from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
 from lyse import LYSE_DIR, _rangeindex_to_multiindex
 
-process_tree = ProcessTree.instance()
-
-# Set a meaningful name for zlock client id:
-process_tree.zlock_client.set_process_name('lyse')
-
+import lyse.analysis
 
 @inmain_decorator()
-def error_dialog(message):
+def error_dialog(app, message):
     QtWidgets.QMessageBox.warning(app.ui, 'lyse', message)
 
 
 @inmain_decorator()
-def question_dialog(message):
+def question_dialog(app, message):
     reply = QtWidgets.QMessageBox.question(app.ui, 'lyse', message,
                                        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
     return (reply == QtWidgets.QMessageBox.Yes)
@@ -153,8 +149,55 @@ def get_screen_geometry():
         geoms.append((sg.left(), sg.top(), sg.width(), sg.height()))
     return geoms
 
+def get_analysis_type(filepath):
+    """
+    returns: filetype, filepath
+
+    filepath: the path to the script to be executed.
+    
+    filetype: type of analysis script that is provided.
+
+    current supported types are:
+        ["CLASSIC", "GUI_1.0"]
+    
+    anything else will return "INVALID"
+    """
+    
+    filetype = "INVALID"
+
+    # check extension, currently .py files are assumed to be old-style
+    if os.path.splitext(filepath) == ".py" and os.path.isfile(filepath):
+        filetype = "CLASSIC"
+    elif os.path.isdir(filepath):
+        # We have been passed a directory, which marks a new-style analysis.
+        # Inside we expect to find a python file called "worker.py"
+        filepath = os.path.join(filepath, "worker.py")
+
+        # If the file exists introspect to see if it defines a new type class
+        if os.path.isfile(filepath):
+            initial_locals = {}
+
+            with open(filepath) as f:
+                code = compile(
+                    f.read(),
+                    filepath,
+                    'exec',
+                    dont_inherit=True,
+                )
+                exec(code, {}, initial_locals)
+
+            # See how many valid classes are present
+            options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
+            if len(options) == 1:
+                filetype = "GUI_1.0"
+
+    return filetype, filepath
 
 class WebServer(ZMQServer):
+
+    def __init__(self, app, *args, **kwargs):
+        self.app = app
+        super().__init__(*args, **kwargs)
 
     def handler(self, request_data):
         logger.info('WebServer request: %s' % str(request_data))
@@ -181,11 +224,11 @@ class WebServer(ZMQServer):
                     h5_filepath = h5_filepath.decode('utf8')
                 if not isinstance(h5_filepath, str):
                     raise AssertionError(str(type(h5_filepath)) + ' is not str or bytes')
-                app.filebox.incoming_queue.put(h5_filepath)
+                self.app.filebox.incoming_queue.put(h5_filepath)
                 return 'added successfully'
         elif isinstance(request_data, str):
             # Just assume it's a filepath:
-            app.filebox.incoming_queue.put(shared_drive.path_to_local(request_data))
+            self.app.filebox.incoming_queue.put(shared_drive.path_to_local(request_data))
             return "Experiment added successfully\n"
 
         return ("error: operation not supported. Recognised requests are:\n "
@@ -193,7 +236,7 @@ class WebServer(ZMQServer):
 
     @inmain_decorator(wait_for_return=True)
     def _copy_dataframe(self):
-        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        df = self.app.filebox.shots_model.dataframe.copy(deep=True)
         return df
 
     def _retrieve_dataframe(self):
@@ -251,7 +294,8 @@ class LyseMainWindow(QtWidgets.QMainWindow):
     # A signal to show that the window is shown and painted.
     firstPaint = Signal()
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app, *args, **kwargs):
+        self.app = app
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self._previously_painted = False
         self.closing = False
@@ -259,14 +303,14 @@ class LyseMainWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         if self.closing:
             return QtWidgets.QMainWindow.closeEvent(self, event)
-        if app.on_close_event():
+        if self.app.on_close_event():
             self.closing = True
             timeout_time = time.time() + 2
             self.delayedClose(timeout_time)
         event.ignore()
 
     def delayedClose(self, timeout_time):
-        if not all(app.workers_terminated().values()) and time.time() < timeout_time:
+        if not all(self.app.workers_terminated().values()) and time.time() < timeout_time:
             QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
         else:
             QtCore.QTimer.singleShot(0, self.close)
@@ -277,156 +321,6 @@ class LyseMainWindow(QtWidgets.QMainWindow):
             self._previously_painted = True
             self.firstPaint.emit()
         return result
-
-
-class AnalysisRoutine(object):
-
-    def __init__(self, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
-        self.filepath = filepath
-        self.shortname = os.path.basename(self.filepath)
-        self.model = model
-        self.output_box_port = output_box_port
-        
-        self.COL_ACTIVE = RoutineBox.COL_ACTIVE
-        self.COL_STATUS = RoutineBox.COL_STATUS
-        self.COL_NAME = RoutineBox.COL_NAME
-        self.ROLE_FULLPATH = RoutineBox.ROLE_FULLPATH
-        
-        self.error = False
-        self.done = False
-        
-        self.to_worker, self.from_worker, self.worker = self.start_worker()
-        
-        # Make a row to put into the model:
-        active_item =  QtGui.QStandardItem()
-        active_item.setCheckable(True)
-        active_item.setCheckState(checked)
-        info_item = QtGui.QStandardItem()
-        name_item = QtGui.QStandardItem(self.shortname)
-        name_item.setToolTip(self.filepath)
-        name_item.setData(self.filepath, self.ROLE_FULLPATH)
-        self.model.appendRow([active_item, info_item, name_item])
-            
-        self.exiting = False
-        
-    def start_worker(self):
-        # Start a worker process for this analysis routine:
-        worker_path = os.path.join(LYSE_DIR, 'analysis_subprocess.py')
-
-        child_handles = process_tree.subprocess(
-            worker_path,
-            # output_redirection_port=self.output_box_port, # IBS Change maybe make an option.
-            startup_timeout=30,
-        )
-        
-        to_worker, from_worker, worker = child_handles
-        # Tell the worker what script it with be executing:
-        to_worker.put(self.filepath)
-        return to_worker, from_worker, worker
-        
-    def do_analysis(self, filepath):
-        self.to_worker.put(['analyse', filepath])
-        signal, data = self.from_worker.get()
-        if signal == 'error':
-            return False, data
-        elif signal == 'done':
-            return True, data
-        else:
-            raise ValueError('invalid signal %s'%str(signal))
-        
-    @inmain_decorator()
-    def set_status(self, status):
-        index = self.get_row_index()
-        if index is None:
-            # Yelp, we've just been deleted. Nothing to do here.
-            return
-        status_item = self.model.item(index, self.COL_STATUS)
-        if status == 'done':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
-            self.done = True
-            self.error = False
-        elif status == 'working':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/hourglass'))
-            self.done = False
-            self.error = False
-        elif status == 'error':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/exclamation'))
-            self.error = True
-            self.done = False
-        elif status == 'clear':
-            status_item.setData(None, QtCore.Qt.DecorationRole)
-            self.done = False
-            self.error = False
-        else:
-            raise ValueError(status)
-        
-    @inmain_decorator()
-    def enabled(self):
-        index = self.get_row_index()
-        if index is None:
-            # Yelp, we've just been deleted.
-            return False
-        enabled_item = self.model.item(index, self.COL_ACTIVE)
-        return (enabled_item.checkState() == QtCore.Qt.Checked)
-        
-    def get_row_index(self):
-        """Returns the row index for this routine's row in the model"""
-        for row in range(self.model.rowCount()):
-            name_item = self.model.item(row, self.COL_NAME)
-            fullpath = name_item.data(self.ROLE_FULLPATH)
-            if fullpath == self.filepath:
-                return row
-
-    def restart(self):
-        # TODO set status to 'restarting' or an icon or something, and gray out the item?
-        self.end_child(restart=True)
-        
-    def remove(self):
-        """End the child process and remove from the treeview"""
-        self.end_child()
-        index = self.get_row_index()
-        if index is None:
-            # Already gone
-            return
-        self.model.removeRow(index)
-         
-    def end_child(self, restart=False):
-        self.to_worker.put(['quit', None])
-        timeout_time = time.time() + 2
-        self.exiting = True
-        QtCore.QTimer.singleShot(50,
-            lambda: self.check_child_exited(self.worker, timeout_time, kill=False, restart=restart))
-
-    def check_child_exited(self, worker, timeout_time, kill=False, restart=False):
-        worker.poll()
-        if worker.returncode is None and time.time() < timeout_time:
-            QtCore.QTimer.singleShot(50,
-                lambda: self.check_child_exited(worker, timeout_time, kill, restart))
-            return
-        elif worker.returncode is None:
-            if not kill:
-                worker.terminate()
-                app.output_box.output('%s worker not responding.\n'%self.shortname)
-                timeout_time = time.time() + 2
-                QtCore.QTimer.singleShot(50,
-                    lambda: self.check_child_exited(worker, timeout_time, kill=True, restart=restart))
-                return
-            else:
-                worker.kill()
-                app.output_box.output('%s worker killed\n'%self.shortname, red=True)
-        elif kill:
-            app.output_box.output('%s worker terminated\n'%self.shortname, red=True)
-        else:
-            app.output_box.output('%s worker exited cleanly\n'%self.shortname)
-        
-        # if analysis was running notify analysisloop that analysis has failed
-        self.from_worker.put(('error', {}))
-
-        if restart:
-            self.to_worker, self.from_worker, self.worker = self.start_worker()
-            app.output_box.output('%s worker restarted\n'%self.shortname)
-        self.exiting = False
-
 
 class TreeView(QtWidgets.QTreeView):
     leftClicked = Signal(QtCore.QModelIndex)
@@ -488,7 +382,9 @@ class RoutineBox(object):
     # using remove/insert.
     ROLE_SORTINDEX = QtCore.Qt.UserRole + 2
     
-    def __init__(self, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
+    def __init__(self, app, container, exp_config, filebox, from_filebox, to_filebox, output_box_port, multishot=False):
+        self.app = app # Reference to main lyse app
+
         self.multishot = multishot
         self.filebox = filebox
         self.exp_config = exp_config
@@ -610,9 +506,20 @@ class RoutineBox(object):
         # Queue the files to be opened:
         for filepath, checked in routine_files:
             if filepath in [routine.filepath for routine in self.routines]:
-                app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
+                self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
-            routine = AnalysisRoutine(filepath, self.model, self.output_box_port, checked)
+            
+            filetype, new_filepath = get_analysis_type(filepath)
+            if filetype == "INVALID":
+                self.app.output_box.output(f'Warning: invalid analysis routine {filepath}\n', red=True)
+                continue                
+
+            if filetype == "CLASSIC":
+                routine = lyse.analysis.ClassicAnalysisRoutine(self.app, filepath, self.model, self.output_box_port, checked)
+            elif filetype == "GUI_V1.0":
+                self.app.output_box.output(f'Warning: new analysis routine detected {filepath}\n', green=True)
+                continue
+
             self.routines.append(routine)
         self.update_select_all_checkstate()
         
@@ -628,7 +535,7 @@ class RoutineBox(object):
         editor_args = self.exp_config.get('programs', 'text_editor_arguments')
         # Get the current labscript file:
         if not editor_path:
-            error_dialog("No editor specified in the labconfig.")
+            error_dialog(self.app, "No editor specified in the labconfig.")
         if '{file}' in editor_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             editor_args = [arg if arg != '{file}' else routine_filepath for arg in editor_args.split()]
@@ -638,7 +545,7 @@ class RoutineBox(object):
         try:
             subprocess.Popen([editor_path] + editor_args)
         except Exception as e:
-            error_dialog("Unable to launch text editor specified in %s. Error was: %s" %
+            error_dialog(self.app, "Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
                          
     def on_remove_selection(self):
@@ -649,7 +556,7 @@ class RoutineBox(object):
         selected_rows = set(index.row() for index in selected_indexes)
         if not selected_rows:
             return
-        if confirm and not question_dialog("Remove %d routines?" % len(selected_rows)):
+        if confirm and not question_dialog(self.app, "Remove %d routines?" % len(selected_rows)):
             return
         name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
         filepaths = [item.data(self.ROLE_FULLPATH) for item in name_items]
@@ -1180,8 +1087,9 @@ class DataFrameModel(QtCore.QObject):
     
     columns_changed = Signal()
 
-    def __init__(self, view, exp_config):
+    def __init__(self, app, view, exp_config):
         QtCore.QObject.__init__(self)
+        self.app = app
         self._view = view
         self.exp_config = exp_config
         self._model = UneditableModel()
@@ -1261,7 +1169,7 @@ class DataFrameModel(QtCore.QObject):
         selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
         if not selected_name_items:
             return
-        if confirm and not question_dialog("Remove %d shots?" % len(selected_name_items)):
+        if confirm and not question_dialog(self.app, "Remove %d shots?" % len(selected_name_items)):
             return
         # Remove from DataFrame first:
         self.dataframe = self.dataframe.drop(index.row() for index in selected_indexes)
@@ -1306,7 +1214,7 @@ class DataFrameModel(QtCore.QObject):
         viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
         # Get the current labscript file:
         if not viewer_path:
-            error_dialog("No hdf5 viewer specified in the labconfig.")
+            error_dialog(self.app, "No hdf5 viewer specified in the labconfig.")
         if '{file}' in viewer_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             viewer_args = [arg if arg != '{file}' else shot_filepath for arg in viewer_args.split()]
@@ -1316,7 +1224,7 @@ class DataFrameModel(QtCore.QObject):
         try:
             subprocess.Popen([viewer_path] + viewer_args)
         except Exception as e:
-            error_dialog("Unable to launch hdf5 viewer specified in %s. Error was: %s" %
+            error_dialog(self.app, "Unable to launch hdf5 viewer specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
         
     def set_columns_visible(self, columns_visible):
@@ -1366,7 +1274,7 @@ class DataFrameModel(QtCore.QObject):
         status_item.setData(100, self.ROLE_STATUS_PERCENT)
         status_item.setToolTip("Shot has been deleted off disk or is unreadable")
         status_item.setIcon(QtGui.QIcon(':qtutils/fugue/drive--minus'))
-        app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
+        self.app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
     def infer_objects(self):
@@ -1581,7 +1489,7 @@ class DataFrameModel(QtCore.QObject):
         # Check for duplicates:
         for filepath in filepaths:
             if filepath in self.row_number_by_filepath or filepath in to_add:
-                app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
+                self.app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
                 if new_row_data is not None:
                     df_row_index = np.where(new_row_data['filepath'].values == filepath)
                     new_row_data = new_row_data.drop(df_row_index[0])
@@ -1596,7 +1504,7 @@ class DataFrameModel(QtCore.QObject):
             self.dataframe = concat_with_padding(self.dataframe, new_row_data)
             self.update_column_levels()
 
-        app.filebox.set_add_shots_progress(None, None, "updating filebox")
+        self.app.filebox.set_add_shots_progress(None, None, "updating filebox")
 
         for filepath in to_add:
             # Add the new rows to the Qt model:
@@ -1611,7 +1519,7 @@ class DataFrameModel(QtCore.QObject):
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
 
-        app.filebox.set_add_shots_progress(None, None, None)        
+        self.app.filebox.set_add_shots_progress(None, None, None)        
             
 
     @inmain_decorator()
@@ -1627,8 +1535,9 @@ class DataFrameModel(QtCore.QObject):
         
 class FileBox(object):
 
-    def __init__(self, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
+    def __init__(self, app, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
 
+        self.app = app
         self.exp_config = exp_config
         self.to_singleshot = to_singleshot
         self.to_multishot = to_multishot
@@ -1643,7 +1552,7 @@ class FileBox(object):
         self.ui = loader.load(os.path.join(LYSE_DIR, 'filebox.ui'))
         self.ui.progressBar_add_shots.hide()
         container.addWidget(self.ui)
-        self.shots_model = DataFrameModel(self.ui.tableView, self.exp_config)
+        self.shots_model = DataFrameModel(self.app, self.ui.tableView, self.exp_config)
         set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
         self.edit_columns_dialog = EditColumns(self, self.shots_model.column_names, self.shots_model.columns_visible)
 
@@ -1802,7 +1711,7 @@ class FileBox(object):
                         dataframe = get_dataframe_from_shot(filepath)
                         dataframes.append(dataframe)
                     except IOError:
-                        app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
+                        self.app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
                         indices_of_files_not_found.append(i)
                     n_shots_added += 1
                     shots_remaining = self.incoming_queue.qsize()
@@ -1937,15 +1846,19 @@ class Lyse(object):
     def __init__(self):
         splash.update_text('loading graphical interface')
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow())
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow(self))
+
+        self.process_tree = ProcessTree.instance()
+
+        # Set a meaningful name for zlock client id:
+        self.process_tree.zlock_client.set_process_name('lyse')
 
         self.connect_signals()
 
         self.setup_config()
         self.port = int(self.exp_config.get('ports', 'lyse'))
 
-        # The singleshot routinebox will be connected to the filebox
-        # by queues:
+        # The singleshot routinebox will be connected to the filebox by queues:
         to_singleshot = queue.Queue()
         from_singleshot = queue.Queue()
 
@@ -1954,11 +1867,12 @@ class Lyse(object):
         from_multishot = queue.Queue()
 
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
-        self.singleshot_routinebox = RoutineBox(self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
+        self.singleshot_routinebox = RoutineBox(self, self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
                                                 self, to_singleshot, from_singleshot, self.output_box.port)
-        self.multishot_routinebox = RoutineBox(self.ui.verticalLayout_multishot_routinebox, self.exp_config,
+        
+        self.multishot_routinebox = RoutineBox(self, self.ui.verticalLayout_multishot_routinebox, self.exp_config,
                                                self, to_multishot, from_multishot, self.output_box.port, multishot=True)
-        self.filebox = FileBox(self.ui.verticalLayout_filebox, self.exp_config,
+        self.filebox = FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
 
         self.last_save_config_file = None
@@ -2066,7 +1980,7 @@ class Lyse(object):
             elif reply == QtWidgets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
-            error_dialog('no changes to revert')
+            error_dialog(self, 'no changes to revert')
 
     def on_save_configuration_as_triggered(self):
         if self.last_save_config_file is not None:
@@ -2259,7 +2173,7 @@ class Lyse(object):
                         sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
-            error_dialog('Dataframe is empty')
+            error_dialog(self, 'Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
         default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')
@@ -2331,16 +2245,21 @@ if __name__ == "__main__":
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
+
     app = Lyse()
+
+    # Move all of the following into Lyse()
 
     # Start the web server:
     splash.update_text('starting analysis server')
-    server = WebServer(app.port)
+    server = WebServer(app, app.port)
     splash.update_text('done')
+
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
     timer.start(500)
     timer.timeout.connect(lambda: None)  # Let the interpreter run each 500 ms.
+
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     

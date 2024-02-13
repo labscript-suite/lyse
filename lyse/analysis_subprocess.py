@@ -392,9 +392,10 @@ class LyseWorkerWindow(QtWidgets.QWidget):
         event.ignore()
 
 class LyseWorker():
-    def __init__(self, filepath, to_parent, from_parent):
+    def __init__(self, filepath, to_parent, from_parent, qapplication):
         self.to_parent = to_parent
         self.from_parent = from_parent
+        self.qapplication = qapplication
         self.title = f"Lyse analysis worker {os.path.basename(filepath)}"
 
         loader = UiLoader()
@@ -432,7 +433,7 @@ class LyseWorker():
             task, data = self.from_parent.get()
             with kill_lock:
                 if task == 'quit':
-                    inmain(qapplication.quit)
+                    inmain(self.qapplication.quit)
                 elif task == 'analyse':
                     self._show()
                     path = data
@@ -445,6 +446,50 @@ class LyseWorker():
                         self.to_parent.put(['error', lyse._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
+
+def get_analysis_type(filepath):
+    """
+    returns: filetype, filepath
+
+    filepath: the path to the script to be executed.
+    
+    filetype: type of analysis script that is provided.
+
+    current supported types are:
+        ["OLD", "GUI_1.0"]
+    
+    anything else will return "INVALID"
+    """
+    
+    filetype = "INVALID"
+
+    # check extension, currently .py files are assumed to be old-style
+    if os.path.splitext(filepath) == ".py" and os.path.isfile(filepath):
+        filetype = "OLD"
+    elif os.path.isdir(filepath):
+        # We have been passed a directory, which marks a new-style analysis.
+        # Inside we expect to find a python file called "worker.py"
+        filepath = os.path.join(filepath, "worker.py")
+
+        # If the file exists introspect to see if it defines a new type class
+        if os.path.isfile(filepath):
+            initial_locals = {}
+
+            with open(filepath) as f:
+                code = compile(
+                    f.read(),
+                    filepath,
+                    'exec',
+                    dont_inherit=True,
+                )
+                exec(code, {}, initial_locals)
+
+            # See how many valid classes are present
+            options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
+            if len(options) == 1:
+                filetype = "GUI_1.0"
+
+    return filetype, filepath
 
 if __name__ == '__main__':
 
@@ -468,46 +513,38 @@ if __name__ == '__main__':
     kill_lock = process_tree.kill_lock
     filepath = from_parent.get()
 
-    # Rename this module to _analysis_subprocess and put it in sys.modules
-    # under that name. The user's analysis routine will become the __main__ module
-    # '_analysis_subprocess'.
-    __name__ = '_analysis_subprocess'
-
-    sys.modules[__name__] = sys.modules['__main__']
-
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
-    # Learn how to introspect what the child process did.
+    # Introspect type of analysis
+    filetype, filepath = get_analysis_type(filepath)
 
-    # Actually run the user's analysis!
+    if filetype == "INVALID":
+        # invalid analysis.
+        msg = f'invalid file path {filepath}'
+        to_parent.put(['error', msg])
+        raise ValueError(msg)
 
-    initial_globals = {}
-    initial_locals = {}
 
-    with open(filepath) as f:
-        code = compile(
-            f.read(),
-            filepath,
-            'exec',
-            dont_inherit=True,
-        )
-        exec(code, initial_globals, initial_locals)
-
-    # These are the potential classes that have been introduced.
-    options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
-    if len(options) != 1:
-        raise ValueError(f"Script {filepath} contaions {len(options)} valid analysis classes.  Only 1 is allowed.")
-
-    # Great!  We have a way of defining the user supplied object :)  Not so sure about the module reload stuff.  That is TBD.
-
-    print(options)
+    to_parent.put(['starting', ''])
 
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
 
-    worker = LyseWorker(filepath, to_parent, from_parent)
+    if filetype == "OLD":
+        # Rename this module to _analysis_subprocess and put it in sys.modules
+        # under that name. The user's analysis routine will become the __main__ module
+        # '_analysis_subprocess'.
+        __name__ = '_analysis_subprocess'
+
+        sys.modules[__name__] = sys.modules['__main__']
+
+        worker = LyseWorker(filepath, to_parent, from_parent, qapplication)
+
+    elif filetype == "GUI_1.0":
+        pass
 
     qapplication.exec_()
+
         
