@@ -447,50 +447,6 @@ class LyseWorker():
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
 
-def get_analysis_type(filepath):
-    """
-    returns: filetype, filepath
-
-    filepath: the path to the script to be executed.
-    
-    filetype: type of analysis script that is provided.
-
-    current supported types are:
-        ["OLD", "GUI_1.0"]
-    
-    anything else will return "INVALID"
-    """
-    
-    filetype = "INVALID"
-
-    # check extension, currently .py files are assumed to be old-style
-    if os.path.splitext(filepath) == ".py" and os.path.isfile(filepath):
-        filetype = "OLD"
-    elif os.path.isdir(filepath):
-        # We have been passed a directory, which marks a new-style analysis.
-        # Inside we expect to find a python file called "worker.py"
-        filepath = os.path.join(filepath, "worker.py")
-
-        # If the file exists introspect to see if it defines a new type class
-        if os.path.isfile(filepath):
-            initial_locals = {}
-
-            with open(filepath) as f:
-                code = compile(
-                    f.read(),
-                    filepath,
-                    'exec',
-                    dont_inherit=True,
-                )
-                exec(code, {}, initial_locals)
-
-            # See how many valid classes are present
-            options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
-            if len(options) == 1:
-                filetype = "GUI_1.0"
-
-    return filetype, filepath
-
 if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
@@ -524,7 +480,6 @@ if __name__ == '__main__':
         msg = f'invalid file path {filepath}'
         to_parent.put(['error', msg])
         raise ValueError(msg)
-
 
     to_parent.put(['starting', ''])
 
