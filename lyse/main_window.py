@@ -36,8 +36,9 @@ from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
-from lyse import LYSE_DIR, _rangeindex_to_multiindex
+import qtutils.icons
 
+from lyse import LYSE_DIR, _rangeindex_to_multiindex
 import lyse.analysis
 import lyse.ui_helpers
 
@@ -946,7 +947,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
     EXTRA_ROW_HEIGHT = 2
 
     def __init__(self, app, view, model, col_status, role_status_percent):
-        self.app = app,
+        self.app = app
         self.view = view
         self.model = model
         self.COL_STATUS = col_status
@@ -988,7 +989,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 progress_bar_option.text = '%d%%' % status_percent
 
                 # Draw the progress bar onto the view.
-                qapplication.style().drawControl(QtWidgets.QStyle.CE_ProgressBar, progress_bar_option, painter)
+                self.app.qapplication.style().drawControl(QtWidgets.QStyle.CE_ProgressBar, progress_bar_option, painter)
         else:
             return QtWidgets.QStyledItemDelegate.paint(self, painter, option, index)
 
