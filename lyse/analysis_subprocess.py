@@ -22,20 +22,23 @@ import time
 import queue
 import inspect
 from types import ModuleType
+import multiprocessing
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
-from labscript_utils.qtwidgets.outputbox import OutputBox
 import qtutils.icons
 
-import multiprocessing
+from labscript_utils.qtwidgets.outputbox import OutputBox
+from labscript_utils.modulewatcher import ModuleWatcher
+import lyse
 
 # Associate app windows with OS menu shortcuts:
 import desktop_app
 desktop_app.set_process_appid('lyse')
+
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
 if (
@@ -52,7 +55,7 @@ class Plot(object):
         tabWidget_canvas.addTab(self.tab, f"Figure {identifier}") 
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), self.tab)
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.tab)
 
         # figure.tight_layout()
         self.figure = figure
@@ -398,7 +401,7 @@ class LyseWorker():
         self.title = f"Lyse analysis worker {os.path.basename(filepath)}"
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow())
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow())
         self.ui.setWindowTitle(self.title)
         
         self.ui.output_box = OutputBox(self.ui.verticalLayout_outputbox)
@@ -432,7 +435,7 @@ class LyseWorker():
             task, data = self.from_parent.get()
             with kill_lock:
                 if task == 'quit':
-                    inmain(self.qapplication.quit)
+                    self.qapplication.quit()
                 elif task == 'analyse':
                     self._show()
                     path = data
@@ -446,28 +449,10 @@ class LyseWorker():
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
 
-
-class QApplicationSafe(QtWidgets.QApplication):
-    """
-    Disable closing from control q 
-    """
-    
-    def event(self, event):
-        # Ignore control/command + q close app keyboard shortcut
-        if event.type() == QtCore.QEvent.Close:
-            print("Got Close")
-            event.ignore()
-            return False
-        
-        return super().event(event)
-
-
 if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
 
-    import lyse
-    from lyse import LYSE_DIR
     lyse.spinning_top = True
     import lyse.figure_manager
     lyse.figure_manager.install()
@@ -475,8 +460,6 @@ if __name__ == '__main__':
     from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
     import pylab
     import labscript_utils.h5_lock, h5py
-
-    from labscript_utils.modulewatcher import ModuleWatcher
 
     process_tree = ProcessTree.connect_to_parent()
     to_parent = process_tree.to_parent
@@ -487,9 +470,9 @@ if __name__ == '__main__':
     # Set a meaningful client id for zlock
     process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
 
-    qapplication = QApplicationSafe.instance()
+    qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
-        qapplication = QApplicationSafe(sys.argv)
+        qapplication = QtWidgets.QApplication(sys.argv)
 
     # Rename this module to _analysis_subprocess and put it in sys.modules
     # under that name. The user's analysis routine will become the __main__ module
