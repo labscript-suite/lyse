@@ -28,6 +28,7 @@ from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
+
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
@@ -49,11 +50,20 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
-def mdiArea_addWindow(mdiArea, widget, title):
+def mdiArea_addWindow(mdiArea, widget, title, maximize=False):
     sub = QtWidgets.QMdiSubWindow()
     sub.setWidget(widget)
     sub.setWindowTitle(title)
     mdiArea.addSubWindow(sub)
+
+    # Remove the close window
+    sub.setWindowFlags(
+        QtCore.WindowMinimizeButtonHint | QtCore.WindowMaximizeButtonHint
+        ) # maybe I also need WindowType
+
+    if maximize:
+        sub.showMaximized()
+
     sub.show()
 
 class Plot(object):
@@ -61,7 +71,7 @@ class Plot(object):
         self.identifier = identifier
 
         self.tab = QtWidgets.QWidget()
-        mdiArea_addWindow(mdiArea_canvas, self.tab, f"Figure {identifier}")
+        mdiArea_addWindow(mdiArea_canvas, self.tab, f"Figure {identifier}", maximize=True)
 
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.tab)
