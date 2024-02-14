@@ -1123,7 +1123,7 @@ class Run(Shot):
             compatible). 'Run' will be removed in lyse v4.0. Please update your 
             analysis code to use the 'Shot' class.
             """
-        warnings.warn(dedent(msg), DeprecationWarning)
+        warnings.warn(dedent(msg), FutureWarning)
         super().__init__(*args, **kwargs)
 
     def globals_diff(self, other_run, group=None):
@@ -1179,7 +1179,7 @@ class Sequence(Shot):
             removed in lyse v4.0. Please update your analysis code to use the 'shots'
             attribute.
             """
-        warnings.warn(dedent(msg), DeprecationWarning)
+        warnings.warn(dedent(msg), FutureWarning)
         return copy.copy(self.__shots)
 
     @property
