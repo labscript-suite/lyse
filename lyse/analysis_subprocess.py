@@ -49,12 +49,19 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
+def mdiArea_addWindow(mdiArea, widget, title):
+    sub = QtWidgets.QMdiSubWindow()
+    sub.setWidget(widget)
+    sub.setWindowTitle(title)
+    mdiArea.addSubWindow(sub)
+    sub.show()
+
 class Plot(object):
-    def __init__(self, figure, identifier, tabWidget_canvas):
+    def __init__(self, figure, identifier, mdiArea_canvas):
         self.identifier = identifier
 
         self.tab = QtWidgets.QWidget()
-        tabWidget_canvas.addTab(self.tab, f"Figure {identifier}") 
+        mdiArea_addWindow(mdiArea_canvas, self.tab, f"Figure {identifier}")
 
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.tab)
@@ -217,12 +224,12 @@ class Plot(object):
 
 
 class AnalysisWorker(object):
-    def __init__(self, filepath, tabWidget_canvas):
+    def __init__(self, filepath, mdiArea_canvas):
         self.filepath = filepath
 
-        # This is a tab widget where all of the figures will go.
-        self.tabWidget_canvas = tabWidget_canvas
-        self.tabWidget_canvas.setMinimumHeight(256)
+        # This is a mdi Area where all of the figures will go.
+        self.mdiArea_canvas = mdiArea_canvas
+        self.mdiArea_canvas.setMinimumHeight(256)
 
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
@@ -365,7 +372,7 @@ class AnalysisWorker(object):
             if not issubclass(cls, Plot): 
                 raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
-            self.plots[fig] = cls(fig, identifier, self.filepath, self.tabWidget_canvas)
+            self.plots[fig] = cls(fig, identifier, self.filepath, self.mdiArea_canvas)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             message = """Failed to instantiate custom class for plot "{identifier}".
@@ -378,7 +385,7 @@ class AnalysisWorker(object):
             sys.stderr.write(message)
 
             # instantiate plot using original Base class so that we always get a plot
-            self.plots[fig] = Plot(fig, identifier, self.tabWidget_canvas)
+            self.plots[fig] = Plot(fig, identifier, self.mdiArea_canvas)
 
         return self.plots[fig]
 
@@ -423,14 +430,15 @@ class LyseWorker():
         self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow(self))
         self.ui.setWindowTitle(self.title)
         
-        # Create an output box
+        # Create a hidden output box
         self.ui.output_box = OutputBox(self.ui.splitter_bottom)
         self._splitter_sizes = self.ui.splitter_bottom.sizes()
+        self.ui.output_box.output_textedit.hide()
 
         # Connect signals
         self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
 
-        self.worker = AnalysisWorker(self.filepath, self.ui.tabWidget_canvas)
+        self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
 
         # Setup for output capturing
         sys.stdout = self.ui.output_box
