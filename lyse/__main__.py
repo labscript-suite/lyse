@@ -1,3 +1,5 @@
+"""Lyse GUI and supporting code
+"""
 import os
 import labscript_utils.excepthook
 
@@ -20,6 +22,7 @@ import subprocess
 import time
 import traceback
 import queue
+import warnings
 
 # 3rd party imports:
 splash.update_text('importing numpy')
@@ -39,6 +42,7 @@ from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 from labscript_utils.qtwidgets.outputbox import OutputBox
 import labscript_utils.shared_drive as shared_drive
+from labscript_utils import dedent
 
 from lyse.dataframe_utilities import (concat_with_padding,
                                       get_dataframe_from_shot,
@@ -188,14 +192,18 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
     @inmain_decorator(wait_for_return=True)
+    def _copy_dataframe(self):
+        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        return df
+
     def _retrieve_dataframe(self):
         # infer_objects() picks fixed datatypes for columns that are compatible with
         # fixed datatypes, dramatically speeding up pickling. It is called here
         # rather than when updating the dataframe as calling it during updating may
         # call it needlessly often, whereas it only needs to be called prior to
         # sending the dataframe to a client requesting it, as we're doing now.
-        app.filebox.shots_model.infer_objects()
-        df = app.filebox.shots_model.dataframe.copy(deep=True)
+        df = self._copy_dataframe()
+        df.infer_objects()
         return df
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
@@ -1095,7 +1103,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 progress_bar_option.textVisible = True
 
                 # Set the progress and text values of the style option.
-                progress_bar_option.progress = status_percent
+                progress_bar_option.progress = int(status_percent)
                 progress_bar_option.text = '%d%%' % status_percent
 
                 # Draw the progress bar onto the view.
@@ -1602,6 +1610,8 @@ class DataFrameModel(QtCore.QObject):
         # Update the Qt model:
         for filepath in to_add:
             self.update_row(filepath, dataframe_already_updated=True)
+
+        app.filebox.set_add_shots_progress(None, None, None)        
             
 
     @inmain_decorator()
@@ -1961,6 +1971,7 @@ class Lyse(object):
         self.ui.actionSave_dataframe_as.triggered.connect(lambda: self.on_save_dataframe_triggered(True))
         self.ui.actionSave_dataframe.triggered.connect(lambda: self.on_save_dataframe_triggered(False))
         self.ui.actionLoad_dataframe.triggered.connect(self.on_load_dataframe_triggered)
+        self.ui.actionQuit.triggered.connect(self.ui.close)
 
         self.ui.resize(1600, 900)
 
@@ -2243,23 +2254,23 @@ class Lyse(object):
             for sequence in sequences:
                 sequence_df = pandas.DataFrame(df[df['sequence'] == sequence], columns=df.columns).dropna(axis=1, how='all')
                 labscript = sequence_df['labscript'].iloc[0]
-                filename = "dataframe_{}_{}.msg".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
+                filename = "dataframe_{}_{}.pkl".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
                 sequence_df.infer_objects()
                 for col in sequence_df.columns :
                     if sequence_df[col].dtype == object:
                         sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
-                sequence_df.to_msgpack(os.path.join(save_path, filename))
+                sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
             error_dialog('Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
-        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.msg')
+        default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                         'Select dataframe file to load',
                         default,
-                        "dataframe files (*.msg)")
+                        "dataframe files (*.pkl *.msg)")
         if type(file) is tuple:
             file, _ = file
         if not file:
@@ -2268,7 +2279,22 @@ class Lyse(object):
         # Convert to standard platform specific path, otherwise Qt likes
         # forward slashes:
         file = os.path.abspath(file)
-        df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+        if file.endswith('.msg'):
+            # try to read msgpack in case using older pandas
+            try:
+                df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                # raise a deprecation warning if this succeeds
+                msg = """msgpack support is being dropped by pandas >= 1.0.0.
+                Please resave this dataframe to use the new format."""
+                warnings.warn(dedent(msg),DeprecationWarning)
+            except AttributeError as err:
+                # using newer pandas that can't read msg
+                msg = """msgpack is no longer supported by pandas.
+                To read this dataframe, you must downgrade pandas to < 1.0.0.
+                You can then read this dataframe and resave it with the new format."""
+                raise DeprecationWarning(dedent(msg)) from err
+        else:
+            df = pandas.read_pickle(file).sort_values("run time").reset_index()
                 
         # Check for changes in the shot files since the dataframe was exported
         def changed_since(filepath, time):
@@ -2279,7 +2305,7 @@ class Lyse(object):
 
         filepaths = df["filepath"].tolist()
         changetime_cache = os.path.getmtime(file)
-        need_updating = np.where(map(lambda x: changed_since(x, changetime_cache), filepaths))[0]
+        need_updating = np.where(list(map(lambda x: changed_since(x, changetime_cache), filepaths)))[0]
         need_updating = np.sort(need_updating)[::-1]  # sort in descending order to not remove the wrong items with pop
 
         # Reload the files where changes where made since exporting
