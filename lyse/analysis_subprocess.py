@@ -50,31 +50,34 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
-def mdiArea_addWindow(mdiArea, widget, title, maximize=False):
+def mdiArea_addWindow(mdiArea, widget):
     sub = QtWidgets.QMdiSubWindow()
     sub.setWidget(widget)
-    sub.setWindowTitle(title)
     mdiArea.addSubWindow(sub)
 
-    # Remove the close window
+    # Remove the close button
     sub.setWindowFlags(
-        QtCore.WindowMinimizeButtonHint | QtCore.WindowMaximizeButtonHint
-        ) # maybe I also need WindowType
+       QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
+       ) # IBS: maybe I also need Qt.WindowType. in the future?
 
-    if maximize:
-        sub.showMaximized()
-
+    # Maximize the first subwindow
+    # if len(mdiArea.subWindowList()) == 1:
+    #     sub.showMaximized()
+    
     sub.show()
+    mdiArea.tileSubWindows()
 
 class Plot(object):
     def __init__(self, figure, identifier, mdiArea_canvas):
         self.identifier = identifier
 
         self.tab = QtWidgets.QWidget()
-        mdiArea_addWindow(mdiArea_canvas, self.tab, f"Figure {identifier}", maximize=True)
+        mdiArea_addWindow(mdiArea_canvas, self.tab)
 
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.tab)
+
+        self.set_window_title(self.identifier)
 
         # figure.tight_layout()
         self.figure = figure
@@ -139,8 +142,8 @@ class Plot(object):
                 continue
 
     @inmain_decorator()
-    def set_window_title(self, identifier, filepath):
-        self.ui.setWindowTitle(str(identifier) + ' - ' + os.path.basename(filepath))
+    def set_window_title(self, identifier):
+        self.ui.setWindowTitle(str(identifier))
 
     @inmain_decorator()
     def update_window_size(self):
@@ -318,14 +321,16 @@ class AnalysisWorker(object):
     def post_analysis_plot_actions(self):
         # reset the current figure to figure 1:
         lyse.figure_manager.figuremanager.set_first_figure_current()
-        # Introspect the figures that were produced:
-        for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+
+        # Introspect the figures that were produced
+        # Reversed since this seems to draw the windows in the right order
+        for identifier, fig in reversed(lyse.figure_manager.figuremanager.figs.items()):
             window_state = None
             if not fig.axes:
                 # Try and clear the figure if it is not in use
                 try:
                     plot = self.plots[fig]
-                    plot.set_window_title("Empty", self.filepath)
+                    plot.set_window_title("Empty")
                     plot.draw()
                     plot.analysis_complete(figure_in_use=False)
                 except KeyError:
@@ -365,7 +370,7 @@ class AnalysisWorker(object):
                 if not plot.is_shown:
                     plot.show()
                     plot.update_window_size()
-                plot.set_window_title(identifier, self.filepath)
+                plot.set_window_title(identifier)
                 if plot.lock_axes:
                     plot.restore_axis_limits()
                 plot.draw()
@@ -375,14 +380,15 @@ class AnalysisWorker(object):
     def new_figure(self, fig, identifier):
         try:
             # Get custom class for this plot if it is registered
-            cls = lyse.get_plot_class(identifier)
+            cls = lyse.get_plot_class(identifier) # IBS: register_plot_class is not used anywhere.
+
             # If no plot was registered, use the base class
             if cls is None: cls = Plot
             # if cls is not a subclass of Plot, then raise an Exception
             if not issubclass(cls, Plot): 
                 raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
-            self.plots[fig] = cls(fig, identifier, self.filepath, self.mdiArea_canvas)
+            self.plots[fig] = cls(fig, identifier, self.mdiArea_canvas)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             message = """Failed to instantiate custom class for plot "{identifier}".
