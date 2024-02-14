@@ -18,80 +18,71 @@
     <normaloff>:/qtutils/custom/lyse.png</normaloff>:/qtutils/custom/lyse.png</iconset>
   </property>
   <property name="styleSheet">
-   <string notr="true">QPushButton {
-     border: none;
-     padding: 4px;
- }
-
-QPushButton:hover {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
- QPushButton:pressed {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QPushButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QPushButton:hover:checked {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton {
-     border: none;
-     padding: 2px;
- }
-
-QToolButton:hover {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
- QToolButton:pressed {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton:hover:checked {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QGroupBox
-{
-    font-weight: bold;
-}</string>
+   <string notr="true"/>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>1</number>
+   </property>
+   <property name="leftMargin">
+    <number>1</number>
+   </property>
+   <property name="topMargin">
+    <number>1</number>
+   </property>
+   <property name="rightMargin">
+    <number>1</number>
+   </property>
+   <property name="bottomMargin">
+    <number>1</number>
+   </property>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>26</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QToolButton" name="button_show_terminal">
+       <property name="toolTip">
+        <string>Show terminal output from the worker process(es)</string>
+       </property>
+       <property name="text">
+        <string>...</string>
+       </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>:/qtutils/fugue/terminal.png</normaloff>:/qtutils/fugue/terminal.png</iconset>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
    <item>
     <widget class="QSplitter" name="splitter_bottom">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="MinimumExpanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="orientation">
       <enum>Qt::Vertical</enum>
+     </property>
+     <property name="childrenCollapsible">
+      <bool>false</bool>
      </property>
      <widget class="QTabWidget" name="tabWidget_canvas">
       <property name="sizePolicy">
@@ -103,13 +94,6 @@ QGroupBox
       <property name="currentIndex">
        <number>-1</number>
       </property>
-     </widget>
-     <widget class="QWidget" name="">
-      <layout class="QVBoxLayout" name="verticalLayout_outputbox">
-       <property name="sizeConstraint">
-        <enum>QLayout::SetDefaultConstraint</enum>
-       </property>
-      </layout>
      </widget>
     </widget>
    </item>

@@ -423,7 +423,12 @@ class LyseWorker():
         self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow(self))
         self.ui.setWindowTitle(self.title)
         
-        self.ui.output_box = OutputBox(self.ui.verticalLayout_outputbox)
+        # Create an output box
+        self.ui.output_box = OutputBox(self.ui.splitter_bottom)
+        self._splitter_sizes = self.ui.splitter_bottom.sizes()
+
+        # Connect signals
+        self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
 
         self.worker = AnalysisWorker(self.filepath, self.ui.tabWidget_canvas)
 
@@ -485,9 +490,15 @@ class LyseWorker():
         save_data['window_pos'] = (window_pos.x(), window_pos.y())
 
         save_data['screen_geometry'] = lyse.ui_helpers.get_screen_geometry(self.qapplication)
-        # save_data['splitter'] = self.ui.splitter.sizes()
-        save_data['splitter_bottom'] = self.ui.splitter_bottom.sizes()
-        
+
+        save_data['button_show_terminal'] = self.ui.button_show_terminal.isChecked()
+
+        # If the terminal is hidden use the cached size
+        if self.ui.button_show_terminal.isChecked():
+            save_data['splitter_bottom'] = self.ui.splitter_bottom.sizes()
+        else:
+            save_data['splitter_bottom'] = self._splitter_sizes
+
         return save_data
 
     def save_configuration(self):
@@ -519,7 +530,22 @@ class LyseWorker():
                 self.ui.move(*save_data['window_pos'])
 
             if 'splitter_bottom' in save_data:
-                self.ui.splitter_bottom.setSizes(save_data['splitter_bottom'])
+                self._splitter_sizes = save_data['splitter_bottom']
+                self.ui.splitter_bottom.setSizes(self._splitter_sizes)
+
+        self.set_terminal_visible(save_data.get('button_show_terminal', False))    
+
+    def set_terminal_visible(self, visible):
+        if visible:
+            self.ui.output_box.output_textedit.show()
+        else:
+            # Store this because we want to remember the splitter position when the terminal is hidden
+            self._splitter_sizes = self.ui.splitter_bottom.sizes()
+
+            self.ui.output_box.output_textedit.hide()
+
+
+        self.ui.button_show_terminal.setChecked(visible)    
 
 if __name__ == '__main__':
 
