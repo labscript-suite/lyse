@@ -1118,6 +1118,11 @@ class Shot(object):
 
 
 class Run(Shot):
+    """Deprecated class for interacting with a shot's hdf5 file.
+    
+    This class will be removed in lyse v4.0.
+    Please update your analysis code to use the :class:`Shot` class.
+    """
     def __init__(self, *args, **kwargs):
         msg = """The 'Run' class has been renamed to 'Shot' (but is otherwise 
             compatible). 'Run' will be removed in lyse v4.0. Please update your 
