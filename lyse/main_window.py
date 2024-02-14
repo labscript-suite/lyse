@@ -174,7 +174,7 @@ class WebServer(ZMQServer):
         super().__init__(*args, **kwargs)
 
     def handler(self, request_data):
-        app.logger.info('WebServer request: %s' % str(request_data))
+        self.app.logger.info('WebServer request: %s' % str(request_data))
         if request_data == 'hello':
             return 'hello'
         elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:

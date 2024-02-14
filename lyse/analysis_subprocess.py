@@ -515,7 +515,8 @@ class LyseWorker():
 
     def load_configuration(self):
 
-        save_data = load_appconfig(self.save_config_file)[f'{self.title}_state']
+        save_data = load_appconfig(self.save_config_file)
+        save_data = save_data.get(f'{self.title}_state', {})
 
         if 'screen_geometry' not in save_data:
             return
@@ -559,6 +560,7 @@ if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
 
+    import lyse
     lyse.spinning_top = True
     import lyse.figure_manager
     lyse.figure_manager.install()
