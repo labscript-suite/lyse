@@ -52,7 +52,7 @@ if (
 
 class PlotWindow(QtWidgets.QMdiSubWindow):
     
-    WindowHints = QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
+    WindowHints = QtCore.Qt.Window | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -477,6 +477,8 @@ class LyseWorker():
 
         # Connect signals
         self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
+        self.ui.button_tile_subwindows.clicked.connect(self.tile_subwindows)
+
         self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
 
         self.load_configuration()
@@ -585,6 +587,26 @@ class LyseWorker():
         self.worker.set_window_state(save_data.get('plot_windows', {}))
 
         return save_data
+
+    def tile_subwindows(self, state):
+        """
+        Tile the subwindows 
+        
+        todo: remove the title bar is there is only one window.
+        """
+
+        # The following code should mark remove the title bar if there is one subwindow, but it does not.
+        subwindows = self.ui.mdiArea_canvas.subWindowList()
+        if len(subwindows) == 1:
+            hint = PlotWindow.WindowHints | QtCore.Qt.WindowTitleHint
+        else:
+            hint = PlotWindow.WindowHints
+
+        for sub in subwindows: 
+            sub.setWindowFlags(hint) 
+            sub.update()
+
+        self.ui.mdiArea_canvas.tileSubWindows()
 
     def set_terminal_visible(self, visible):
         if visible:
