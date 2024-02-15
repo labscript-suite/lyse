@@ -50,36 +50,41 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
-def mdiArea_addWindow(mdiArea, widget):
-    sub = QtWidgets.QMdiSubWindow()
-    sub.setWidget(widget)
-    mdiArea.addSubWindow(sub)
-
-    # Remove the close button
-    sub.setWindowFlags(
-       QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
-       ) # IBS: maybe I also need Qt.WindowType. in the future?
-
-    # Maximize the first subwindow
-    # if len(mdiArea.subWindowList()) == 1:
-    #     sub.showMaximized()
+class PlotWindow(QtWidgets.QMdiSubWindow):
     
-    sub.show()
-    mdiArea.tileSubWindows()
+    WindowHints = QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimumHeight(256)
+        self.setMinimumWidth(256)
+    
+    def closeEvent(self, event):
+        event.ignore()
+
+def mdiArea_addWindow(mdiArea, widget):
+    sub_window = PlotWindow()
+    sub_window.setWidget(widget)
+    mdiArea.addSubWindow(sub_window)
+    
+    sub_window.setWindowFlags(PlotWindow.WindowHints) 
+    sub_window.show()    
+
+    return sub_window
 
 class Plot(object):
     def __init__(self, figure, identifier, mdiArea_canvas):
         self.identifier = identifier
 
-        self.tab = QtWidgets.QWidget()
-        mdiArea_addWindow(mdiArea_canvas, self.tab)
+        # Get the plot window ready
+        self.widget = QtWidgets.QWidget()
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.tab)
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.widget)
+        self.subwindow = mdiArea_addWindow(mdiArea_canvas, self.widget)
 
         self.set_window_title(self.identifier)
 
-        # figure.tight_layout()
         self.figure = figure
         self.canvas = figure.canvas
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
@@ -166,7 +171,7 @@ class Plot(object):
     def analysis_complete(self, figure_in_use):
         """To be overriden by subclasses. 
         Called as part of the post analysis plot actions"""
-        pass
+        pass        
 
     def get_window_state(self):
         """Called when the Plot window is about to be closed due to a change in 
@@ -184,8 +189,11 @@ class Plot(object):
         then update the returned dictionary with your additional information before 
         returning it from your method.
         """
+        window_size = self.subwindow.size()
+        window_pos = self.subwindow.pos()
         return {
-            'window_geometry': self.ui.saveGeometry(),
+            'window_size': (window_size.width(), window_size.height()),
+            'window_pos': (window_pos.x(), window_pos.y()),
             'axis_lock_state': self.lock_axes,
             'axis_limits': self.axis_limits,
         }
@@ -205,9 +213,12 @@ class Plot(object):
         Arguments:
             state: A dictionary of information to restore
         """
-        geometry = state.get('window_geometry', None)
-        if geometry is not None:
-            self.ui.restoreGeometry(geometry)
+
+        if 'window_size' in state:
+            self.subwindow.resize(*state['window_size'])
+
+        if 'window_pos' in state:
+            self.subwindow.move(*state['window_pos'])
 
         axis_limits = state.get('axis_limits', None)
         axis_lock_state = state.get('axis_lock_state', None)
@@ -255,8 +266,11 @@ class AnalysisWorker(object):
         self.routine_module_clean_dict = self.routine_module.__dict__.copy()
         sys.modules[self.routine_module.__name__] = self.routine_module
 
-        # Plot objects, keyed by matplotlib Figure object:
+        # Plot objects, keyed by matplotlib Figure object
         self.plots = {}
+
+        # State of each plot keyed by the window identifier NOT the figure object
+        self.window_state = {}
 
         # An object with a method to unload user modules if any have
         # changed on disk:
@@ -323,9 +337,9 @@ class AnalysisWorker(object):
         lyse.figure_manager.figuremanager.set_first_figure_current()
 
         # Introspect the figures that were produced
-        # Reversed since this seems to draw the windows in the right order
-        for identifier, fig in reversed(lyse.figure_manager.figuremanager.figs.items()):
-            window_state = None
+
+        for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
+            window_state = self.window_state.get(identifier, None)
             if not fig.axes:
                 # Try and clear the figure if it is not in use
                 try:
@@ -376,7 +390,6 @@ class AnalysisWorker(object):
                 plot.draw()
             plot.analysis_complete(figure_in_use=True)
 
-
     def new_figure(self, fig, identifier):
         try:
             # Get custom class for this plot if it is registered
@@ -407,6 +420,13 @@ class AnalysisWorker(object):
 
     def reset_figs(self):
         pass
+
+    def get_window_state(self):
+        return {plot.identifier:plot.get_window_state() for fig, plot in self.plots.items()}
+
+    def set_window_state(self, window_state):
+        self.window_state = window_state
+
 
 class LyseWorkerWindow(QtWidgets.QWidget):
 
@@ -451,21 +471,20 @@ class LyseWorker():
         self._splitter_sizes = self.ui.splitter_bottom.sizes()
         self.ui.output_box.output_textedit.hide()
 
-        # Connect signals
-        self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
-
-        self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
-
         # Setup for output capturing
         sys.stdout = self.ui.output_box
         sys.stderr = self.ui.output_box
+
+        # Connect signals
+        self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
+        self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
+
+        self.load_configuration()
 
         # Start the thread that listens for instructions from the parent process:
         self.parentloop_thread = threading.Thread(target=self.parentloop)
         self.parentloop_thread.daemon = True
         self.parentloop_thread.start()           
-
-        self.load_configuration()
 
         self.ui.output_box.write(f'{self.title} started.')
         self.ui.show()
@@ -523,6 +542,9 @@ class LyseWorker():
         else:
             save_data['splitter_bottom'] = self._splitter_sizes
 
+        # plot_windows information
+        save_data['plot_windows'] = self.worker.get_window_state()
+
         return save_data
 
     def save_configuration(self):
@@ -558,7 +580,11 @@ class LyseWorker():
                 self._splitter_sizes = save_data['splitter_bottom']
                 self.ui.splitter_bottom.setSizes(self._splitter_sizes)
 
-        self.set_terminal_visible(save_data.get('button_show_terminal', False))    
+        self.set_terminal_visible(save_data.get('button_show_terminal', False))
+
+        self.worker.set_window_state(save_data.get('plot_windows', {}))
+
+        return save_data
 
     def set_terminal_visible(self, visible):
         if visible:
