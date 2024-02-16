@@ -41,6 +41,7 @@ import qtutils.icons
 from lyse import LYSE_DIR, _rangeindex_to_multiindex
 import lyse.analysis
 import lyse.ui_helpers
+from lyse.gui_analysis_subprocess import PlotGUI
 
 @inmain_decorator()
 def error_dialog(app, message):
@@ -160,8 +161,8 @@ def get_analysis_type(filepath):
                 )
                 exec(code, {}, initial_locals)
 
-            # See how many valid classes are present
-            options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, lyse.Sequence)}
+            # See how many valid classes are present.
+            options = {k:v for k,v in initial_locals.items() if inspect.isclass(v) and issubclass(v, PlotGUI)}
             if len(options) == 1:
                 filetype = "GUI_1.0"
 

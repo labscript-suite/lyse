@@ -15,7 +15,7 @@ from lyse.ui_helpers import RoutineBoxData
 
 class ClassicAnalysisRoutine(object):
 
-    filepath_subprocess = 'analysis_subprocess.py'
+    filepath_subprocess = 'classic_analysis_subprocess.py'
 
     def __init__(self, app, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
         self.app = app # Reference to main lyse app
