@@ -52,22 +52,39 @@ if (
 
 class PlotWindow(QtWidgets.QMdiSubWindow):
     
-    WindowHints = QtCore.Qt.Window | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
+    WindowHints = QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setMinimumHeight(256)
         self.setMinimumWidth(256)
+        self.FrameState = True
     
     def closeEvent(self, event):
         event.ignore()
+
+    def setFrameState(self, state):
+        """
+        Enable / disable the frame
+        """
+
+        self.FrameState = bool(state)
+
+        if self.FrameState:
+            hint = self.WindowHints
+        else:
+            hint = self.WindowHints | QtCore.Qt.FramelessWindowHint
+
+        self.setWindowFlags(hint) 
+        self.update()
 
 def mdiArea_addWindow(mdiArea, widget):
     sub_window = PlotWindow()
     sub_window.setWidget(widget)
     mdiArea.addSubWindow(sub_window)
     
-    sub_window.setWindowFlags(PlotWindow.WindowHints) 
+    sub_window.setFrameState(True)
+    
     sub_window.show()    
 
     return sub_window
@@ -196,6 +213,7 @@ class Plot(object):
             'window_pos': (window_pos.x(), window_pos.y()),
             'axis_lock_state': self.lock_axes,
             'axis_limits': self.axis_limits,
+            'frame_state': self.subwindow.FrameState
         }
 
     def restore_window_state(self, state):
@@ -219,6 +237,9 @@ class Plot(object):
 
         if 'window_pos' in state:
             self.subwindow.move(*state['window_pos'])
+
+        if 'frame_state' in state:
+            self.subwindow.setFrameState(state['frame_state'])
 
         axis_limits = state.get('axis_limits', None)
         axis_lock_state = state.get('axis_lock_state', None)
@@ -478,6 +499,7 @@ class LyseWorker():
         # Connect signals
         self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
         self.ui.button_tile_subwindows.clicked.connect(self.tile_subwindows)
+        self.ui.button_cascade_subwindows.clicked.connect(self.cascade_subwindows)
 
         self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
 
@@ -588,23 +610,33 @@ class LyseWorker():
 
         return save_data
 
+    def cascade_subwindows(self, state):
+        """
+        Cascade the subwindows 
+        """
+
+        # Make sure the windows have frames.
+        subwindows = self.ui.mdiArea_canvas.subWindowList()
+
+        for sub in subwindows: 
+           sub.setFrameState(True) 
+
+        self.ui.mdiArea_canvas.cascadeSubWindows()
+
     def tile_subwindows(self, state):
         """
         Tile the subwindows 
         
-        todo: remove the title bar is there is only one window.
+        Remove the title bar is there is only one window.
         """
 
-        # The following code should mark remove the title bar if there is one subwindow, but it does not.
         subwindows = self.ui.mdiArea_canvas.subWindowList()
-        if len(subwindows) == 1:
-            hint = PlotWindow.WindowHints | QtCore.Qt.WindowTitleHint
-        else:
-            hint = PlotWindow.WindowHints
+
+        # The following code removes the title bar if there is one subwindow
+        FrameState = len(subwindows) != 1
 
         for sub in subwindows: 
-            sub.setWindowFlags(hint) 
-            sub.update()
+           sub.setFrameState(FrameState) 
 
         self.ui.mdiArea_canvas.tileSubWindows()
 
@@ -649,5 +681,3 @@ if __name__ == '__main__':
     worker = LyseWorker(process_tree, qapplication)
 
     qapplication.exec_()
-
-        
