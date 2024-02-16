@@ -60,11 +60,11 @@ Single shot analysis with global file opening
 
 	from lyse import *
 
-	# Instantiate Run object and open
+	# Instantiate Shot object and open
 	# Globally opening the shot keeps the h5 file open
 	# This prevents excessive opening and closing of the file
 	# which can slow down the analysis
-	with Run(path).open('r+') as shot:
+	with Shot(path).open('r+') as shot:
 
 		# Obtaining a trace:
 		t, mot_fluorecence = shot.get_trace('mot fluorecence')
