@@ -16,7 +16,6 @@
 from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
 from labscript_utils.dict_diff import dict_diff
 import os
-import socket
 import pickle as pickle
 from pathlib import Path
 import sys
