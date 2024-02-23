@@ -32,6 +32,7 @@ import h5py
 import pandas
 
 # Labscript imports
+import labscript_utils.excepthook
 from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
 import zprocess
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
@@ -1958,7 +1959,7 @@ class Lyse(object):
 
         # Start the web server:
         splash.update_text('starting analysis server')
-        self.server = WebServer(self.port)
+        self.server = WebServer(self,  self.port)
         splash.update_text('done')
 
         # The singleshot routinebox will be connected to the filebox

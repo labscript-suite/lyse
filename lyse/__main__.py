@@ -12,7 +12,6 @@
 #####################################################################
 
 import os
-import labscript_utils.excepthook
 
 # Associate app windows with OS menu shortcuts:
 import desktop_app
@@ -63,12 +62,6 @@ from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 
 import lyse.main
-
-process_tree = ProcessTree.instance()
-
-# Set a meaningful name for zlock client id:
-process_tree.zlock_client.set_process_name('lyse')
-
 
 if __name__ == "__main__":
 
