@@ -71,21 +71,13 @@ process_tree.zlock_client.set_process_name('lyse')
 
 
 if __name__ == "__main__":
-    logger = setup_logging('lyse')
-    labscript_utils.excepthook.set_logger(logger)
-    logger.info('\n\n===============starting===============\n')
 
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
 
-    app = lyse.main_window.Lyse(qapplication)
-
-    # Start the web server:
-    splash.update_text('starting analysis server')
-    server = WebServer(app.port)
-    splash.update_text('done')
+    app = lyse.main.Lyse(qapplication, splash)
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
@@ -98,4 +90,4 @@ if __name__ == "__main__":
     qapplication.exec_()
 
     # Shutdown the webserver.
-    server.shutdown()
+    app.server.shutdown()
