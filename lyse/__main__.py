@@ -11,66 +11,89 @@
 #                                                                   #
 #####################################################################
 
-import os
+def first_import():
+    """
+    This function just imports a bunch of modules.  This causes python to load and cache them so
+    they will loaded faster the next time.  We do this here so that we can monitor this with a splash
+    window
+    """
+    import os
 
-# Associate app windows with OS menu shortcuts:
-import desktop_app
-desktop_app.set_process_appid('lyse')
+    # Splash screen
+    from labscript_utils.splash import Splash
+    splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
+    splash.show()
 
-# Splash screen
-from labscript_utils.splash import Splash
-splash = Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
-splash.show()
+    splash.update_text('importing standard library modules')
+    # stdlib imports
+    import sys
+    import logging
+    import threading
+    import signal
+    import subprocess
+    import time
+    import traceback
+    import queue
+    import warnings
 
-splash.update_text('importing standard library modules')
-# stdlib imports
-import sys
-import logging
-import threading
-import signal
-import subprocess
-import time
-import traceback
-import queue
-import warnings
+    # 3rd party imports:
+    splash.update_text('importing numpy')
+    import numpy as np
+    splash.update_text('importing h5_lock and h5py')
+    import labscript_utils.h5_lock
+    import h5py
+    splash.update_text('importing pandas')
+    import pandas
 
-# 3rd party imports:
-splash.update_text('importing numpy')
-import numpy as np
-splash.update_text('importing h5_lock and h5py')
-import labscript_utils.h5_lock
-import h5py
-splash.update_text('importing pandas')
-import pandas
+    splash.update_text('importing labscript suite modules')
 
-splash.update_text('importing labscript suite modules')
+    from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
+    import zprocess
+    from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
+    from labscript_utils.setup_logging import setup_logging
+    from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
+    from labscript_utils.qtwidgets.outputbox import OutputBox
+    import labscript_utils.shared_drive as shared_drive
+    from labscript_utils import dedent
+    import labscript_utils.excepthook
 
-from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
-import zprocess
-from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
-from labscript_utils.setup_logging import setup_logging
-from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
-from labscript_utils.qtwidgets.outputbox import OutputBox
-import labscript_utils.shared_drive as shared_drive
-from labscript_utils import dedent
+    splash.update_text('importing qt modules')
 
-splash.update_text('importing qt modules')
+    from qtutils.qt import QtCore, QtGui, QtWidgets
+    from qtutils.qt.QtCore import pyqtSignal as Signal
+    from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
+    from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 
-from qtutils.qt import QtCore, QtGui, QtWidgets
-from qtutils.qt.QtCore import pyqtSignal as Signal
-from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
-from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
-
-import lyse.main
+    return splash
 
 if __name__ == "__main__":
+
+    # This is the first entry point into the program so we can open the splash 
+    # and import things for the first time
+    splash = first_import()
+
+    # stdlib imports
+    import sys
+    import signal
+
+    # qt imports
+    from qtutils.qt import QtCore, QtWidgets
+
+    import lyse.main
+
+    # Associate app windows with OS menu shortcuts:
+    import desktop_app
+    desktop_app.set_process_appid('lyse')
+
 
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
 
-    app = lyse.main.Lyse(qapplication, splash)
+    splash.update_text('starting GUI')
+    app = lyse.main.Lyse(qapplication)
+    splash.hide()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
@@ -79,7 +102,6 @@ if __name__ == "__main__":
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
-    splash.hide()
     qapplication.exec_()
 
     # Shutdown the webserver.

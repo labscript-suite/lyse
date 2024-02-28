@@ -244,39 +244,6 @@ class WebServer(ZMQServer):
         return df_subset
 
 
-class LyseMainWindow(QtWidgets.QMainWindow):
-    # A signal to show that the window is shown and painted.
-    firstPaint = Signal()
-
-    def __init__(self, app, *args, **kwargs):
-        self.app = app
-        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
-        self._previously_painted = False
-        self.closing = False
-
-    def closeEvent(self, event):
-        if self.closing:
-            return QtWidgets.QMainWindow.closeEvent(self, event)
-        if self.app.on_close_event():
-            self.closing = True
-            timeout_time = time.time() + 2
-            self.delayedClose(timeout_time)
-        event.ignore()
-
-    def delayedClose(self, timeout_time):
-        if not all(self.app.workers_terminated().values()) and time.time() < timeout_time:
-            QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
-        else:
-            QtCore.QTimer.singleShot(0, self.close)
-
-    def paintEvent(self, event):
-        result = QtWidgets.QMainWindow.paintEvent(self, event)
-        if not self._previously_painted:
-            self._previously_painted = True
-            self.firstPaint.emit()
-        return result
-
-
 class AnalysisRoutine(object):
 
     def __init__(self, app, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
@@ -1933,13 +1900,44 @@ class FileBox(object):
             elif signal == 'error':
                 self.pause_analysis()
                 return
-        
-        
+            
+
+class LyseMainWindow(QtWidgets.QMainWindow):
+    # A signal to show that the window is shown and painted.
+    firstPaint = Signal()
+
+    def __init__(self, app, *args, **kwargs):
+        self.app = app
+        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+        self._previously_painted = False
+        self.closing = False
+
+    def closeEvent(self, event):
+        if self.closing:
+            return QtWidgets.QMainWindow.closeEvent(self, event)
+        if self.app.on_close_event():
+            self.closing = True
+            timeout_time = time.time() + 2
+            self.delayedClose(timeout_time)
+        event.ignore()
+
+    def delayedClose(self, timeout_time):
+        if not all(self.app.workers_terminated().values()) and time.time() < timeout_time:
+            QtCore.QTimer.singleShot(50, lambda: self.delayedClose(timeout_time))
+        else:
+            QtCore.QTimer.singleShot(0, self.close)
+
+    def paintEvent(self, event):
+        result = QtWidgets.QMainWindow.paintEvent(self, event)
+        if not self._previously_painted:
+            self._previously_painted = True
+            self.firstPaint.emit()
+        return result
+
 class Lyse(object):
 
-    def __init__(self, qapplication, splash):
+    def __init__(self, qapplication):
         self.qapplication = qapplication
-        splash.update_text('loading graphical interface')
         loader = UiLoader()
         self.ui = loader.load(os.path.join(LYSE_DIR, 'main.ui'), LyseMainWindow(self))
 
@@ -1958,9 +1956,7 @@ class Lyse(object):
         self.port = int(self.exp_config.get('ports', 'lyse'))
 
         # Start the web server:
-        splash.update_text('starting analysis server')
         self.server = WebServer(self,  self.port)
-        splash.update_text('done')
 
         # The singleshot routinebox will be connected to the filebox
         # by queues:
