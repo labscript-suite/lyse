@@ -13,6 +13,21 @@
 
 import numpy as np
 
+from qtutils import inmain_decorator
+from qtutils.qt import QtWidgets
+
+
+@inmain_decorator()
+def error_dialog(app, message):
+    QtWidgets.QMessageBox.warning(app.ui, 'lyse', message)
+
+
+@inmain_decorator()
+def question_dialog(app, message):
+    reply = QtWidgets.QMessageBox.question(app.ui, 'lyse', message,
+                                       QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+    return (reply == QtWidgets.QMessageBox.Yes)
+
 def scientific_notation(x, sigfigs=4, mode='eng'):
     """Returns a unicode string of the float f in scientific notation"""
 
@@ -81,7 +96,6 @@ def scientific_notation(x, sigfigs=4, mode='eng'):
                 superscript = ''.join(sups.get(char, char) for char in str(exponent))
                 result += thinspace + times + thinspace + '10' + superscript
     return result
-
 
 def get_screen_geometry(qapplication):
     """Return the a list of the geometries of each screen: each a tuple of
