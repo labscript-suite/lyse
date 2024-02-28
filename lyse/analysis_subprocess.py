@@ -68,7 +68,7 @@ class Plot(object):
     def __init__(self, figure, identifier, filepath):
         self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow(self))
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/plot_window.ui'), PlotWindow(self))
 
         self.set_window_title(identifier, filepath)
 
