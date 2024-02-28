@@ -72,28 +72,26 @@ if __name__ == "__main__":
     # and import things for the first time
     splash = first_import()
 
-    # stdlib imports
+    # 
+    # Now import only what is needed to start the Lyse application
+    # 
+
     import sys
     import signal
-
-    # qt imports
     from qtutils.qt import QtCore, QtWidgets
-
+    import desktop_app
     import lyse.main
 
     # Associate app windows with OS menu shortcuts:
-    import desktop_app
     desktop_app.set_process_appid('lyse')
 
-
+    splash.update_text('starting GUI')
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
 
-    splash.update_text('starting GUI')
     app = lyse.main.Lyse(qapplication)
-    splash.hide()
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
     timer = QtCore.QTimer()
@@ -102,6 +100,7 @@ if __name__ == "__main__":
     # Upon seeing a ctrl-c interrupt, quit the event loop
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
+    splash.hide()
     qapplication.exec_()
 
     # Shutdown the webserver.
