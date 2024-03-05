@@ -16,6 +16,10 @@ Top level Lyse GUI
 """
 import os
 
+# Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
+import desktop_app
+desktop_app.set_process_appid('lyse')
+
 # Splash screen
 import labscript_utils.splash
 splash = labscript_utils.splash.Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
@@ -37,15 +41,16 @@ import pandas
 # Labscript imports
 splash.update_text('importing global error catcher')
 import labscript_utils.excepthook
+
 splash.update_text('importing zprocess (zlog and zlock must be running)')
 from labscript_utils.ls_zprocess import ProcessTree
+
 splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.outputbox import OutputBox
 from labscript_utils import dedent
-import desktop_app
-    
+
 # qt imports
 splash.update_text('importing qt modules')
 from qtutils.qt import QtCore, QtWidgets
@@ -505,17 +510,6 @@ class Lyse(object):
 
 
 if __name__ == "__main__":
-
-    # This is the first entry point into the program so we can open the splash 
-    # and import things for the first time
-    # splash = first_import()
-
-    # 
-    # Now import only what is needed to start the Lyse application
-    # 
-
-    # Associate app windows with OS menu shortcuts:
-    desktop_app.set_process_appid('lyse')
 
     splash.update_text('starting GUI')
     qapplication = QtWidgets.QApplication.instance()
