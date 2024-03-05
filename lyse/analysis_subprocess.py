@@ -23,7 +23,6 @@ from types import ModuleType
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
-from qtutils.qt.QtCore import pyqtSlot as Slot
 
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons

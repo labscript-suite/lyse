@@ -1,6 +1,6 @@
 #####################################################################
 #                                                                   #
-# /__main__.py                                                      #
+# /communication.py                                                      #
 #                                                                   #
 # Copyright 2013, Monash University                                 #
 #                                                                   #
@@ -35,9 +35,11 @@ splash.update_text('importing pandas')
 import pandas
 
 # Labscript imports
-splash.update_text('importing labscript suite modules')
+splash.update_text('importing global error catcher')
 import labscript_utils.excepthook
+splash.update_text('importing zprocess (zlog and zlock must be running)')
 from labscript_utils.ls_zprocess import ProcessTree
+splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.outputbox import OutputBox
@@ -58,66 +60,10 @@ import qtutils.icons
 splash.update_text('importing core Lyse modules')
 from lyse import LYSE_DIR
 import lyse.utils
-import lyse.analysis
+import lyse.routines
 import lyse.widgets
 import lyse.filebox
 import lyse.communication
-
-def first_import():
-    """
-    This function just imports a bunch of modules.  This causes python to load and cache them so
-    they will loaded faster the next time.  We do this here so that we can monitor this with a splash
-    window
-    """
-    import os
-
-    # Splash screen
-    import labscript_utils.splash
-    splash = labscript_utils.splash.Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
-    splash.show()
-
-    splash.update_text('importing standard library modules')
-    # stdlib imports
-    import sys
-    import logging
-    import threading
-    import signal
-    import subprocess
-    import time
-    import traceback
-    import queue
-    import warnings
-
-    # 3rd party imports:
-    splash.update_text('importing numpy')
-    import numpy as np
-    splash.update_text('importing h5_lock and h5py')
-    import labscript_utils.h5_lock
-    import h5py
-    splash.update_text('importing pandas')
-    import pandas
-
-    splash.update_text('importing labscript suite modules')
-
-    from labscript_utils.ls_zprocess import ZMQServer, ProcessTree
-    import zprocess
-    from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
-    from labscript_utils.setup_logging import setup_logging
-    from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
-    from labscript_utils.qtwidgets.outputbox import OutputBox
-    import labscript_utils.shared_drive as shared_drive
-    from labscript_utils import dedent
-    import labscript_utils.excepthook
-
-    splash.update_text('importing qt modules')
-
-    from qtutils.qt import QtCore, QtGui, QtWidgets
-    from qtutils.qt.QtCore import pyqtSignal as Signal
-    from qtutils import inmain_decorator, inmain, UiLoader, DisconnectContextManager
-    from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
-
-    return splash
-
 
 class LyseMainWindow(QtWidgets.QMainWindow):
     # A signal to show that the window is shown and painted.
@@ -154,29 +100,30 @@ class LyseMainWindow(QtWidgets.QMainWindow):
 class Lyse(object):
 
     def __init__(self, qapplication):
-        self.qapplication = qapplication
-        loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
-
-        self.process_tree = ProcessTree.instance()
-
+        # First: Start logging
         self.logger = setup_logging('lyse')
         labscript_utils.excepthook.set_logger(self.logger)
         self.logger.info('\n\n===============starting===============\n')
 
-        # Set a meaningful name for zlock client id:
+        # Second: read lyse config
+        self.setup_config()
+
+        # Third: connect to zprocess and set a meaningful name for zlock client id:
+        self.process_tree = ProcessTree.instance()
         self.process_tree.zlock_client.set_process_name('lyse')
+
+        # Forth: start remote communication server
+        self.port = int(self.exp_config.get('ports', 'lyse'))
+        self.server = lyse.communication.WebServer(self,  self.port)
+
+        # Last: UI setup
+        self.qapplication = qapplication
+        loader = UiLoader()
+        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
 
         self.connect_signals()
 
-        self.setup_config()
-        self.port = int(self.exp_config.get('ports', 'lyse'))
-
-        # Start the web server
-        self.server = lyse.communication.WebServer(self,  self.port)
-
-        # The singleshot routinebox will be connected to the filebox
-        # by queues:
+        # The singleshot routinebox will be connected to the filebox by queues:
         to_singleshot = queue.Queue()
         from_singleshot = queue.Queue()
 
@@ -185,9 +132,9 @@ class Lyse(object):
         from_multishot = queue.Queue()
 
         self.output_box = OutputBox(self.ui.verticalLayout_output_box)
-        self.singleshot_routinebox = lyse.widgets.RoutineBox(self, self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
+        self.singleshot_routinebox = lyse.routines.RoutineBox(self, self.ui.verticalLayout_singleshot_routinebox, self.exp_config,
                                                 self, to_singleshot, from_singleshot, self.output_box.port)
-        self.multishot_routinebox = lyse.widgets.RoutineBox(self, self.ui.verticalLayout_multishot_routinebox, self.exp_config,
+        self.multishot_routinebox = lyse.routines.RoutineBox(self, self.ui.verticalLayout_multishot_routinebox, self.exp_config,
                                                self, to_multishot, from_multishot, self.output_box.port, multishot=True)
         self.filebox = lyse.filebox.FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
@@ -243,7 +190,6 @@ class Lyse(object):
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
 
         self.ui.show()
-        # self.ui.showMaximized()
 
     def terminate_all_workers(self):
         for routine in self.singleshot_routinebox.routines + self.multishot_routinebox.routines:
