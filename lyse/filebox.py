@@ -26,7 +26,6 @@ import h5py
 import pandas
 
 # Labscript imports
-import labscript_utils.excepthook
 import zprocess
 from labscript_utils.labconfig import LabConfig
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
@@ -43,7 +42,6 @@ import qtutils.icons
 from lyse.dataframe_utilities import concat_with_padding, get_dataframe_from_shot, replace_with_padding
 from lyse import LYSE_DIR
 import lyse.utils
-import lyse.routines
 import lyse.widgets
 
 

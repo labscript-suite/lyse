@@ -21,7 +21,6 @@ from qtutils.qt import QtWidgets
 def error_dialog(app, message):
     QtWidgets.QMessageBox.warning(app.ui, 'lyse', message)
 
-
 @inmain_decorator()
 def question_dialog(app, message):
     reply = QtWidgets.QMessageBox.question(app.ui, 'lyse', message,

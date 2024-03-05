@@ -10,8 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-
-import labscript_utils.excepthook
+ 
+import labscript_utils.excepthook # I do magic stuff, so import must be in place
 from labscript_utils.ls_zprocess import ProcessTree
 
 import sys
