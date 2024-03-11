@@ -26,7 +26,7 @@ import labscript_utils.shared_drive as shared_drive
 from qtutils import inmain_decorator
 
 # Lyse imports
-from dataframe_utilities import rangeindex_to_multiindex
+from lyse.dataframe_utilities import rangeindex_to_multiindex
 
 class WebServer(ZMQServer):
 

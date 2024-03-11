@@ -39,7 +39,7 @@ from labscript_utils.ls_zprocess import zmq_get
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
 
 # lyse imports
-from dataframe_utilities import rangeindex_to_multiindex
+from lyse.dataframe_utilities import rangeindex_to_multiindex
 
 LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
 
