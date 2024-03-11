@@ -26,7 +26,7 @@ import labscript_utils.shared_drive as shared_drive
 from qtutils import inmain_decorator
 
 # Lyse imports
-from lyse import _rangeindex_to_multiindex
+from dataframe_utilities import rangeindex_to_multiindex
 
 class WebServer(ZMQServer):
 
@@ -41,7 +41,7 @@ class WebServer(ZMQServer):
         elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:
             _, n_sequences, filter_kwargs = request_data
             df = self._retrieve_dataframe()
-            df = _rangeindex_to_multiindex(df, inplace=True)
+            df = rangeindex_to_multiindex(df, inplace=True)
             # Return only a subset of the dataframe if instructed to do so.
             if n_sequences is not None:
                 df = self._extract_n_sequences_from_df(df, n_sequences)

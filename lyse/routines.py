@@ -30,7 +30,6 @@ from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 
 from lyse import LYSE_DIR
 import lyse.widgets
-import lyse.routines
 
 class RoutineBox(object):
     
@@ -170,7 +169,7 @@ class RoutineBox(object):
             if filepath in [routine.filepath for routine in self.routines]:
                 self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
-            routine = lyse.routines.AnalysisRoutine(self.app, filepath, self.model, self.output_box_port, checked)
+            routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port, checked)
             self.routines.append(routine)
         self.update_select_all_checkstate()
         
