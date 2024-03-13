@@ -13,10 +13,13 @@
 import labscript_utils.h5_lock, h5py
 import pandas
 import tzlocal
+
+# Labscript imports
 import labscript_utils.shared_drive
 from labscript_utils.connections import _ensure_str
 from labscript_utils.properties import get_attributes
 from labscript_utils.shot_utils import get_shot_globals
+from labscript_utils.labconfig import LabConfig
 
 def rangeindex_to_multiindex(df, inplace):
     if isinstance(df.index, pandas.MultiIndex):
