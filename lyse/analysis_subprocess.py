@@ -12,6 +12,8 @@
 #####################################################################
  
 import labscript_utils.excepthook # I do magic stuff, so import must be in place
+import labscript_utils.h5_lock, h5py
+
 from labscript_utils.ls_zprocess import ProcessTree
 
 import sys
@@ -29,9 +31,20 @@ import qtutils.icons
 
 import multiprocessing
 
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
+# Labscript imports
+from labscript_utils.modulewatcher import ModuleWatcher
+
+
 # Associate app windows with OS menu shortcuts:
 import desktop_app
 desktop_app.set_process_appid('lyse')
+
+# lyse imports
+import lyse
+import lyse.utils
+import lyse.figure_manager
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
 if (
@@ -67,7 +80,7 @@ class Plot(object):
     def __init__(self, figure, identifier, filepath):
         self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/plot_window.ui'), PlotWindow(self))
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/plot_window.ui'), PlotWindow(self))
 
         self.set_window_title(identifier, filepath)
 
@@ -432,17 +445,12 @@ if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
 
-    import lyse
-    from lyse import LYSE_DIR
     lyse.spinning_top = True
-    import lyse.figure_manager
+
     lyse.figure_manager.install()
 
-    from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+    # Where are pylab features used?  Should this be here?
     import pylab
-    import labscript_utils.h5_lock, h5py
-
-    from labscript_utils.modulewatcher import ModuleWatcher
 
     process_tree = ProcessTree.connect_to_parent()
     to_parent = process_tree.to_parent

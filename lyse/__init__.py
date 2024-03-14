@@ -39,9 +39,11 @@ from labscript_utils.ls_zprocess import zmq_get
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
 
 # lyse imports
-from lyse.dataframe_utilities import rangeindex_to_multiindex
+import lyse.dataframe_utilities
+import lyse.utils
 
-LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
+# Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
+from lyse.utils import LYSE_DIR
 
 # If running stand-alone, and not from within lyse, the below two variables
 # will be as follows. Otherwise lyse will override them with spinning_top =
@@ -59,13 +61,6 @@ plots = {}
 delay_event = threading.Event()
 # a flag to determine whether we should wait for the delay event
 _delay_flag = False
-
-# get port that lyse is using for communication
-try:
-    _labconfig = LabConfig(required_params={"ports": ["lyse"]})
-    _lyse_port = int(_labconfig.get('ports', 'lyse'))
-except Exception:
-    _lyse_port = 42519
 
 if len(sys.argv) > 1:
     path = sys.argv[1]
@@ -85,7 +80,7 @@ class _RoutineStorage(object):
 routine_storage = _RoutineStorage()
 
 
-def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None, filter_kwargs=None):
+def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None):
     """Get data from the lyse dataframe or a file.
     
     This function allows for either extracting information from a run's hdf5
@@ -183,7 +178,7 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             raise ValueError(dedent(msg))
         # Ensure conversion to multiindex is done, which needs to be done here
         # if the server is running an outdated version of lyse.
-        rangeindex_to_multiindex(df, inplace=True)
+        lyse.dataframe_utilities.rangeindex_to_multiindex(df, inplace=True)
         return df
 
 def globals_diff(run1, run2, group=None):

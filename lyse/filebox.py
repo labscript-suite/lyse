@@ -40,7 +40,6 @@ import qtutils.icons
 
 # Lyse imports
 from lyse.dataframe_utilities import concat_with_padding, get_dataframe_from_shot, replace_with_padding
-from lyse import LYSE_DIR
 import lyse.utils
 import lyse.widgets
 
@@ -57,7 +56,7 @@ class EditColumns(object):
         self.old_columns_visible = columns_visible.copy()
 
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/edit_columns.ui'), lyse.widgets.EditColumnsDialog())
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/edit_columns.ui'), lyse.widgets.EditColumnsDialog())
 
         self.model = lyse.widgets.UneditableModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
@@ -716,7 +715,7 @@ class FileBox(object):
 
         loader = UiLoader()
         loader.registerCustomWidget(lyse.widgets.TableView)
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/filebox.ui'))
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/filebox.ui'))
         self.ui.progressBar_add_shots.hide()
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.app, self.ui.tableView, self.exp_config)

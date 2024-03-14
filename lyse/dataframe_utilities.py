@@ -21,6 +21,9 @@ from labscript_utils.properties import get_attributes
 from labscript_utils.shot_utils import get_shot_globals
 from labscript_utils.labconfig import LabConfig
 
+# lyse imports
+from lyse.utils import LABCONFIG
+
 def rangeindex_to_multiindex(df, inplace):
     if isinstance(df.index, pandas.MultiIndex):
         # The dataframe has already been converted.
@@ -28,7 +31,7 @@ def rangeindex_to_multiindex(df, inplace):
     try:
         padding = ('',)*(df.columns.nlevels - 1)
         try:
-            integer_indexing = _labconfig.getboolean('lyse', 'integer_indexing')
+            integer_indexing = LABCONFIG.getboolean('lyse', 'integer_indexing')
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             integer_indexing = False
         if integer_indexing:

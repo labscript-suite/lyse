@@ -1,6 +1,6 @@
 #####################################################################
 #                                                                   #
-# /__main__.py                                                      #
+# /utils.py                                                      #
 #                                                                   #
 # Copyright 2013, Monash University                                 #
 #                                                                   #
@@ -11,11 +11,25 @@
 #                                                                   #
 #####################################################################
 
+import os
 import numpy as np
 
+# qt imports
 from qtutils import inmain_decorator
 from qtutils.qt import QtWidgets
 
+# labscript imports
+from labscript_utils.labconfig import LabConfig
+
+LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
+
+# get port that lyse is using for communication
+try:
+    LABCONFIG = LabConfig(required_params={"ports": ["lyse"]})
+    LYSE_PORT = int(LABCONFIG.get('ports', 'lyse'))
+except Exception:
+    LABCONFIG = None
+    LYSE_PORT = 42519
 
 @inmain_decorator()
 def error_dialog(app, message):

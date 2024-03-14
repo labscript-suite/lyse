@@ -28,8 +28,8 @@ from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderVi
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 
-from lyse import LYSE_DIR
 import lyse.widgets
+import lyse.utils
 
 class RoutineBox(object):
     
@@ -57,7 +57,7 @@ class RoutineBox(object):
         
         loader = UiLoader()
         loader.registerCustomWidget(lyse.widgets.TreeView)
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/routinebox.ui'))
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/routinebox.ui'))
         container.addWidget(self.ui)
 
         if multishot:
@@ -439,7 +439,7 @@ class AnalysisRoutine(object):
         
     def start_worker(self):
         # Start a worker process for this analysis routine:
-        worker_path = os.path.join(LYSE_DIR, 'analysis_subprocess.py')
+        worker_path = os.path.join(lyse.utils.LYSE_DIR, 'analysis_subprocess.py')
 
         child_handles = self.app.process_tree.subprocess(
             worker_path,

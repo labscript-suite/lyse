@@ -63,7 +63,6 @@ import qtutils.icons
 
 # Lyse imports
 splash.update_text('importing core Lyse modules')
-from lyse import LYSE_DIR
 import lyse.utils
 import lyse.routines
 import lyse.widgets
@@ -124,7 +123,7 @@ class Lyse(object):
         # Last: UI setup
         self.qapplication = qapplication
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
 
         self.connect_signals()
 
