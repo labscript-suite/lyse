@@ -23,12 +23,13 @@ from labscript_utils.labconfig import LabConfig
 
 LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
 
+# Open up the lab config
+LABCONFIG = LabConfig()
+
 # get port that lyse is using for communication
 try:
-    LABCONFIG = LabConfig(required_params={"ports": ["lyse"]})
     LYSE_PORT = int(LABCONFIG.get('ports', 'lyse'))
 except Exception:
-    LABCONFIG = None
     LYSE_PORT = 42519
 
 @inmain_decorator()

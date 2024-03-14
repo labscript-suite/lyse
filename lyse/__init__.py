@@ -26,7 +26,6 @@ import functools
 import contextlib
 
 import labscript_utils.h5_lock, h5py
-from labscript_utils.labconfig import LabConfig
 import pandas
 from numpy import array, ndarray, where
 import types
