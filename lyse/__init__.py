@@ -1120,12 +1120,12 @@ class Shot(object):
 class Run(Shot):
     """Deprecated class for interacting with a shot's hdf5 file.
     
-    This class will be removed in lyse v4.0.
+    This class will be removed in in a future release.
     Please update your analysis code to use the :class:`Shot` class.
     """
     def __init__(self, *args, **kwargs):
         msg = """The 'Run' class has been renamed to 'Shot' (but is otherwise 
-            compatible). 'Run' will be removed in lyse v4.0. Please update your 
+            compatible). 'Run' will be removed in a future release. Please update your 
             analysis code to use the 'Shot' class.
             """
         warnings.warn(dedent(msg), FutureWarning)
@@ -1176,12 +1176,12 @@ class Sequence(Shot):
         
     @property
     def runs(self):
-        """This property is deprecated and will be removed in lyse v4.0
+        """This property is deprecated and will be removed in a future release
         
         Use the :attr:`shots` attribute instead.
         """
         msg = """The 'runs' attribute has been renamed to 'shots'. 'runs' will be
-            removed in lyse v4.0. Please update your analysis code to use the 'shots'
+            removed in a future release. Please update your analysis code to use the 'shots'
             attribute.
             """
         warnings.warn(dedent(msg), FutureWarning)
