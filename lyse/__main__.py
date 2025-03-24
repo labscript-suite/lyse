@@ -213,7 +213,7 @@ class WebServer(ZMQServer):
             return df
 
         # Get a list of all unique sequences, each corresponding to one call to
-        # engage in runmanager. Each sequence may contain multiple runs. The
+        # engage in runmanager. Each sequence may contain multiple shots. The
         # below creates strings to identify sequences. To be from the same
         # sequence, two shots have to have the same value for 'sequence' (which
         # makes sure that the time when engage was called are the same to within
