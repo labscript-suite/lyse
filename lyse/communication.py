@@ -1,6 +1,6 @@
 #####################################################################
 #                                                                   #
-# /main.py                                                          #
+# /communication.py                                                 #
 #                                                                   #
 # Copyright 2013, Monash University                                 #
 #                                                                   #
