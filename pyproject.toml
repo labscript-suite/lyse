@@ -33,7 +33,7 @@ dependencies = [
     "labscript_utils>=3.3.0",
     "matplotlib",
     "numpy",
-    "pandas>=0.21",
+    "pandas>=1.5",
     "qtutils>=2.2.2",
     "scipy",
     "tzlocal",
