@@ -16,11 +16,11 @@ y = ser['some_routine','y']
 # Image attributes are also stored in this series:
 w_x2 = ser['side','absorption','OD','Gaussian_XW']
 
-# If we want actual measurement data, we'll have to instantiate a Run object:
-run = Run(path)
+# If we want actual measurement data, we'll have to instantiate a Shot object:
+shot = Shot(path)
 
 # Obtaining a trace:
-t, mot_fluorecence = run.get_trace('mot fluorecence')
+t, mot_fluorecence = shot.get_trace('mot fluorecence')
 
 # Now we might do some analysis on this data. Say we've written a
 # linear fit function (or we're calling some other libaries linear
@@ -43,4 +43,4 @@ legend()
 
 # We might wish to save this result so that we can compare it across
 # shots in a multishot analysis:
-run.save_result('mot loadrate', c)
+shot.save_result('mot loadrate', c)
