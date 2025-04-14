@@ -13,8 +13,6 @@
 """Lyse analysis API
 """
 
-from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
-from labscript_utils.dict_diff import dict_diff
 import os
 import socket
 import pickle as pickle
@@ -33,6 +31,7 @@ from .__version__ import __version__
 
 from labscript_utils import dedent
 from labscript_utils.ls_zprocess import zmq_get
+from labscript_utils.dict_diff import dict_diff
 
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
 
@@ -144,7 +143,7 @@ def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, 
         the lyse dataframe, or a subset of it, is returned.
     """    
     if filepath is not None:
-        return _get_singleshot(filepath)
+        return lyse.dataframe_utilities.get_series_from_shot(filepath)
     else:
         if n_sequences is not None:
             if not (type(n_sequences) is int and n_sequences >= 0):

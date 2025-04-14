@@ -13,6 +13,7 @@
 """Top level Lyse GUI
 """
 import os
+import labscript_utils.excepthook
 
 # Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
 import desktop_app
@@ -37,9 +38,6 @@ splash.update_text('importing pandas')
 import pandas
 
 # Labscript imports
-splash.update_text('importing global error catcher')
-import labscript_utils.excepthook
-
 splash.update_text('importing zprocess (zlog and zlock must be running)')
 from labscript_utils.ls_zprocess import ProcessTree
 
