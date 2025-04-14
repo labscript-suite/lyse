@@ -1,6 +1,6 @@
 #####################################################################
 #                                                                   #
-# /utils.py                                                         #
+# /utils.gui.py                                                     #
 #                                                                   #
 # Copyright 2013, Monash University                                 #
 #                                                                   #
@@ -10,30 +10,15 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-"""Lyse API/GUI common utilities
+"""Lyse GUI common utilities
 """
 
-
-import os
 import numpy as np
 
 # qt imports
 from qtutils import inmain_decorator
 from qtutils.qt import QtWidgets
 
-# labscript imports
-from labscript_utils.labconfig import LabConfig
-
-LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
-
-# Open up the lab config
-LABCONFIG = LabConfig()
-
-# get port that lyse is using for communication
-try:
-    LYSE_PORT = int(LABCONFIG.get('ports', 'lyse'))
-except Exception:
-    LYSE_PORT = 42519
 
 @inmain_decorator()
 def error_dialog(app, message):

@@ -30,6 +30,7 @@ from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 
 import lyse.widgets
 import lyse.utils
+import lyse.utils.gui
 
 class RoutineBox(object):
     
@@ -185,7 +186,7 @@ class RoutineBox(object):
         editor_args = self.exp_config.get('programs', 'text_editor_arguments')
         # Get the current labscript file:
         if not editor_path:
-            lyse.utils.error_dialog(self.app, "No editor specified in the labconfig.")
+            lyse.utils.gui.error_dialog(self.app, "No editor specified in the labconfig.")
         if '{file}' in editor_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             editor_args = [arg if arg != '{file}' else routine_filepath for arg in editor_args.split()]
@@ -195,7 +196,7 @@ class RoutineBox(object):
         try:
             subprocess.Popen([editor_path] + editor_args)
         except Exception as e:
-            lyse.utils.error_dialog(self.app, "Unable to launch text editor specified in %s. Error was: %s" %
+            lyse.utils.gui.error_dialog(self.app, "Unable to launch text editor specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
                          
     def on_remove_selection(self):
@@ -206,7 +207,7 @@ class RoutineBox(object):
         selected_rows = set(index.row() for index in selected_indexes)
         if not selected_rows:
             return
-        if confirm and not lyse.utils.question_dialog(self.app, "Remove %d routines?" % len(selected_rows)):
+        if confirm and not lyse.utils.gui.question_dialog(self.app, "Remove %d routines?" % len(selected_rows)):
             return
         name_items = [self.model.item(row, self.COL_NAME) for row in selected_rows]
         filepaths = [item.data(self.ROLE_FULLPATH) for item in name_items]

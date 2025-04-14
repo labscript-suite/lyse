@@ -60,8 +60,8 @@ import qtutils.icons
 # Lyse imports
 splash.update_text('importing core Lyse modules')
 import lyse.utils
+import lyse.utils.gui
 import lyse.routines
-import lyse.widgets
 import lyse.filebox
 import lyse.communication
 
@@ -244,7 +244,7 @@ class Lyse(object):
             elif reply == QtWidgets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
-            lyse.utils.error_dialog(self.app, 'no changes to revert')
+            lyse.utils.gui.error_dialog(self.app, 'no changes to revert')
 
     def on_save_configuration_as_triggered(self):
         if self.last_save_config_file is not None:
@@ -302,7 +302,7 @@ class Lyse(object):
 
         save_data['window_pos'] = (window_pos.x(), window_pos.y())
 
-        save_data['screen_geometry'] = lyse.utils.get_screen_geometry(self.qapplication)
+        save_data['screen_geometry'] = lyse.utils.gui.get_screen_geometry(self.qapplication)
         save_data['splitter'] = self.ui.splitter.sizes()
         save_data['splitter_vertical'] = self.ui.splitter_vertical.sizes()
         save_data['splitter_horizontal'] = self.ui.splitter_horizontal.sizes()
@@ -385,7 +385,7 @@ class Lyse(object):
         # position was saved when 2 monitors were plugged in but there is
         # only one now, and the splitters may not make sense in light of a
         # different window size, so better to fall back to defaults:
-        current_screen_geometry = lyse.utils.get_screen_geometry(self.qapplication)
+        current_screen_geometry = lyse.utils.gui.get_screen_geometry(self.qapplication)
         if current_screen_geometry == screen_geometry:
             if 'window_size' in save_data:
                 self.ui.resize(*save_data['window_size'])
@@ -440,7 +440,7 @@ class Lyse(object):
                         sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
-            lyse.utils.error_dialog(self.app, 'Dataframe is empty')
+            lyse.utils.gui.error_dialog(self.app, 'Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
         default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')

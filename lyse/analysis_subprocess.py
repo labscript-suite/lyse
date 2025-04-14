@@ -46,6 +46,7 @@ desktop_app.set_process_appid('lyse')
 # lyse imports
 import lyse
 import lyse.utils
+import lyse.utils.worker
 import lyse.figure_manager
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
@@ -123,7 +124,7 @@ class Plot(object):
             self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
 
     def on_copy_to_clipboard_triggered(self):
-        lyse.figure_to_clipboard(self.figure)
+        lyse.utils.worker.figure_to_clipboard(self.figure)
 
     @inmain_decorator()
     def save_axis_limits(self):
@@ -374,7 +375,7 @@ class AnalysisWorker(object):
                 plot = self.plots[fig]
 
                 # Get the Plot subclass registered for this plot identifier if it exists
-                cls = lyse.get_plot_class(identifier)
+                cls = lyse.utils.worker.get_plot_class(identifier)
                 # If no plot was registered, use the base class
                 if cls is None: cls = Plot
                 
@@ -415,7 +416,7 @@ class AnalysisWorker(object):
     def new_figure(self, fig, identifier):
         try:
             # Get custom class for this plot if it is registered
-            cls = lyse.get_plot_class(identifier)
+            cls = lyse.utils.worker.get_plot_class(identifier)
             # If no plot was registered, use the base class
             if cls is None: cls = Plot
             # if cls is not a subclass of Plot, then raise an Exception

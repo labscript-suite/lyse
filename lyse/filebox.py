@@ -43,6 +43,7 @@ import qtutils.icons
 # Lyse imports
 from lyse.dataframe_utilities import concat_with_padding, get_dataframe_from_shot, replace_with_padding
 import lyse.utils
+import lyse.utils.gui
 import lyse.widgets
 
 
@@ -338,7 +339,7 @@ class DataFrameModel(QtCore.QObject):
         selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
         if not selected_name_items:
             return
-        if confirm and not lyse.utils.question_dialog(self.app, "Remove %d shots?" % len(selected_name_items)):
+        if confirm and not lyse.utils.gui.question_dialog(self.app, "Remove %d shots?" % len(selected_name_items)):
             return
         # Remove from DataFrame first:
         self.dataframe = self.dataframe.drop(index.row() for index in selected_indexes)
@@ -383,7 +384,7 @@ class DataFrameModel(QtCore.QObject):
         viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
         # Get the current labscript file:
         if not viewer_path:
-            lyse.utils.error_dialog(self.app, "No hdf5 viewer specified in the labconfig.")
+            lyse.utils.gui.error_dialog(self.app, "No hdf5 viewer specified in the labconfig.")
         if '{file}' in viewer_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             viewer_args = [arg if arg != '{file}' else shot_filepath for arg in viewer_args.split()]
@@ -393,7 +394,7 @@ class DataFrameModel(QtCore.QObject):
         try:
             subprocess.Popen([viewer_path] + viewer_args)
         except Exception as e:
-            lyse.utils.error_dialog(self.app, "Unable to launch hdf5 viewer specified in %s. Error was: %s" %
+            lyse.utils.gui.error_dialog(self.app, "Unable to launch hdf5 viewer specified in %s. Error was: %s" %
                          (self.exp_config.config_path, str(e)))
         
     def set_columns_visible(self, columns_visible):
@@ -558,7 +559,7 @@ class DataFrameModel(QtCore.QObject):
                     continue
             value = dataframe_row[column_name]
             if isinstance(value, float):
-                value_str = lyse.utils.scientific_notation(value)
+                value_str = lyse.utils.gui.scientific_notation(value)
             else:
                 value_str = str(value)
             lines = value_str.splitlines()
