@@ -10,6 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse GUI dataframe filebox widget
+"""
 
 import os
 import sys

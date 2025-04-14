@@ -1,6 +1,6 @@
 #####################################################################
 #                                                                   #
-# /utils.py                                                      #
+# /utils.py                                                         #
 #                                                                   #
 # Copyright 2013, Monash University                                 #
 #                                                                   #
@@ -10,6 +10,9 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse API/GUI common utilities
+"""
+
 
 import os
 import numpy as np

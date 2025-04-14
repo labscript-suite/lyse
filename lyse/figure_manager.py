@@ -10,6 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Custom matplotlib Figure Manager
+"""
 import lyse
 from collections import OrderedDict
 import sys

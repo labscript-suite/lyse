@@ -10,8 +10,7 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-"""
-Lyse analysis API
+"""Lyse analysis API
 """
 
 from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot

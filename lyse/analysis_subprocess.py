@@ -10,6 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Analysis subprocess definitions and routines
+"""
  
 import labscript_utils.excepthook # I do magic stuff, so import must be in place
 import labscript_utils.h5_lock, h5py

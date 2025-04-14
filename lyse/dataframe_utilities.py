@@ -10,6 +10,9 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse dataframe utilities
+"""
+
 import labscript_utils.h5_lock, h5py
 import pandas
 import tzlocal

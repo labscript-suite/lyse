@@ -10,6 +10,8 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse GUI widgets
+"""
 
 # qt imports
 from qtutils.qt import QtCore, QtGui, QtWidgets

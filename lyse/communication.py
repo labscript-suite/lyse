@@ -10,9 +10,7 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-
-"""
-Code required for interprocess communication
+"""Code required for interprocess communication
 """
 
 # 3rd party imports:

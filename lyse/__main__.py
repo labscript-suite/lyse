@@ -10,9 +10,7 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-
-"""
-Top level Lyse GUI
+"""Top level Lyse GUI
 """
 import os
 
