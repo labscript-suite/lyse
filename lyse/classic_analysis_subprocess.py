@@ -19,20 +19,29 @@ import os
 import threading
 import traceback
 import time
+import queue
+import inspect
 from types import ModuleType
+import multiprocessing
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import pyqtSlot as Slot
 
+
 from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
 import qtutils.icons
 
-import multiprocessing
+from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
+from labscript_utils.qtwidgets.outputbox import OutputBox
+from labscript_utils.modulewatcher import ModuleWatcher
+import lyse
+import lyse.ui_helpers
 
 # Associate app windows with OS menu shortcuts:
 import desktop_app
 desktop_app.set_process_appid('lyse')
+
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
 if (
@@ -41,38 +50,58 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
+class PlotWindow(QtWidgets.QMdiSubWindow):
+    
+    WindowHints = QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowMinimizeButtonHint | QtCore.Qt.WindowMaximizeButtonHint
 
-class PlotWindowCloseEvent(QtGui.QCloseEvent):
-    def __init__(self, force, *args, **kwargs):
-        QtGui.QCloseEvent.__init__(self, *args, **kwargs)
-        self.force = force
-
-class PlotWindow(QtWidgets.QWidget):
-    # A signal for when the window manager has created a new window for this widget:
-    close_signal = Signal()
-
-    def __init__(self, plot, *args, **kwargs):
-        self.__plot = plot
-        QtWidgets.QWidget.__init__(self, *args, **kwargs)
-
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setMinimumHeight(256)
+        self.setMinimumWidth(256)
+        self.FrameState = True
+    
     def closeEvent(self, event):
-        self.hide()
-        if isinstance(event, PlotWindowCloseEvent) and event.force:
-            self.__plot.on_close()
-            event.accept()
+        event.ignore()
+
+    def setFrameState(self, state):
+        """
+        Enable / disable the frame
+        """
+
+        self.FrameState = bool(state)
+
+        if self.FrameState:
+            hint = self.WindowHints
         else:
-            event.ignore()
-        
+            hint = self.WindowHints | QtCore.Qt.FramelessWindowHint
+
+        self.setWindowFlags(hint) 
+        self.update()
+
+def mdiArea_addWindow(mdiArea, widget):
+    sub_window = PlotWindow()
+    sub_window.setWidget(widget)
+    mdiArea.addSubWindow(sub_window)
+    
+    sub_window.setFrameState(True)
+    
+    sub_window.show()    
+
+    return sub_window
 
 class Plot(object):
-    def __init__(self, figure, identifier, filepath):
+    def __init__(self, figure, identifier, mdiArea_canvas):
         self.identifier = identifier
+
+        # Get the plot window ready
+        self.widget = QtWidgets.QWidget()
+
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(LYSE_DIR, 'plot_window.ui'), PlotWindow(self))
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'plot_window.ui'), self.widget)
+        self.subwindow = mdiArea_addWindow(mdiArea_canvas, self.widget)
 
-        self.set_window_title(identifier, filepath)
+        self.set_window_title(self.identifier)
 
-        # figure.tight_layout()
         self.figure = figure
         self.canvas = figure.canvas
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
@@ -135,8 +164,8 @@ class Plot(object):
                 continue
 
     @inmain_decorator()
-    def set_window_title(self, identifier, filepath):
-        self.ui.setWindowTitle(str(identifier) + ' - ' + os.path.basename(filepath))
+    def set_window_title(self, identifier):
+        self.ui.setWindowTitle(str(identifier))
 
     @inmain_decorator()
     def update_window_size(self):
@@ -159,7 +188,7 @@ class Plot(object):
     def analysis_complete(self, figure_in_use):
         """To be overriden by subclasses. 
         Called as part of the post analysis plot actions"""
-        pass
+        pass        
 
     def get_window_state(self):
         """Called when the Plot window is about to be closed due to a change in 
@@ -177,10 +206,14 @@ class Plot(object):
         then update the returned dictionary with your additional information before 
         returning it from your method.
         """
+        window_size = self.subwindow.size()
+        window_pos = self.subwindow.pos()
         return {
-            'window_geometry': self.ui.saveGeometry(),
+            'window_size': (window_size.width(), window_size.height()),
+            'window_pos': (window_pos.x(), window_pos.y()),
             'axis_lock_state': self.lock_axes,
             'axis_limits': self.axis_limits,
+            'frame_state': self.subwindow.FrameState
         }
 
     def restore_window_state(self, state):
@@ -198,9 +231,15 @@ class Plot(object):
         Arguments:
             state: A dictionary of information to restore
         """
-        geometry = state.get('window_geometry', None)
-        if geometry is not None:
-            self.ui.restoreGeometry(geometry)
+
+        if 'window_size' in state:
+            self.subwindow.resize(*state['window_size'])
+
+        if 'window_pos' in state:
+            self.subwindow.move(*state['window_pos'])
+
+        if 'frame_state' in state:
+            self.subwindow.setFrameState(state['frame_state'])
 
         axis_limits = state.get('axis_limits', None)
         axis_lock_state = state.get('axis_lock_state', None)
@@ -230,10 +269,12 @@ class Plot(object):
 
 
 class AnalysisWorker(object):
-    def __init__(self, filepath, to_parent, from_parent):
-        self.to_parent = to_parent
-        self.from_parent = from_parent
+    def __init__(self, filepath, mdiArea_canvas):
         self.filepath = filepath
+
+        # This is a mdi Area where all of the figures will go.
+        self.mdiArea_canvas = mdiArea_canvas
+        self.mdiArea_canvas.setMinimumHeight(256)
 
         # Add user script directory to the pythonpath:
         sys.path.insert(0, os.path.dirname(self.filepath))
@@ -246,41 +287,15 @@ class AnalysisWorker(object):
         self.routine_module_clean_dict = self.routine_module.__dict__.copy()
         sys.modules[self.routine_module.__name__] = self.routine_module
 
-        # Plot objects, keyed by matplotlib Figure object:
+        # Plot objects, keyed by matplotlib Figure object
         self.plots = {}
+
+        # State of each plot keyed by the window identifier NOT the figure object
+        self.window_state = {}
 
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
-        
-        # Start the thread that listens for instructions from the
-        # parent process:
-        self.mainloop_thread = threading.Thread(target=self.mainloop)
-        self.mainloop_thread.daemon = True
-        self.mainloop_thread.start()
-        
-    def mainloop(self):
-        # HDF5 prints lots of errors by default, for things that aren't
-        # actually errors. These are silenced on a per thread basis,
-        # and automatically silenced in the main thread when h5py is
-        # imported. So we'll silence them in this thread too:
-        h5py._errors.silence_errors()
-        while True:
-            task, data = self.from_parent.get()
-            with kill_lock:
-                if task == 'quit':
-                    inmain(qapplication.quit)
-                elif task == 'analyse':
-                    path = data
-                    success = self.do_analysis(path)
-                    if success:
-                        if lyse._delay_flag:
-                            lyse.delay_event.wait()
-                        self.to_parent.put(['done', lyse._updated_data])
-                    else:
-                        self.to_parent.put(['error', lyse._updated_data])
-                else:
-                    self.to_parent.put(['error','invalid task %s'%str(task)])
         
     @inmain_decorator()
     def do_analysis(self, path):
@@ -341,14 +356,16 @@ class AnalysisWorker(object):
     def post_analysis_plot_actions(self):
         # reset the current figure to figure 1:
         lyse.figure_manager.figuremanager.set_first_figure_current()
-        # Introspect the figures that were produced:
+
+        # Introspect the figures that were produced
+
         for identifier, fig in lyse.figure_manager.figuremanager.figs.items():
-            window_state = None
+            window_state = self.window_state.get(identifier, None)
             if not fig.axes:
                 # Try and clear the figure if it is not in use
                 try:
                     plot = self.plots[fig]
-                    plot.set_window_title("Empty", self.filepath)
+                    plot.set_window_title("Empty")
                     plot.draw()
                     plot.analysis_complete(figure_in_use=False)
                 except KeyError:
@@ -370,9 +387,6 @@ class AnalysisWorker(object):
                 if type(plot) != cls or plot.identifier != identifier:
                     window_state = plot.get_window_state()
 
-                    # Create a custom CloseEvent to force close the plot window
-                    event = PlotWindowCloseEvent(True)
-                    QtCore.QCoreApplication.instance().postEvent(plot.ui, event)
                     # Delete the plot
                     del self.plots[fig]
 
@@ -391,24 +405,24 @@ class AnalysisWorker(object):
                 if not plot.is_shown:
                     plot.show()
                     plot.update_window_size()
-                plot.set_window_title(identifier, self.filepath)
+                plot.set_window_title(identifier)
                 if plot.lock_axes:
                     plot.restore_axis_limits()
                 plot.draw()
             plot.analysis_complete(figure_in_use=True)
 
-
     def new_figure(self, fig, identifier):
         try:
             # Get custom class for this plot if it is registered
-            cls = lyse.get_plot_class(identifier)
+            cls = lyse.get_plot_class(identifier) # IBS: register_plot_class is not used anywhere.
+
             # If no plot was registered, use the base class
             if cls is None: cls = Plot
             # if cls is not a subclass of Plot, then raise an Exception
             if not issubclass(cls, Plot): 
                 raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
-            self.plots[fig] = cls(fig, identifier, self.filepath)
+            self.plots[fig] = cls(fig, identifier, self.mdiArea_canvas)
         except Exception:
             traceback_lines = traceback.format_exception(*sys.exc_info())
             message = """Failed to instantiate custom class for plot "{identifier}".
@@ -421,20 +435,228 @@ class AnalysisWorker(object):
             sys.stderr.write(message)
 
             # instantiate plot using original Base class so that we always get a plot
-            self.plots[fig] = Plot(fig, identifier, self.filepath)
+            self.plots[fig] = Plot(fig, identifier, self.mdiArea_canvas)
 
         return self.plots[fig]
 
     def reset_figs(self):
         pass
+
+    def get_window_state(self):
+        return {plot.identifier:plot.get_window_state() for fig, plot in self.plots.items()}
+
+    def set_window_state(self, window_state):
+        self.window_state = window_state
+
+
+class LyseWorkerWindow(QtWidgets.QWidget):
+
+    def __init__(self, app, *args, **kwargs):
+        self.app = app
+
+        QtWidgets.QWidget.__init__(self, *args, **kwargs)
+
+    def closeEvent(self, event):
+        self.hide()
+        event.ignore()
+
+class LyseWorker():
+    def __init__(self, process_tree, qapplication):
+
+        # Interprocess communication setup
+        self.to_parent = process_tree.to_parent
+        self.from_parent = process_tree.from_parent
+        self.kill_lock = process_tree.kill_lock
+
+        # File name from parent
+        self.filepath = self.from_parent.get()
+        file = os.path.splitext(os.path.basename(self.filepath))[0] # file with no path and no extension
+        self.title = f"Lyse_analysis_{file}"
+
+        # Config location from parent
+        lyse_config_file = self.from_parent.get() # this will be the lyse config file
+        self.save_config_file = os.path.join(os.path.dirname(lyse_config_file), f"{file}.ini")
+
+        # Set a meaningful client id for zlock
+        process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(self.filepath))
+
+        # GUI setup
+        self.qapplication = qapplication
+
+        loader = UiLoader()
+        self.ui = loader.load(os.path.join(lyse.LYSE_DIR, 'subprocess_window.ui'), LyseWorkerWindow(self))
+        self.ui.setWindowTitle(self.title)
         
+        # Create a hidden output box
+        self.ui.output_box = OutputBox(self.ui.splitter_bottom)
+        self._splitter_sizes = self.ui.splitter_bottom.sizes()
+        self.ui.output_box.output_textedit.hide()
+
+        # Setup for output capturing
+        sys.stdout = self.ui.output_box
+        sys.stderr = self.ui.output_box
+
+        # Connect signals
+        self.ui.button_show_terminal.toggled.connect(self.set_terminal_visible)
+        self.ui.button_tile_subwindows.clicked.connect(self.tile_subwindows)
+        self.ui.button_cascade_subwindows.clicked.connect(self.cascade_subwindows)
+
+        self.worker = AnalysisWorker(self.filepath, self.ui.mdiArea_canvas)
+
+        self.load_configuration()
+
+        # Start the thread that listens for instructions from the parent process:
+        self.parentloop_thread = threading.Thread(target=self.parentloop)
+        self.parentloop_thread.daemon = True
+        self.parentloop_thread.start()           
+
+        self.ui.output_box.write(f'{self.title} started.')
+        self.ui.show()
+
+    @inmain_decorator()
+    def _show(self):
+        self.ui.show()
+
+    def parentloop(self):
+        # HDF5 prints lots of errors by default, for things that aren't
+        # actually errors. These are silenced on a per thread basis,
+        # and automatically silenced in the main thread when h5py is
+        # imported. So we'll silence them in this thread too:
+        h5py._errors.silence_errors()
+        while True:
+            task, data = self.from_parent.get()
+            with self.kill_lock:
+                if task == 'quit':
+                    self.quit()
+                elif task == 'analyse':
+                    self._show()
+                    path = data
+                    success = self.worker.do_analysis(path)
+                    if success:
+                        if lyse._delay_flag:
+                            lyse.delay_event.wait()
+                        self.to_parent.put(['done', lyse._updated_data])
+                    else:
+                        self.to_parent.put(['error', lyse._updated_data])
+                else:
+                    self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    @inmain_decorator()
+    def quit(self):
+        self.save_configuration()
+        self.qapplication.quit()
+
+    @inmain_decorator()
+    def get_save_data(self):
+        save_data = {}
+
+        window_size = self.ui.size()
+        save_data['window_size'] = (window_size.width(), window_size.height())
+
+        window_pos = self.ui.pos()
+        save_data['window_pos'] = (window_pos.x(), window_pos.y())
+
+        save_data['screen_geometry'] = lyse.ui_helpers.get_screen_geometry(self.qapplication)
+
+        save_data['button_show_terminal'] = self.ui.button_show_terminal.isChecked()
+
+        # If the terminal is hidden use the cached size
+        if self.ui.button_show_terminal.isChecked():
+            save_data['splitter_bottom'] = self.ui.splitter_bottom.sizes()
+        else:
+            save_data['splitter_bottom'] = self._splitter_sizes
+
+        # plot_windows information
+        save_data['plot_windows'] = self.worker.get_window_state()
+
+        return save_data
+
+    def save_configuration(self):
+        save_data = self.get_save_data()
+        save_appconfig(self.save_config_file, {f'{self.title}_state': save_data})
+
+    def load_configuration(self):
+
+        save_data = load_appconfig(self.save_config_file)
+        save_data = save_data.get(f'{self.title}_state', {})
+
+        if 'screen_geometry' not in save_data:
+            return
         
+        screen_geometry = save_data['screen_geometry']
+
+        # Only restore the window size and position, and splitter
+        # positions if the screen is the same size/same number of monitors
+        # etc. This prevents the window moving off the screen if say, the
+        # position was saved when 2 monitors were plugged in but there is
+        # only one now, and the splitters may not make sense in light of a
+        # different window size, so better to fall back to defaults:
+
+        current_screen_geometry = lyse.ui_helpers.get_screen_geometry(self.qapplication)
+        if current_screen_geometry == screen_geometry:
+            if 'window_size' in save_data:
+                self.ui.resize(*save_data['window_size'])
+
+            if 'window_pos' in save_data:
+                self.ui.move(*save_data['window_pos'])
+
+            if 'splitter_bottom' in save_data:
+                self._splitter_sizes = save_data['splitter_bottom']
+                self.ui.splitter_bottom.setSizes(self._splitter_sizes)
+
+        self.set_terminal_visible(save_data.get('button_show_terminal', False))
+
+        self.worker.set_window_state(save_data.get('plot_windows', {}))
+
+        return save_data
+
+    def cascade_subwindows(self, state):
+        """
+        Cascade the subwindows 
+        """
+
+        # Make sure the windows have frames.
+        subwindows = self.ui.mdiArea_canvas.subWindowList()
+
+        for sub in subwindows: 
+           sub.setFrameState(True) 
+
+        self.ui.mdiArea_canvas.cascadeSubWindows()
+
+    def tile_subwindows(self, state):
+        """
+        Tile the subwindows 
+        
+        Remove the title bar is there is only one window.
+        """
+
+        subwindows = self.ui.mdiArea_canvas.subWindowList()
+
+        # The following code removes the title bar if there is one subwindow
+        FrameState = len(subwindows) != 1
+
+        for sub in subwindows: 
+           sub.setFrameState(FrameState) 
+
+        self.ui.mdiArea_canvas.tileSubWindows()
+
+    def set_terminal_visible(self, visible):
+        if visible:
+            self.ui.output_box.output_textedit.show()
+        else:
+            # Store this because we want to remember the splitter position when the terminal is hidden
+            self._splitter_sizes = self.ui.splitter_bottom.sizes()
+
+            self.ui.output_box.output_textedit.hide()
+
+
+        self.ui.button_show_terminal.setChecked(visible)    
+
 if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
 
     import lyse
-    from lyse import LYSE_DIR
     lyse.spinning_top = True
     import lyse.figure_manager
     lyse.figure_manager.install()
@@ -443,13 +665,11 @@ if __name__ == '__main__':
     import pylab
     import labscript_utils.h5_lock, h5py
 
-    from labscript_utils.modulewatcher import ModuleWatcher
-
     process_tree = ProcessTree.connect_to_parent()
-    to_parent = process_tree.to_parent
-    from_parent = process_tree.from_parent
-    kill_lock = process_tree.kill_lock
-    filepath = from_parent.get()
+
+    qapplication = QtWidgets.QApplication.instance()
+    if qapplication is None:
+        qapplication = QtWidgets.QApplication(sys.argv)
 
     # Rename this module to _analysis_subprocess and put it in sys.modules
     # under that name. The user's analysis routine will become the __main__ module
@@ -458,12 +678,6 @@ if __name__ == '__main__':
 
     sys.modules[__name__] = sys.modules['__main__']
 
-    # Set a meaningful client id for zlock
-    process_tree.zlock_client.set_process_name('lyse-'+os.path.basename(filepath))
+    worker = LyseWorker(process_tree, qapplication)
 
-    qapplication = QtWidgets.QApplication.instance()
-    if qapplication is None:
-        qapplication = QtWidgets.QApplication(sys.argv)
-    worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec_()
-        
