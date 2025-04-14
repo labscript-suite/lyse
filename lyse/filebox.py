@@ -24,7 +24,7 @@ import queue
 
 # 3rd party imports:
 import numpy as np
-import h5py
+import labscript_utils.h5_lock, h5py # use patched h5py
 import pandas
 
 # Labscript imports
