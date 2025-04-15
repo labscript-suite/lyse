@@ -15,10 +15,30 @@
 
 import os
 import sys
+import threading
 
 from labscript_utils import dedent
 
-from lyse import spinning_top, _plot_classes, _delay_flag
+
+# If running stand-alone, and not from within lyse, the below two variables
+# will be as follows. Otherwise lyse will override them with spinning_top =
+# True and path <name of hdf5 file being analysed>:
+spinning_top = False
+#path = None
+# data to be sent back to the lyse GUI if running within lyse
+_updated_data = {}
+# dictionary of plot id's to classes to use for Plot object
+_plot_classes = {}
+# A fake Plot object to subclass if we are not running in the GUI
+Plot=object
+# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
+plots = {}
+# A threading.Event to delay the 
+delay_event = threading.Event()
+# a flag to determine whether we should wait for the delay event
+_delay_flag = False
+
+
 utils_dir = os.path.dirname(os.path.realpath(__file__))
 
 def figure_to_clipboard(figure=None, **kwargs):

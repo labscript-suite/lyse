@@ -37,6 +37,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 # Labscript imports
 from labscript_utils.modulewatcher import ModuleWatcher
+from labscript_utils import dedent
 
 
 # Associate app windows with OS menu shortcuts:
@@ -44,7 +45,6 @@ import desktop_app
 desktop_app.set_process_appid('lyse')
 
 # lyse imports
-import lyse
 import lyse.utils
 import lyse.utils.worker
 import lyse.figure_manager
@@ -289,11 +289,11 @@ class AnalysisWorker(object):
                     path = data
                     success = self.do_analysis(path)
                     if success:
-                        if lyse._delay_flag:
-                            lyse.delay_event.wait()
-                        self.to_parent.put(['done', lyse._updated_data])
+                        if lyse.utils.worker._delay_flag:
+                            lyse.utils.worker.delay_event.wait()
+                        self.to_parent.put(['done', lyse.utils.worker._updated_data])
                     else:
-                        self.to_parent.put(['error', lyse._updated_data])
+                        self.to_parent.put(['error', lyse.utils.worker._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
@@ -313,11 +313,12 @@ class AnalysisWorker(object):
 
         # Use lyse.path instead:
         lyse.path = path
-        lyse.plots = self.plots
-        lyse.Plot = Plot
-        lyse._updated_data = {}
-        lyse._delay_flag = False
-        lyse.delay_event.clear()
+        # global variables used to communicate between analysis processes and GUI functions
+        lyse.utils.worker.plots = self.plots
+        lyse.utils.worker.Plot = Plot
+        lyse.utils.worker._updated_data = {}
+        lyse.utils.worker._delay_flag = False
+        lyse.utils.worker.delay_event.clear()
 
         # Save the current working directory before changing it to the
         # location of the user's script:
@@ -430,7 +431,7 @@ class AnalysisWorker(object):
                 Perhaps lyse.register_plot_class() was called incorrectly from your
                 script? The exception raised was:
                 """.format(identifier=identifier)
-            message = lyse.dedent(message) + '\n'.join(traceback_lines[1:])
+            message = dedent(message) + '\n'.join(traceback_lines[1:])
             message += '\n'
             message += 'Due to this error, we used the default lyse.Plot class instead.\n'
             sys.stderr.write(message)

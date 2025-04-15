@@ -41,23 +41,8 @@ import lyse.utils
 
 # Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
 from lyse.utils import LYSE_DIR
+from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
 
-# If running stand-alone, and not from within lyse, the below two variables
-# will be as follows. Otherwise lyse will override them with spinning_top =
-# True and path <name of hdf5 file being analysed>:
-spinning_top = False
-# data to be sent back to the lyse GUI if running within lyse
-_updated_data = {}
-# dictionary of plot id's to classes to use for Plot object
-_plot_classes = {}
-# A fake Plot object to subclass if we are not running in the GUI
-Plot=object
-# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
-plots = {}
-# A threading.Event to delay the 
-delay_event = threading.Event()
-# a flag to determine whether we should wait for the delay event
-_delay_flag = False
 
 if len(sys.argv) > 1:
     path = sys.argv[1]
@@ -645,6 +630,7 @@ class Run(object):
         set_attributes(self.h5_file[group], {name: value})
             
         if spinning_top:
+            global _updated_data
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
             if group.startswith('results'):
