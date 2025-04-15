@@ -22,7 +22,7 @@ except ImportError:
 # -- Project information (unique to each project) -------------------------------------
 
 project = "lyse"
-copyright = "2020, labscript suite"
+copyright = "2024, labscript suite"
 author = "labscript suite contributors"
 
 # The full version, including alpha/beta/rc tags
