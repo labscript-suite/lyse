@@ -18,6 +18,7 @@ from pathlib import Path
 import sys
 import functools
 import contextlib
+import warnings
 
 import labscript_utils.h5_lock, h5py
 import pandas
@@ -39,12 +40,16 @@ import lyse.utils
 from lyse.utils import LYSE_DIR
 from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
 
-
-if len(sys.argv) > 1:
-    path = sys.argv[1]
-else:
-    path = None
-
+# note: path is injected into the script namespace by AnalysisWorker at runtime
+def __getattr__(name):
+    if name == 'path':
+        from lyse.utils.worker import path
+        warnings.warn("'path' is now automatically injected into the script namespace. "
+                      "Importing it from 'lyse.path' will be deprecated.",
+                      warnings.FutureWarning)
+        return path
+    else:
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 class _RoutineStorage(object):
     """An empty object that analysis routines can store data in. It will

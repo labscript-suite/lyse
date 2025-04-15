@@ -24,7 +24,7 @@ from labscript_utils import dedent
 # will be as follows. Otherwise lyse will override them with spinning_top =
 # True and path <name of hdf5 file being analysed>:
 spinning_top = False
-#path = None
+path = None
 # data to be sent back to the lyse GUI if running within lyse
 _updated_data = {}
 # dictionary of plot id's to classes to use for Plot object
