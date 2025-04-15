@@ -28,7 +28,7 @@ from types import ModuleType
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 
-from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+from qtutils import inmain, inmain_decorator, UiLoader
 import qtutils.icons
 
 import multiprocessing

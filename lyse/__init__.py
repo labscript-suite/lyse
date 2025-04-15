@@ -13,19 +13,15 @@
 """Lyse analysis API
 """
 
-import os
-import socket
 import pickle as pickle
 from pathlib import Path
 import sys
-import threading
 import functools
 import contextlib
 
 import labscript_utils.h5_lock, h5py
 import pandas
-from numpy import array, ndarray, where
-import types
+from numpy import array, where
 
 from .__version__ import __version__
 
