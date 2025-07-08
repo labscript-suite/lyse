@@ -28,7 +28,7 @@ from types import ModuleType
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 
-from qtutils import inmain, inmain_later, inmain_decorator, UiLoader, inthread, DisconnectContextManager
+from qtutils import inmain, inmain_decorator, UiLoader
 import qtutils.icons
 
 import multiprocessing
@@ -37,6 +37,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 # Labscript imports
 from labscript_utils.modulewatcher import ModuleWatcher
+from labscript_utils import dedent
 
 
 # Associate app windows with OS menu shortcuts:
@@ -44,8 +45,8 @@ import desktop_app
 desktop_app.set_process_appid('lyse')
 
 # lyse imports
-import lyse
 import lyse.utils
+import lyse.utils.worker
 import lyse.figure_manager
 
 # This process is not fork-safe. Spawn fresh processes on platforms that would fork:
@@ -123,7 +124,7 @@ class Plot(object):
             self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
 
     def on_copy_to_clipboard_triggered(self):
-        lyse.figure_to_clipboard(self.figure)
+        lyse.utils.worker.figure_to_clipboard(self.figure)
 
     @inmain_decorator()
     def save_axis_limits(self):
@@ -288,11 +289,11 @@ class AnalysisWorker(object):
                     path = data
                     success = self.do_analysis(path)
                     if success:
-                        if lyse._delay_flag:
-                            lyse.delay_event.wait()
-                        self.to_parent.put(['done', lyse._updated_data])
+                        if lyse.utils.worker._delay_flag:
+                            lyse.utils.worker.delay_event.wait()
+                        self.to_parent.put(['done', lyse.utils.worker._updated_data])
                     else:
-                        self.to_parent.put(['error', lyse._updated_data])
+                        self.to_parent.put(['error', lyse.utils.worker._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
         
@@ -309,14 +310,16 @@ class AnalysisWorker(object):
         # Reset the routine module's namespace:
         self.routine_module.__dict__.clear()
         self.routine_module.__dict__.update(self.routine_module_clean_dict)
+        # inject path into script namespace
+        self.routine_module.__dict__['path'] = path
 
-        # Use lyse.path instead:
-        lyse.path = path
-        lyse.plots = self.plots
-        lyse.Plot = Plot
-        lyse._updated_data = {}
-        lyse._delay_flag = False
-        lyse.delay_event.clear()
+        # global variables used to communicate between analysis processes and GUI functions
+        lyse.utils.worker.path = path  # for backwards compat with scripts that use lyse.path
+        lyse.utils.worker.plots = self.plots
+        lyse.utils.worker.Plot = Plot
+        lyse.utils.worker._updated_data = {}
+        lyse.utils.worker._delay_flag = False
+        lyse.utils.worker.delay_event.clear()
 
         # Save the current working directory before changing it to the
         # location of the user's script:
@@ -374,7 +377,7 @@ class AnalysisWorker(object):
                 plot = self.plots[fig]
 
                 # Get the Plot subclass registered for this plot identifier if it exists
-                cls = lyse.get_plot_class(identifier)
+                cls = lyse.utils.worker.get_plot_class(identifier)
                 # If no plot was registered, use the base class
                 if cls is None: cls = Plot
                 
@@ -415,7 +418,7 @@ class AnalysisWorker(object):
     def new_figure(self, fig, identifier):
         try:
             # Get custom class for this plot if it is registered
-            cls = lyse.get_plot_class(identifier)
+            cls = lyse.utils.worker.get_plot_class(identifier)
             # If no plot was registered, use the base class
             if cls is None: cls = Plot
             # if cls is not a subclass of Plot, then raise an Exception
@@ -429,7 +432,7 @@ class AnalysisWorker(object):
                 Perhaps lyse.register_plot_class() was called incorrectly from your
                 script? The exception raised was:
                 """.format(identifier=identifier)
-            message = lyse.dedent(message) + '\n'.join(traceback_lines[1:])
+            message = dedent(message) + '\n'.join(traceback_lines[1:])
             message += '\n'
             message += 'Due to this error, we used the default lyse.Plot class instead.\n'
             sys.stderr.write(message)
