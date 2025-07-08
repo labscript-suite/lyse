@@ -10,14 +10,48 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
+"""Lyse dataframe utilities
+"""
+
 import labscript_utils.h5_lock, h5py
 import pandas
 import tzlocal
+
+# Labscript imports
 import labscript_utils.shared_drive
 from labscript_utils.connections import _ensure_str
 from labscript_utils.properties import get_attributes
 from labscript_utils.shot_utils import get_shot_globals
+from labscript_utils.labconfig import LabConfig
 
+# lyse imports
+from lyse.utils import LABCONFIG
+
+def rangeindex_to_multiindex(df, inplace):
+    if isinstance(df.index, pandas.MultiIndex):
+        # The dataframe has already been converted.
+        return df
+    try:
+        padding = ('',)*(df.columns.nlevels - 1)
+        try:
+            integer_indexing = LABCONFIG.getboolean('lyse', 'integer_indexing')
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+            integer_indexing = False
+        if integer_indexing:
+            out = df.set_index(['sequence_index', 'run number', 'run repeat'], inplace=inplace, drop=False)
+            # out is None if inplace is True, and is the new dataframe is inplace is False.
+            if not inplace:
+                df = out
+        else:
+            out = df.set_index([('sequence',) + padding,('run time',) + padding], inplace=inplace, drop=False)
+            if not inplace:
+                df = out
+            df.index.names = ['sequence', 'run time']
+    except KeyError:
+        # Empty DataFrame or index column not found, so fall back to RangeIndex instead
+        pass
+    df.sort_index(inplace=True)
+    return df
 
 def asdatetime(timestr):
     if isinstance(timestr, bytes):
