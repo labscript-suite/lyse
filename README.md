@@ -4,7 +4,7 @@
 
 ### Online analysis of live experiment data
 
-[![Actions Status](https://github.com/labscript-suite/lyse/workflows/Build%20and%20Release/badge.svg?branch=maintenance%2F3.0.x)](https://github.com/labscript-suite/lyse/actions)
+[![Actions Status](https://github.com/labscript-suite/lyse/workflows/Build%20and%20Release/badge.svg)](https://github.com/labscript-suite/lyse/actions)
 [![License](https://img.shields.io/pypi/l/lyse.svg)](https://github.com/labscript-suite/lyse/raw/master/LICENSE.txt)
 [![Python Version](https://img.shields.io/pypi/pyversions/lyse.svg)](https://python.org)
 [![PyPI](https://img.shields.io/pypi/v/lyse.svg)](https://pypi.org/project/lyse)
