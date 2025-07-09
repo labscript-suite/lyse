@@ -450,7 +450,7 @@ if __name__ == '__main__':
 
     os.environ['MPLBACKEND'] = "qt5agg"
 
-    lyse.spinning_top = True
+    lyse.utils.worker.spinning_top = True
 
     lyse.figure_manager.install()
 
