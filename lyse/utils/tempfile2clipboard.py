@@ -10,13 +10,6 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-
-import sys
-import os
-
-from qtutils.qt.QtWidgets import QApplication
-from qtutils.qt.QtGui import QImage
-
 """
 This is a stand-alone script which copies an image to the clipboard and then
 optionally deletes the image file.
@@ -38,6 +31,12 @@ this way we avoid corner-cases of how this may interfere with any use of Qt in
 the calling program.
 
 """
+
+import sys
+import os
+
+from qtutils.qt.QtWidgets import QApplication
+from qtutils.qt.QtGui import QImage
 
 def main():
     USAGE = 'Usage:\n    python tempfile2clipboard.py [--delete] image_filepath\n'
