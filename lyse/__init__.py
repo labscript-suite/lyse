@@ -46,7 +46,7 @@ def __getattr__(name):
         from lyse.utils.worker import path
         warnings.warn("'path' is now automatically injected into the script namespace. "
                       "Importing it from 'lyse.path' will be deprecated.",
-                      warnings.FutureWarning)
+                      FutureWarning)
         return path
     else:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
