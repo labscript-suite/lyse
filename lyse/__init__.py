@@ -38,7 +38,8 @@ import lyse.utils
 
 # Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
 from lyse.utils import LYSE_DIR
-from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
+from lyse.utils.worker import register_plot_class, delay_results_return
+
 if len(sys.argv) > 1:
     warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
                   "If you need this feature, let the developers know so it is not removed.",
@@ -610,6 +611,9 @@ class Run(object):
             PermissionError: A `PermissionError` is raised if an attribute with
                 name `name` already exists but `overwrite` is set to `False`.
         """
+        # lazy import here so they get updated values from analysis subprocess
+        from lyse.utils.worker import spinning_top, _updated_data
+
         if not group:
             if self.group is None:
                 msg = """Cannot save result; no default group set. Either
@@ -631,9 +635,8 @@ class Run(object):
                 )
             raise PermissionError(dedent(msg))
         set_attributes(self.h5_file[group], {name: value})
-            
+        
         if spinning_top:
-            global _updated_data
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
             if group.startswith('results'):
