@@ -39,6 +39,11 @@ import lyse.utils
 # Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
 from lyse.utils import LYSE_DIR
 from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
+if len(sys.argv) > 1:
+    warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
+                  "If you need this feature, let the developers know so it is not removed.",
+                  FutureWarning)
+    path = sys.argv[1]
 
 # lazy import so we catch updated path from analysis subprocess
 def __getattr__(name):
