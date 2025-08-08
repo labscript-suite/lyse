@@ -40,13 +40,10 @@ import lyse.utils
 from lyse.utils import LYSE_DIR
 from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
 
-# note: path is injected into the script namespace by AnalysisWorker at runtime
+# lazy import so we catch updated path from analysis subprocess
 def __getattr__(name):
     if name == 'path':
         from lyse.utils.worker import path
-        warnings.warn("'path' is now automatically injected into the script namespace. "
-                      "Importing it from 'lyse.path' will be deprecated.",
-                      FutureWarning)
         return path
     else:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
