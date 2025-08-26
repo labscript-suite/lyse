@@ -213,7 +213,7 @@ class WebServer(ZMQServer):
             return df
 
         # Get a list of all unique sequences, each corresponding to one call to
-        # engage in runmanager. Each sequence may contain multiple runs. The
+        # engage in runmanager. Each sequence may contain multiple shots. The
         # below creates strings to identify sequences. To be from the same
         # sequence, two shots have to have the same value for 'sequence' (which
         # makes sure that the time when engage was called are the same to within
@@ -2286,13 +2286,13 @@ class Lyse(object):
                 # raise a deprecation warning if this succeeds
                 msg = """msgpack support is being dropped by pandas >= 1.0.0.
                 Please resave this dataframe to use the new format."""
-                warnings.warn(dedent(msg),DeprecationWarning)
+                warnings.warn(dedent(msg), FutureWarning)
             except AttributeError as err:
                 # using newer pandas that can't read msg
                 msg = """msgpack is no longer supported by pandas.
                 To read this dataframe, you must downgrade pandas to < 1.0.0.
                 You can then read this dataframe and resave it with the new format."""
-                raise DeprecationWarning(dedent(msg)) from err
+                raise FutureWarning(dedent(msg)) from err
         else:
             df = pandas.read_pickle(file).sort_values("run time").reset_index()
                 

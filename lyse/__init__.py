@@ -15,6 +15,7 @@
 
 from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
 from labscript_utils.dict_diff import dict_diff
+import copy
 import os
 import socket
 import pickle as pickle
@@ -23,6 +24,7 @@ import sys
 import threading
 import functools
 import contextlib
+import warnings
 
 import labscript_utils.h5_lock, h5py
 from labscript_utils.labconfig import LabConfig
@@ -83,7 +85,7 @@ routine_storage = _RoutineStorage()
 def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None, filter_kwargs=None):
     """Get data from the lyse dataframe or a file.
     
-    This function allows for either extracting information from a run's hdf5
+    This function allows for either extracting information from a shots's hdf5
     file, or retrieving data from lyse's dataframe. If `filepath` is provided
     then data will be read from that file and returned as a pandas series. If
     `filepath` is not provided then the dataframe in lyse, or a portion of it,
@@ -101,11 +103,11 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
     that method.
 
     Args:
-        filepath (str, optional): The path to a run's hdf5 file. If a value
+        filepath (str, optional): The path to a shot's hdf5 file. If a value
             other than `None` is provided, then this function will return a
-            pandas series containing data associated with the run. In particular
+            pandas series containing data associated with the shot. In particular
             it will contain the globals, singleshot results, multishot results,
-            etc. that would appear in the run's row in the Lyse dataframe, but
+            etc. that would appear in the shot's row in the Lyse dataframe, but
             the values will be read from the file rather than extracted from the
             lyse dataframe. If `filepath` is `None`, then this function will
             instead return a section of the lyse dataframe. Note that if
@@ -207,14 +209,14 @@ def _rangeindex_to_multiindex(df, inplace):
     df.sort_index(inplace=True)
     return df
 
-def globals_diff(run1, run2, group=None):
-    """Take a diff of the globals between two runs.
+def globals_diff(shot1, shot2, group=None):
+    """Take a diff of the globals between two shots.
 
     Uses the :obj:`labscript-utils:dict_diff` function.
 
     Args:
-        run1 (:obj:`Run`): First Run to compare.
-        run2 (:obj:`Run`): Second Run to compare.
+        shot1 (:obj:`Shot`): First Shot to compare.
+        shot2 (:obj:`Shot`): Second Shot to compare.
         group (str, optional): When `None` (default), compare all groups.
             Otherwise, only compare globals in `group`.
 
@@ -223,12 +225,12 @@ def globals_diff(run1, run2, group=None):
         pairs. Keys unique to either dictionary are returned as `key:[val1,'-']` or
         `key:['-',val2]`.
     """
-    return dict_diff(run1.get_globals(group), run2.get_globals(group))
+    return dict_diff(shot1.get_globals(group), shot2.get_globals(group))
  
 def open_file(mode):
     """Decorator for lyse functions to allow using previously opened file with context manager.
     
-    If multiple read/write operations happen on a Run in a single shot,
+    If multiple read/write operations happen on a Shot in a single analysis,
     opening the h5file once via the context manager `open`
     can speed up the analysis execution time by limiting the number of times
     the file must be opened/closed.
@@ -244,17 +246,17 @@ def open_file(mode):
             Lyse typically only uses 'r' and 'r+'.
 
     Returns:
-        Decorator for :class:`~.Run` methods that need to read/write the shot file
+        Decorator for :class:`~.Shot` methods that need to read/write the shot file
 
     Raises:
-        PermissionError: If the Run is set as read-only but a write mode is requested
+        PermissionError: If the Shot is set as read-only but a write mode is requested
     """
     def decorator_open_file(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
 
             if self.no_write and mode != 'r':
-                msg = f'Cannot perform operation {func.__name__:s}; this run is read-only'
+                msg = f'Cannot perform operation {func.__name__:s}; this shot is read-only'
                 raise PermissionError(msg)
 
             if self.h5_file is None:
@@ -272,7 +274,7 @@ def open_file(mode):
         return wrapper
     return decorator_open_file
 
-class Run(object):
+class Shot(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
 
     This class implements methods that allow the user to retrieve data from a
@@ -294,8 +296,8 @@ class Run(object):
         if not self.no_write:
             self._create_group_if_not_exists(h5_path, '/', 'results')
                      
-        # The group where this run's results will be stored in the h5 file will be the
-        # name of the python script which is instantiating this Run object. If the user
+        # The group where this shot's results will be stored in the h5 file will be the
+        # name of the python script which is instantiating this Shot object. If the user
         # is running interactively or in an unusual environment such that the __main__
         # module isn't in sys.modules or doesn't have a non-None __file__ attribute,
         # then self.group will not be set.
@@ -320,7 +322,7 @@ class Run(object):
     
     @contextlib.contextmanager
     def open(self, mode):
-        """Context manager to open the Run's h5 file for successive reads/writes.
+        """Context manager to open the Shot's h5 file for successive reads/writes.
 
         Supports all h5 modes, though only `'r'` and `'r+'`/`'a'` are typically
         used within lyse itself.
@@ -331,10 +333,10 @@ class Run(object):
                 Lyse typically only uses 'r' and 'r+'.
 
         Yields:
-            :class:`~.Run`: Handle to opened `Run` object.
+            :class:`~.Shot`: Handle to opened `Shot` object.
 
         Raises:
-            PermissionError: If the Run is set as read-only but a write mode is requested
+            PermissionError: If the Shot is set as read-only but a write mode is requested
 
         Examples:
             
@@ -343,7 +345,7 @@ class Run(object):
             these two openings into one.
 
             >>> from lyse import *
-            >>> shot = Run(path)
+            >>> shot = Shot(path)
             >>> with shot.open('r'):
             >>>     # shot processing that requires reads/writes
             >>>     _, vals = shot.get_trace('my_trace')
@@ -360,7 +362,7 @@ class Run(object):
             in a single line.
 
             >>> from lyse import *
-            >>> with Run(path).open('r+') as shot:
+            >>> with Shot(path).open('r+') as shot:
             >>>     # shot processing that requires reads/writes
             >>>     t, vals = shot.get_trace('my_trace')
             >>>     results = vals**2
@@ -374,14 +376,14 @@ class Run(object):
 
         # ensure no_write is respected
         if self.no_write and mode != 'r':
-            msg = 'Cannot open file with a write mode; this run is read-only'
+            msg = 'Cannot open file with a write mode; this shot is read-only'
             raise PermissionError(msg)
             
         # check if file is already open, do nothing if modes compatible
         if self.__h5_file is not None:
             # ensure no-write is respected
             if (self.__h5_file.mode == 'r') and (mode != 'r'):
-                msg = 'Cannot open file with a write mode; this run is read-only'
+                msg = 'Cannot open file with a write mode; this shot is read-only'
                 raise PermissionError(msg)
             yield self
             return
@@ -397,7 +399,7 @@ class Run(object):
     def group(self):
         """str: The group in the hdf5 file in which results are saved by default.
         
-        When a `Run` instance is created from within a lyse singleshot or
+        When a `Shot` instance is created from within a lyse singleshot or
         multishot routine, `group` will be set to the name of the running
         routine. If created from outside a lyse script it will be set to `None`.
         To change the default group for saving results, use the `set_group()`
@@ -426,7 +428,7 @@ class Run(object):
                 create_group = True
         if create_group:
             if self.no_write:
-                msg = "Cannot create group; this run is read-only."
+                msg = "Cannot create group; this shot is read-only."
                 raise PermissionError(msg)
             with h5py.File(h5_path, 'r+') as h5_file:
                 # Catch the ValueError raised if the group was created by
@@ -454,7 +456,7 @@ class Run(object):
 
     @open_file('r')
     def trace_names(self):
-        """Return a list of all saved data traces in Run.
+        """Return a list of all saved data traces in Shot.
 
         Raises:
             KeyError: If the group `'/data/traces/'` does not yet exist.
@@ -812,10 +814,10 @@ class Run(object):
                 for the optional arguments of `self.save_result()`.
 
         Examples:
-            >>> run = Run('path/to/an/hdf5/file.h5')  # doctest: +SKIP
+            >>> shot = Shot('path/to/an/hdf5/file.h5')  # doctest: +SKIP
             >>> a = 5
             >>> b = 2.48
-            >>> run.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
+            >>> shot.save_results('result', a, 'other_result', b, overwrite=False)  # doctest: +SKIP
         """
         names = args[::2]
         values = args[1::2]
@@ -1099,25 +1101,43 @@ class Run(object):
         except KeyError:
             return []
                 
-    def globals_diff(self, other_run, group=None):
-        """Take a diff between this run and another run.
+    def globals_diff(self, other_shot, group=None):
+        """Take a diff between this shot and another shot.
 
-        This calls :obj:`globals_diff(self, other_run, group) <globals_diff>`.
+        This calls :obj:`globals_diff(self, other_shot, group) <globals_diff>`.
 
         Args:
-            other_run (:obj:`Run`): Run to compare to.
+            other_shot (:obj:`Shot`): Shot to compare to.
             group (str, optional): When `None` (default), compare all globals.
                 Otherwise only compare globals in `group`. 
 
         Returns:
             dict: Dictionary of different globals.
         """
-        return globals_diff(self, other_run, group)            
+        return globals_diff(self, other_shot, group)            
+
+
+class Run(Shot):
+    """Deprecated class for interacting with a shot's hdf5 file.
     
+    This class will be removed in in a future release.
+    Please update your analysis code to use the :class:`Shot` class.
+    """
+    def __init__(self, *args, **kwargs):
+        msg = """The 'Run' class has been renamed to 'Shot' (but is otherwise 
+            compatible). 'Run' will be removed in a future release. Please update your 
+            analysis code to use the 'Shot' class.
+            """
+        warnings.warn(dedent(msg), FutureWarning)
+        super().__init__(*args, **kwargs)
+
+    def globals_diff(self, other_run, group=None):
+        return globals_diff(self, other_run, group)  
+
         
-class Sequence(Run):
-    def __init__(self, h5_path, run_paths, no_write=False):
-        """Generic results storage that is not associated with a specific Run.
+class Sequence(Shot):
+    def __init__(self, h5_path, shot_paths, no_write=False):
+        """Generic results storage that is not associated with a specific Shot.
 
         This is typically used to save results from a multi-shot analysis to
         an independent h5 file.
@@ -1126,9 +1146,9 @@ class Sequence(Run):
             h5_path (str): Path to h5 file to save to. If file does not exist,
                 will try to create it assuming `no_write=False`. If file exists,
                 opens a handle to it.
-            run_paths (:obj:`list` or :obj:`pandas:pandas.DataFrame`): List of
-                runs to associate with the sequence. If a dataframe is supplied,
-                will introspect the runs from the `'filepath'` data.
+            shot_paths (:obj:`list` or :obj:`pandas:pandas.DataFrame`): List of
+                shots to associate with the sequence. If a dataframe is supplied,
+                will introspect the shots from the `'filepath'` data.
             no_write (bool, optional): If `True`, opens file in read-only mode.
 
         Raises:
@@ -1150,32 +1170,53 @@ class Sequence(Run):
 
         super().__init__(h5_path, no_write=no_write)
 
-        if isinstance(run_paths, pandas.DataFrame):
-            run_paths = run_paths['filepath']      
-        self.runs = {path: Run(path,no_write=True) for path in run_paths}
+        if isinstance(shot_paths, pandas.DataFrame):
+            shot_paths = shot_paths['filepath']      
+        self.__shots = {path: Shot(path,no_write=True) for path in shot_paths}
+        
+    @property
+    def runs(self):
+        """This property is deprecated and will be removed in a future release
+        
+        Use the :attr:`shots` attribute instead.
+        """
+        msg = """The 'runs' attribute has been renamed to 'shots'. 'runs' will be
+            removed in a future release. Please update your analysis code to use the 'shots'
+            attribute.
+            """
+        warnings.warn(dedent(msg), FutureWarning)
+        return copy.copy(self.__shots)
+
+    @property
+    def shots(self):
+        """A dictionary containing :class:`Shot` instances.
+        
+        The dictionary is keyed by filepaths specified in the :code:`shot_paths`
+        argument at instantiation time."""
+        return copy.copy(self.__shots)
 
     def get_trace(self,*args):
-        """Get the named trace from each run in the sequence.
+        """Get the named trace from each shot in the sequence.
 
         Args:
             *args (str): Name of trace. Passed directly to :obj:`get_trace`.
 
         Return:
-            dict: Dictonary of path:trace pairs for each run.
+            dict: Dictonary of path:trace pairs for each shot.
         """
-        return {path:run.get_trace(*args) for path,run in self.runs.items()}
+        return {path:shot.get_trace(*args) for path,shot in self.shots.items()}
         
     def get_result_array(self,*args):
-        """Get the specified result array from each run in the sequence.
+        """Get the specified result array from each shot in the sequence.
 
         Args:
             *args (str): Passed directly to :obj:`get_result_array`. Should be
                 `group` and `name` to result to obtain.
 
         Return:
-            dict: Dictionary of path:result pairs for each run.
+            dict: Dictionary of path:result pairs for each shot.
         """
-        return {path:run.get_result_array(*args) for path,run in self.runs.items()}
+        return {path:shot.get_result_array(*args) for path,shot in self.shots.items()}
          
     def get_traces(self,*args):
         """Not implemented!
