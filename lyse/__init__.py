@@ -40,6 +40,21 @@ import lyse.utils
 from lyse.utils import LYSE_DIR
 from lyse.utils.worker import register_plot_class, delay_results_return
 
+__all__ = [
+    # interacting with lyse internals
+    'LYSE_DIR',
+    'register_plot_class',
+    'delay_results_return',
+    # lyse analysis API objects
+    'path',  # needed so old star imports know to pull `path` from the lazy loader here
+    'routine_storage',
+    'data',
+    'globals_diff',
+    'open_file',
+    'Run',
+    'Sequence',
+]
+
 if len(sys.argv) > 1:
     warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
                   "If you need this feature, let the developers know so it is not removed.",
