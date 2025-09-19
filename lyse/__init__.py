@@ -22,7 +22,7 @@ import warnings
 
 import labscript_utils.h5_lock, h5py
 import pandas
-from numpy import array, where
+import numpy as np
 
 from .__version__ import __version__
 
@@ -482,7 +482,7 @@ class Run(object):
         if raw_data:
             data = trace[()]
         else:
-            data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
+            data = np.array(trace['t'],dtype=float), np.array(trace['values'],dtype=float)  
         
         return data
 
@@ -504,7 +504,7 @@ class Run(object):
         name=name.encode()
         if name not in self.h5_file['data']['waits']['label']:
             raise Exception('The wait \'%s\' does not exist'%name.decode())
-        name_index, =where(self.h5_file['data']['waits']['label']==name)[0]
+        name_index, = np.where(self.h5_file['data']['waits']['label']==name)[0]
         return self.h5_file['data']['waits'][name_index]
 
     @open_file('r')
@@ -542,7 +542,7 @@ class Run(object):
             raise Exception('The result group \'%s\' does not exist'%group)
         if name not in self.h5_file['results'][group]:
             raise Exception('The result array \'%s\' does not exist'%name)
-        return array(self.h5_file['results'][group][name])
+        return np.array(self.h5_file['results'][group][name])
 
     @open_file('r')            
     def get_result(self, group, name):
@@ -866,7 +866,7 @@ class Run(object):
             raise Exception('File does not contain any images with label \'%s\''%label)
         if image not in self.h5_file['images'][orientation][label]:
             raise Exception('Image \'%s\' not found in file'%image)
-        return array(self.h5_file['images'][orientation][label][image])
+        return np.array(self.h5_file['images'][orientation][label][image])
 
     @open_file('r')    
     def get_images(self, orientation, label, *images):
