@@ -10,9 +10,15 @@
 # the project for the full license.                                 #
 #                                                                   #
 #####################################################################
-import lyse
+"""Custom matplotlib Figure Manager
+"""
+
 from collections import OrderedDict
 import sys
+
+from labscript_utils import dedent
+
+import lyse.utils.worker
 
 class FigureManager(object):
 
@@ -67,7 +73,7 @@ class FigureManager(object):
                     To permanently fix this, please ensure you call figure() prior
                     to other matplotlib plotting functions.
                     """
-                sys.stderr.write(lyse.dedent(msg))
+                sys.stderr.write(dedent(msg))
             self.figs[identifier] = fig
             self.__allocated_figures.append(identifier)
             self._remove_dead_references(identifier, fig)
@@ -110,7 +116,7 @@ class FigureManager(object):
             del self.figs[identifier]
             
     def show(self):
-        if lyse.spinning_top:
+        if lyse.utils.worker.spinning_top:
             pass # supress show()
         else:
             self._show()
