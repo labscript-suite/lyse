@@ -310,11 +310,9 @@ class AnalysisWorker(object):
         # Reset the routine module's namespace:
         self.routine_module.__dict__.clear()
         self.routine_module.__dict__.update(self.routine_module_clean_dict)
-        # inject path into script namespace
-        self.routine_module.__dict__['path'] = path
 
         # global variables used to communicate between analysis processes and GUI functions
-        lyse.utils.worker.path = path  # for backwards compat with scripts that use lyse.path
+        lyse.utils.worker.path = path
         lyse.utils.worker.plots = self.plots
         lyse.utils.worker.Plot = Plot
         lyse.utils.worker._updated_data = {}

@@ -22,7 +22,7 @@ import warnings
 
 import labscript_utils.h5_lock, h5py
 import pandas
-from numpy import array, where
+import numpy as np
 
 from .__version__ import __version__
 
@@ -38,15 +38,42 @@ import lyse.utils
 
 # Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
 from lyse.utils import LYSE_DIR
-from lyse.utils.worker import spinning_top, _updated_data, register_plot_class, delay_results_return
+from lyse.utils.worker import register_plot_class, delay_results_return
 
-# note: path is injected into the script namespace by AnalysisWorker at runtime
+__all__ = [
+    # interacting with lyse internals
+    'LYSE_DIR',
+    'register_plot_class',
+    'delay_results_return',
+    # lyse analysis API objects
+    'path',  # needed so old star imports know to pull `path` from the lazy loader here
+    'routine_storage',
+    'data',
+    'globals_diff',
+    'open_file',
+    'Run',
+    'Sequence',
+]
+
+if len(sys.argv) > 1:
+    warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
+                  "If you need this feature, let the developers know so it is not removed.",
+                  FutureWarning)
+    path = sys.argv[1]
+
+if 'sphinx' in sys.modules:
+    # building docs, define path with docstring here so docs knows it's present
+    path = None
+    """Links to :attr:`lyse.utils.worker.path` which contains hdf5 filepath to be analysed.
+    
+    Automatically populated by the lyse GUI.
+    Can be passed as a command line argument, but this behavior is deprecated.
+    """
+
+# lazy import so we catch updated path from analysis subprocess
 def __getattr__(name):
     if name == 'path':
         from lyse.utils.worker import path
-        warnings.warn("'path' is now automatically injected into the script namespace. "
-                      "Importing it from 'lyse.path' will be deprecated.",
-                      FutureWarning)
         return path
     else:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
@@ -61,6 +88,14 @@ class _RoutineStorage(object):
     these cases."""
 
 routine_storage = _RoutineStorage()
+"""An empty object that analysis routines can store data in.
+
+It will persist from one run of an analysis routine to the next when the routine
+is being run from within lyse. No attempt is made to store data to disk,
+so if the routine is run multiple times from the command line instead of
+from lyse, or the lyse analysis subprocess is restarted, data will not be
+retained. An alternate method should be used to store data if desired in
+these cases."""
 
 
 def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None):
@@ -464,7 +499,7 @@ class Run(object):
         if raw_data:
             data = trace[()]
         else:
-            data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
+            data = np.array(trace['t'],dtype=float), np.array(trace['values'],dtype=float)  
         
         return data
 
@@ -486,7 +521,7 @@ class Run(object):
         name=name.encode()
         if name not in self.h5_file['data']['waits']['label']:
             raise Exception('The wait \'%s\' does not exist'%name.decode())
-        name_index, =where(self.h5_file['data']['waits']['label']==name)[0]
+        name_index, = np.where(self.h5_file['data']['waits']['label']==name)[0]
         return self.h5_file['data']['waits'][name_index]
 
     @open_file('r')
@@ -524,7 +559,7 @@ class Run(object):
             raise Exception('The result group \'%s\' does not exist'%group)
         if name not in self.h5_file['results'][group]:
             raise Exception('The result array \'%s\' does not exist'%name)
-        return array(self.h5_file['results'][group][name])
+        return np.array(self.h5_file['results'][group][name])
 
     @open_file('r')            
     def get_result(self, group, name):
@@ -608,6 +643,9 @@ class Run(object):
             PermissionError: A `PermissionError` is raised if an attribute with
                 name `name` already exists but `overwrite` is set to `False`.
         """
+        # lazy import here so they get updated values from analysis subprocess
+        from lyse.utils.worker import spinning_top, _updated_data
+
         if not group:
             if self.group is None:
                 msg = """Cannot save result; no default group set. Either
@@ -629,9 +667,8 @@ class Run(object):
                 )
             raise PermissionError(dedent(msg))
         set_attributes(self.h5_file[group], {name: value})
-            
+        
         if spinning_top:
-            global _updated_data
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
             if group.startswith('results'):
@@ -846,7 +883,7 @@ class Run(object):
             raise Exception('File does not contain any images with label \'%s\''%label)
         if image not in self.h5_file['images'][orientation][label]:
             raise Exception('Image \'%s\' not found in file'%image)
-        return array(self.h5_file['images'][orientation][label][image])
+        return np.array(self.h5_file['images'][orientation][label][image])
 
     @open_file('r')    
     def get_images(self, orientation, label, *images):
