@@ -13,6 +13,5 @@ API Reference
    lyse.figure_manager
    lyse.filebox
    lyse.routines
-   lyse.tempfile2clipboard
    lyse.utils
    lyse.__main__

@@ -61,6 +61,15 @@ if len(sys.argv) > 1:
                   FutureWarning)
     path = sys.argv[1]
 
+if 'sphinx' in sys.modules:
+    # building docs, define path with docstring here so docs knows it's present
+    path = None
+    """Links to :attr:`lyse.utils.worker.path` which contains hdf5 filepath to be analysed.
+    
+    Automatically populated by the lyse GUI.
+    Can be passed as a command line argument, but this behavior is deprecated.
+    """
+
 # lazy import so we catch updated path from analysis subprocess
 def __getattr__(name):
     if name == 'path':
@@ -79,6 +88,14 @@ class _RoutineStorage(object):
     these cases."""
 
 routine_storage = _RoutineStorage()
+"""An empty object that analysis routines can store data in.
+
+It will persist from one run of an analysis routine to the next when the routine
+is being run from within lyse. No attempt is made to store data to disk,
+so if the routine is run multiple times from the command line instead of
+from lyse, or the lyse analysis subprocess is restarted, data will not be
+retained. An alternate method should be used to store data if desired in
+these cases."""
 
 
 def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None):

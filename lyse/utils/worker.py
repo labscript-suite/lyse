@@ -20,23 +20,26 @@ import threading
 from labscript_utils import dedent
 
 
-# If running stand-alone, and not from within lyse, the below two variables
-# will be as follows. Otherwise lyse will override them with spinning_top =
-# True and path <name of hdf5 file being analysed>:
 spinning_top = False
+"""Variable to tell lyse API if running from within lyse GUI"""
 path = None
-# data to be sent back to the lyse GUI if running within lyse
+"""Path to hdf5 being analysed.
+
+If running stand-alone, not from within the lyse GUI, default is None.
+Within lyse GUI, updated automatically to the correct path.
+"""
 _updated_data = {}
-# dictionary of plot id's to classes to use for Plot object
+"""Data to be sent back to the lyse GUI if running within lyse"""
 _plot_classes = {}
-# A fake Plot object to subclass if we are not running in the GUI
+"""Dictionary of plot id's to classes to use for Plot object"""
 Plot=object
-# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
+"""A fake Plot object to subclass if we are not running in the GUI"""
 plots = {}
-# A threading.Event to delay the 
+"""An empty dictionary of plots (overwritten by the analysis worker if running within lyse)"""
 delay_event = threading.Event()
-# a flag to determine whether we should wait for the delay event
+"""A threading.Event to signal a delay"""
 _delay_flag = False
+"""Flag to determine whether we should wait for the delay event"""
 
 
 utils_dir = os.path.dirname(os.path.realpath(__file__))
