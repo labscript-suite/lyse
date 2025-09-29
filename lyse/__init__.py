@@ -334,7 +334,7 @@ class Run(object):
             For better performance, it would be better to combine
             these two openings into one.
 
-            >>> from lyse import *
+            >>> from lyse import Run, path
             >>> shot = Run(path)
             >>> with shot.open('r'):
             >>>     # shot processing that requires reads/writes
@@ -351,7 +351,7 @@ class Run(object):
             Open and create the shot handle for the whole analysis
             in a single line.
 
-            >>> from lyse import *
+            >>> from lyse import Run, path
             >>> with Run(path).open('r+') as shot:
             >>>     # shot processing that requires reads/writes
             >>>     t, vals = shot.get_trace('my_trace')
