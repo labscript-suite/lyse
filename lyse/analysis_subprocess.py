@@ -27,6 +27,7 @@ from types import ModuleType
 
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
+from qtutils.qt.QtCore import QSettings, QByteArray
 
 from qtutils import inmain, inmain_decorator, UiLoader
 import qtutils.icons
@@ -56,6 +57,9 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
+# read labconfig once for plot window locations
+autoload_config_file = lyse.utils.LABCONFIG.get('lyse', 'autoload_config_file')
+config_dir = os.path.dirname(autoload_config_file)
 
 class PlotWindowCloseEvent(QtGui.QCloseEvent):
     def __init__(self, force, *args, **kwargs):
@@ -68,22 +72,43 @@ class PlotWindow(QtWidgets.QWidget):
 
     def __init__(self, plot, *args, **kwargs):
         self.__plot = plot
+        filepath = kwargs.pop('analysis_filepath')
         QtWidgets.QWidget.__init__(self, *args, **kwargs)
+
+        # configure plot window persistence
+        filename = os.path.basename(os.path.splitext(filepath)[0])
+        settings_path = os.path.join(config_dir, 'lyse-'+filename+'.ini')
+        self.settings = QSettings(settings_path, QSettings.IniFormat)
+
+        self.restore_geometry()
 
     def closeEvent(self, event):
         self.hide()
         if isinstance(event, PlotWindowCloseEvent) and event.force:
+            # if closing, save window geometry to QSettings
+            self.settings.setValue("windowGeometry", self.saveGeometry())
+            self.settings.sync()
             self.__plot.on_close()
             event.accept()
         else:
             event.ignore()
+
+    def restore_geometry(self):
+        """Restores window geometry from local QSettings config.
+        
+        Will do nothing if config not present.
+        """
+        geometry = self.settings.value("windowGeometry", QByteArray())
+        if isinstance(geometry, QByteArray) and not geometry.isEmpty():
+            self.restoreGeometry(geometry)
         
 
 class Plot(object):
     def __init__(self, figure, identifier, filepath):
         self.identifier = identifier
         loader = UiLoader()
-        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/plot_window.ui'), PlotWindow(self))
+        self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/plot_window.ui'),
+                              PlotWindow(self, analysis_filepath=filepath))
 
         self.set_window_title(identifier, filepath)
 
@@ -284,6 +309,7 @@ class AnalysisWorker(object):
             task, data = self.from_parent.get()
             with kill_lock:
                 if task == 'quit':
+                    self.close_plots()
                     inmain(qapplication.quit)
                 elif task == 'analyse':
                     path = data
@@ -296,6 +322,13 @@ class AnalysisWorker(object):
                         self.to_parent.put(['error', lyse.utils.worker._updated_data])
                 else:
                     self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    @inmain_decorator()
+    def close_plots(self):
+        """Ensures analysis plots get the force close event and save geometry when lyse closes"""
+        for plot in self.plots.values():
+            event = PlotWindowCloseEvent(True)
+            QtCore.QCoreApplication.instance().postEvent(plot.ui, event)
         
     @inmain_decorator()
     def do_analysis(self, path):
