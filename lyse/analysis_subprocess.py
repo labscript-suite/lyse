@@ -73,6 +73,7 @@ class PlotWindow(QtWidgets.QWidget):
     def __init__(self, plot, *args, **kwargs):
         self.__plot = plot
         filepath = kwargs.pop('analysis_filepath')
+        self.identifier = kwargs.pop('analysis_identifier')
         QtWidgets.QWidget.__init__(self, *args, **kwargs)
 
         # configure plot window persistence
@@ -86,7 +87,7 @@ class PlotWindow(QtWidgets.QWidget):
         self.hide()
         if isinstance(event, PlotWindowCloseEvent) and event.force:
             # if closing, save window geometry to QSettings
-            self.settings.setValue("windowGeometry", self.saveGeometry())
+            self.settings.setValue(f"windowGeometry-{self.identifier:d}", self.saveGeometry())
             self.settings.sync()
             self.__plot.on_close()
             event.accept()
@@ -98,7 +99,7 @@ class PlotWindow(QtWidgets.QWidget):
         
         Will do nothing if config not present.
         """
-        geometry = self.settings.value("windowGeometry", QByteArray())
+        geometry = self.settings.value(f"windowGeometry-{self.identifier}", QByteArray())
         if isinstance(geometry, QByteArray) and not geometry.isEmpty():
             self.restoreGeometry(geometry)
         
@@ -108,7 +109,8 @@ class Plot(object):
         self.identifier = identifier
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/plot_window.ui'),
-                              PlotWindow(self, analysis_filepath=filepath))
+                              PlotWindow(self, analysis_filepath=filepath,
+                                         analysis_identifier=identifier))
 
         self.set_window_title(identifier, filepath)
 
