@@ -170,7 +170,8 @@ class RoutineBox(object):
             if filepath in [routine.filepath for routine in self.routines]:
                 self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
-            routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port, checked)
+            routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port,
+                                      QtCore.Qt.CheckState(checked))
             self.routines.append(routine)
         self.update_select_all_checkstate()
         
