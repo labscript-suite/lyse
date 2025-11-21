@@ -115,11 +115,13 @@ class Lyse(object):
         # Forth: start remote communication server
         self.port = int(self.exp_config.get('ports', 'lyse'))
         self.server = lyse.communication.WebServer(self,  self.port)
+        self.logger.info(f'Started lyse server on port {self.port}')
 
         # Last: UI setup
         self.qapplication = qapplication
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
+        self.logger.info('UI loaded')
 
         self.connect_signals()
 
@@ -138,6 +140,7 @@ class Lyse(object):
                                                self, to_multishot, from_multishot, self.output_box.port, multishot=True)
         self.filebox = lyse.filebox.FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
+        self.logger.info('Boxes loaded')
 
         self.last_save_config_file = None
         self.last_save_data = None
@@ -188,6 +191,7 @@ class Lyse(object):
                 # Success - skip loading window geometry in load_configuration:
                 restore_window_geometry = False
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
+        self.logger.info('lyse configuration loaded')
 
         self.ui.show()
 
