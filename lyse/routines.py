@@ -54,12 +54,14 @@ class RoutineBox(object):
         self.to_filebox = to_filebox
         self.output_box_port = output_box_port
         
-        self.logger = logging.getLogger('lyse.RoutineBox.%s'%('multishot' if multishot else 'singleshot'))  
+        self.logger = logging.getLogger('lyse.RoutineBox.%s'%('multishot' if multishot else 'singleshot'))
+        self.logger.info('starting')
         
         loader = UiLoader()
         loader.registerCustomWidget(lyse.widgets.TreeView)
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/routinebox.ui'))
         container.addWidget(self.ui)
+        self.logger.info('UI loaded')
 
         if multishot:
             self.ui.groupBox.setTitle('Multishot routines')
@@ -110,6 +112,7 @@ class RoutineBox(object):
         
         self.connect_signals()
 
+        self.logger.info('starting analysis loop')
         self.analysis = threading.Thread(target = self.analysis_loop)
         self.analysis.daemon = True
         self.analysis.start()
@@ -170,6 +173,7 @@ class RoutineBox(object):
             if filepath in [routine.filepath for routine in self.routines]:
                 self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
                 continue
+            self.logger.info(f'adding routine for {filepath}')
             routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port,
                                       QtCore.Qt.CheckState(checked))
             self.routines.append(routine)
@@ -216,6 +220,7 @@ class RoutineBox(object):
             if routine.filepath in filepaths:
                 routine.remove()
                 self.routines.remove(routine)
+                self.logger.info(f'removing routine for {routine.filepath}')
         self.update_select_all_checkstate()
         
     def on_model_item_changed(self, item):
@@ -424,8 +429,12 @@ class AnalysisRoutine(object):
         
         self.error = False
         self.done = False
-        
+
+        self.logger = logging.getLogger(f'lyse.AnalysisRoutine.{self.shortname}')
+
+        self.logger.info('starting worker')
         self.to_worker, self.from_worker, self.worker = self.start_worker()
+        self.logger.info('analysis_subprocess started')
         
         # Make a row to put into the model:
         active_item =  QtGui.QStandardItem()
