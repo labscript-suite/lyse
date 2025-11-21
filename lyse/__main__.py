@@ -522,7 +522,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
     splash.hide()
-    qapplication.exec_()
+    qapplication.exec()
 
     # Shutdown the webserver.
     app.server.shutdown()

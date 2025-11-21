@@ -237,7 +237,7 @@ class RoutineBox(object):
         menu.addAction(self.action_set_selected_inactive)
         menu.addAction(self.action_restart_selected)
         menu.addAction(self.action_remove_selected)
-        menu.exec_(QtGui.QCursor.pos())
+        menu.exec(QtGui.QCursor.pos())
         
     def on_set_selected_triggered(self, active):
         selected_indexes = self.ui.treeView.selectedIndexes()

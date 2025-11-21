@@ -475,5 +475,5 @@ if __name__ == '__main__':
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
-    qapplication.exec_()
+    qapplication.exec()
         
