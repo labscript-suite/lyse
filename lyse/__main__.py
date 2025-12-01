@@ -288,12 +288,12 @@ class Lyse(object):
 
         box = self.singleshot_routinebox
         save_data['singleshot'] = list(zip([routine.filepath for routine in box.routines],
-                                           [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                           [lyse.utils.gui.get_check_state(box.model.item(row, box.COL_ACTIVE))
                                             for row in range(box.model.rowCount())]))
         save_data['lastsingleshotfolder'] = box.last_opened_routine_folder
         box = self.multishot_routinebox
         save_data['multishot'] = list(zip([routine.filepath for routine in box.routines],
-                                          [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                          [lyse.utils.gui.get_check_state(box.model.item(row, box.COL_ACTIVE))
                                            for row in range(box.model.rowCount())]))
         save_data['lastmultishotfolder'] = box.last_opened_routine_folder
 
