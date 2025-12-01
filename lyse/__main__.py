@@ -14,6 +14,7 @@
 """
 import os
 import labscript_utils.excepthook
+import importlib.metadata
 
 # Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
 import desktop_app
@@ -49,9 +50,11 @@ from labscript_utils import dedent
 
 # qt imports
 splash.update_text('importing qt modules')
-from qtutils.qt import QtCore, QtWidgets
+from qtutils.qt import QtCore, QtWidgets, QT_ENV
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import UiLoader
+QT_VERSION_STR = QtCore.qVersion()
+PYQT_VERSION_STR = importlib.metadata.version(QT_ENV)
 
 # needs to be present so that qtutils icons referenced in .ui files can be resolved.  Since this is 
 # magical is should not be implemented in this way.
@@ -104,6 +107,9 @@ class Lyse(object):
         self.logger = setup_logging('lyse')
         labscript_utils.excepthook.set_logger(self.logger)
         self.logger.info('\n\n===============starting===============\n')
+        self.logger.info(f'Qt Environment: {QT_ENV}')
+        self.logger.info(f'PySide/PyQt version: {PYQT_VERSION_STR}')
+        self.logger.info(f'Qt version: {QT_VERSION_STR}')
 
         # Second: read lyse config
         self.setup_config()
