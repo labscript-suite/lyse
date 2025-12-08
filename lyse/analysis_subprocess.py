@@ -99,7 +99,7 @@ class PlotWindow(QtWidgets.QWidget):
         
         Will do nothing if config not present.
         """
-        geometry = self.settings.value(f"windowGeometry-{self.identifier}", QByteArray())
+        geometry = self.settings.value(f"windowGeometry-{self.identifier:d}", QByteArray())
         if isinstance(geometry, QByteArray) and not geometry.isEmpty():
             self.restoreGeometry(geometry)
         
