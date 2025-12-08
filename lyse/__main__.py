@@ -522,6 +522,20 @@ if __name__ == "__main__":
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
 
+    if QT_ENV == 'PySide6':
+        extra_styles = """
+        QTreeView:item:selected { color: palette(highlighted-text); }
+
+        QTreeView:item:hover { color: palette(highlighted-text); }
+
+        QTableView:item:selected { color: palette(highlighted-text); }
+
+        QTableView:item:hover { color: palette(highlighted-text); }
+        """
+
+        current_style = qapplication.styleSheet()
+        qapplication.setStyleSheet(current_style + extra_styles)
+
     app = Lyse(qapplication)
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
