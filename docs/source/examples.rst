@@ -6,8 +6,8 @@ An analysis on a single shot
 
 .. code-block:: python
 
-	from lyse import *
-	from pylab import *
+	from lyse import Run, data, path
+	import matplotlib.pyplot as plt
 
 	# Let's obtain our data for this shot -- globals, image attributes and
 	# the results of any previously run single-shot routines:
@@ -37,11 +37,11 @@ An analysis on a single shot
 
 	# We might wish to plot the fit on the trace to show whether the fit is any good:
 
-	plot(t,mot_fluorecence,label='data')
-	plot(t,m*t + x,label='linear fit')
-	xlabel('time')
-	ylabel('MOT flourescence')
-	legend()
+	plt.plot(t,mot_fluorecence,label='data')
+	plt.plot(t,m*t + x,label='linear fit')
+	plt.xlabel('time')
+	plt.ylabel('MOT flourescence')
+	plt.legend()
 
 	# Don't call show() ! lyse will introspect what figures have been made
 	# and display them once this script has finished running.  If you call
@@ -58,7 +58,7 @@ Single shot analysis with global file opening
 
 .. code-block:: python
 
-	from lyse import *
+	from lyse import Run, path
 
 	# Instantiate Run object and open
 	# Globally opening the shot keeps the h5 file open
@@ -91,11 +91,11 @@ An analysis on multiple shots
 
 .. code-block:: python
 
-	from lyse import *
-	from pylab import *
+	import lyse
+	import matplotlib.pyplot as plt
 
 	# Let's obtain the dataframe for all of lyse's currently loaded shots:
-	df = data()
+	df = lyse.data()
 
 	# Now let's see how the MOT load rate varies with, say a global called
 	# 'detuning', which might be the detuning of the MOT beams:
@@ -108,19 +108,18 @@ An analysis on multiple shots
 
 	# Let's plot them against each other:
 
-	plot(detunings, load_rates,'bo',label='data')
+	plt.plot(detunings, load_rates,'bo',label='data')
 
 	# Maybe we expect a linear relationship over the range we've got:
 	m, c = linear_fit(detunings, load_rates)
-	# (note, not a function provided by lyse, though I'm sure we'll have
-	# lots of stock functions like this available for import!)
+	# (note, not a function provided by lyse)
 
-	plot(detunings, m*detunings + c, 'ro', label='linear fit')
-	legend()
+	plt.plot(detunings, m*detunings + c, 'ro', label='linear fit')
+	plt.legend()
 
 	#To save this result to the output hdf5 file, we have to instantiate a
 	#Sequence object:
-	seq = Sequence(path, df)
+	seq = lyse.Sequence(lyse.path, df)
 	seq.save_result('detuning_loadrate_slope',c)
 
 .. sectionauthor:: Chris Billington

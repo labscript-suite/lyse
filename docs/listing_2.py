@@ -1,5 +1,5 @@
-from lyse import *
-from pylab import *
+from lyse import data, Run, path
+import matplotlib.pyplot as plt
 
 # Let's obtain our data for this shot -- globals, image attributes and
 # the results of any previously run single-shot routines:
@@ -29,11 +29,11 @@ m, c = linear_fit(t, mot_fluorecence)
 
 # We might wish to plot the fit on the trace to show whether the fit is any good:
 
-plot(t,mot_fluorecence,label='data')
-plot(t,m*t + x,label='linear fit')
-xlabel('time')
-ylabel('MOT flourescence')
-legend()
+plt.plot(t,mot_fluorecence,label='data')
+plt.plot(t,m*t + x,label='linear fit')
+plt.xlabel('time')
+plt.ylabel('MOT flourescence')
+plt.legend()
 
 # Don't call show() ! lyse will introspect what figures have been made
 # and display them once this script has finished running.  If you call
