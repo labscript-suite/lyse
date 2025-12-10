@@ -31,7 +31,7 @@ df = lyse.data(host='127.0.0.1', port=42519)
 
 Moreover, the lyse DataFrame can be serialized so that an analysis session can be restored in lyse or in a headless environment.
 
-<img src="https://raw.githubusercontent.com/labscript-suite/lyse/master/docs/source/img/gui.svg" alt="lyse interface – screenshot">
+<img src="https://raw.githubusercontent.com/labscript-suite/lyse/master/docs/source/img/lyse_gui.png" alt="lyse interface – screenshot">
 
 The lyse interface, comprising:
 
