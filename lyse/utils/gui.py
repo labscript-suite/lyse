@@ -103,8 +103,23 @@ def get_screen_geometry(qapplication):
     """Return the a list of the geometries of each screen: each a tuple of
     left, top, width and height"""
     geoms = []
-    desktop = qapplication.desktop()
-    for i in range(desktop.screenCount()):
-        sg = desktop.screenGeometry(i)
-        geoms.append((sg.left(), sg.top(), sg.width(), sg.height()))
+    screens = qapplication.screens()
+    for screen in screens:
+        sg = screen.geometry()
+        geoms.append((sg.x(), sg.y(), sg.width(), sg.height()))
     return geoms
+
+def get_check_state(qcheckbox):
+    """Return check state of a QCheckBox as an integer
+    
+    Shim to handle differences between PyQt5 and PySide6 enum implementations
+    """
+
+    try:
+        # PySide6 uses proper python Enum, access by value attribute
+        return qcheckbox.checkState().value
+    except AttributeError:
+        # PyQt5 uses custom float class, cast to int directly
+        return int(qcheckbox.checkState())
+    except Exception as e:
+        raise RuntimeError('Input is not a recognized QCheckBox type') from e

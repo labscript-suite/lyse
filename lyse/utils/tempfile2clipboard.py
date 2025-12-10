@@ -65,7 +65,7 @@ def main():
 
     # Keep running until the clipboard contents change to something else:
     app.clipboard().dataChanged.connect(app.quit)
-    app.exec_()
+    app.exec()
 
 
 if __name__ == '__main__':

@@ -32,28 +32,28 @@
 
 QPushButton:hover {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(light), stop: 1 palette(window));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
  QPushButton:pressed {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(window), stop: 1 palette(light));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
 QPushButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
+     background-color: palette(window);
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
 QPushButton:hover:checked {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(window), stop: 1 palette(light));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
@@ -64,28 +64,28 @@ QToolButton {
 
 QToolButton:hover {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(light), stop: 1 palette(window));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
  QToolButton:pressed {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(window), stop: 1 palette(light));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
 QToolButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
+     background-color: palette(window);
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 
 QToolButton:hover:checked {
      background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
+                                       stop: 0 palette(window), stop: 1 palette(light));
+     border: 1px solid palette(dark);
      border-radius: 3px;
  }
 </string>

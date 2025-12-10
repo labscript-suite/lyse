@@ -14,6 +14,7 @@
 """
 import os
 import labscript_utils.excepthook
+import importlib.metadata
 
 # Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
 import desktop_app
@@ -49,9 +50,11 @@ from labscript_utils import dedent
 
 # qt imports
 splash.update_text('importing qt modules')
-from qtutils.qt import QtCore, QtWidgets
+from qtutils.qt import QtCore, QtWidgets, QT_ENV
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import UiLoader
+QT_VERSION_STR = QtCore.qVersion()
+PYQT_VERSION_STR = importlib.metadata.version(QT_ENV)
 
 # needs to be present so that qtutils icons referenced in .ui files can be resolved.  Since this is 
 # magical is should not be implemented in this way.
@@ -104,6 +107,9 @@ class Lyse(object):
         self.logger = setup_logging('lyse')
         labscript_utils.excepthook.set_logger(self.logger)
         self.logger.info('\n\n===============starting===============\n')
+        self.logger.info(f'Qt Environment: {QT_ENV}')
+        self.logger.info(f'PySide/PyQt version: {PYQT_VERSION_STR}')
+        self.logger.info(f'Qt version: {QT_VERSION_STR}')
 
         # Second: read lyse config
         self.setup_config()
@@ -115,11 +121,13 @@ class Lyse(object):
         # Forth: start remote communication server
         self.port = int(self.exp_config.get('ports', 'lyse'))
         self.server = lyse.communication.WebServer(self,  self.port)
+        self.logger.info(f'Started lyse server on port {self.port}')
 
         # Last: UI setup
         self.qapplication = qapplication
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
+        self.logger.info('UI loaded')
 
         self.connect_signals()
 
@@ -138,6 +146,7 @@ class Lyse(object):
                                                self, to_multishot, from_multishot, self.output_box.port, multishot=True)
         self.filebox = lyse.filebox.FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
+        self.logger.info('Boxes loaded')
 
         self.last_save_config_file = None
         self.last_save_data = None
@@ -188,6 +197,7 @@ class Lyse(object):
                 # Success - skip loading window geometry in load_configuration:
                 restore_window_geometry = False
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
+        self.logger.info('lyse configuration loaded')
 
         self.ui.show()
 
@@ -284,12 +294,12 @@ class Lyse(object):
 
         box = self.singleshot_routinebox
         save_data['singleshot'] = list(zip([routine.filepath for routine in box.routines],
-                                           [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                           [lyse.utils.gui.get_check_state(box.model.item(row, box.COL_ACTIVE))
                                             for row in range(box.model.rowCount())]))
         save_data['lastsingleshotfolder'] = box.last_opened_routine_folder
         box = self.multishot_routinebox
         save_data['multishot'] = list(zip([routine.filepath for routine in box.routines],
-                                          [box.model.item(row, box.COL_ACTIVE).checkState() 
+                                          [lyse.utils.gui.get_check_state(box.model.item(row, box.COL_ACTIVE))
                                            for row in range(box.model.rowCount())]))
         save_data['lastmultishotfolder'] = box.last_opened_routine_folder
 
@@ -512,6 +522,20 @@ if __name__ == "__main__":
         qapplication = QtWidgets.QApplication(sys.argv)
     qapplication.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, False)
 
+    if QT_ENV == 'PySide6':
+        extra_styles = """
+        QTreeView:item:selected { color: palette(highlighted-text); }
+
+        QTreeView:item:hover { color: palette(highlighted-text); }
+
+        QTableView:item:selected { color: palette(highlighted-text); }
+
+        QTableView:item:hover { color: palette(highlighted-text); }
+        """
+
+        current_style = qapplication.styleSheet()
+        qapplication.setStyleSheet(current_style + extra_styles)
+
     app = Lyse(qapplication)
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:
@@ -522,7 +546,7 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
     
     splash.hide()
-    qapplication.exec_()
+    qapplication.exec()
 
     # Shutdown the webserver.
     app.server.shutdown()
