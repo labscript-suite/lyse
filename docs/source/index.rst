@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-lyse
-====
+lyse |version|
+==============
 
 **lyse** is a component of the labscript suite. It is a combination API and GUI interface that leverages the API to run user provided analysis scripts of experiment shots. This documentation provides a brief outline of the use of lyse.
 

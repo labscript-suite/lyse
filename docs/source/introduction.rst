@@ -1,24 +1,24 @@
 Introduction
 ==============
 
-**Lyse** is a data analysis system which gets *your code* running on experimental data as it is acquired. It is fundamenally based around the ideas of experimental *shots* and analysis *routines*. A shot is one trial of an experiment, and a routine is a ``Python`` script, written by you, that does something with the measurement data from one or more shots.
+**Lyse** is a data analysis system which gets *your code* running on experimental data as it is acquired. It is fundamentally based around the ideas of experimental *shots* and analysis *routines*. A shot is one trial of an experiment, and a routine is a ``Python`` script, written by you, that does something with the measurement data from one or more shots.
 
-Analysis routines can be either *single-shot* or *multi-shot*. This determines what data and functions are available to your code when it runs. A single-shot routine has access to the data from only one shot, and functions available for saving results only to the hdf5 file for that shot. A a multi-shot routine has access to the entire dataset from all the runs that are currently loaded into **lyse**, and has functions available for saving results to an hdf5 file which does not belong to any of the shots---it's a file that exists only to save the "meta results".
+Analysis routines can be either *single-shot* or *multi-shot*. This determines what data and functions are available to your code when it runs. A single-shot routine has access to the data from only one shot, and functions available for saving results only to the hdf5 file for that shot. A multi-shot routine has access to the entire dataset from all the runs that are currently loaded into **lyse**, and has functions available for saving results to an hdf5 file which does not belong to any of the shots---it's a file that exists only to save the "meta results".
 
-Actually things are far less magical than that. The only enforced difference between a single shot routine and a multi-shot routine is a single variable provided to your code when **lyse** runs it. Your code runs in a perfectly clean ``Python`` environment with this one exception: a variable in the global namespace called ``path``, which is a path to an hdf5 file. If you have told **lyse** that your routine is a singleshot one, then this path will point to the hdf5 file for the current shot being analysed. On the other hand, if you've told **lyse** that your routine is a multishot one, then it will be the path to an h5 file that has been selected in **lyse** for saving results to.
+Actually things are far less magical than that. The only enforced difference between a single shot routine and a multi-shot routine is a single variable provided to your code when **lyse** runs it. Your code runs in a perfectly clean ``Python`` environment with this one exception: a variable in the lyse namespace called ``path``, which is a path to an hdf5 file. If you have told **lyse** that your routine is a singleshot one, then this path will point to the hdf5 file for the current shot being analysed. On the other hand, if you've told **lyse** that your routine is a multishot one, then it will be the path to an h5 file that has been selected in **lyse** for saving results to.
 
 The other differences listed above are conventions only (though **lyse**'s design is based around the assumption that you'll follow these conventions most of the time), and pertain to how you use the API that **lyse** provides, which will be different depending on what sort of analysis you're doing.
 
 The **lyse** API
 ~~~~~~~~~~~~~~~~~
 
-So grea, you've got a single filepath. What data analysis could you possibly do with that? It might seem like you have to still do the same amount of work that you would without an analysis system! Whilst that's not quite true, it's intentionally been designed that way so that you can run your code outside **lyse** with very little modification. Another motivating factor is to minimise the amount of magic black box behaviour, such that an analysis routine is actually just an ordinary ``Python`` script which makes use of an API designed for our purposes. **lyse** is both a program which executes your code, and an API that your code can call on.
+So great, you've got a single filepath. What data analysis could you possibly do with that? It might seem like you have to still do the same amount of work that you would without an analysis system! Whilst that's not quite true, it's intentionally been designed that way so that you can run your code outside **lyse** with very little modification. Another motivating factor is to minimise the amount of magic black box behaviour, such that an analysis routine is actually just an ordinary ``Python`` script which makes use of an API designed for our purposes. **lyse** is both a program which executes your code, and an API that your code can call on.
 
-To use the API in an analysis routine, begine your code with:
+To use the API in an analysis routine, begin your code with:
 
 .. code-block:: python
 
-	from lyse import *
+	import lyse
 
 The details of the API are found in the :doc:`API reference<api/_autosummary/lyse>`.
 

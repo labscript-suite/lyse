@@ -9,7 +9,10 @@ API Reference
 
    lyse
    lyse.analysis_subprocess
+   lyse.communication
    lyse.dataframe_utilities
    lyse.figure_manager
-   lyse.tempfile2clipboard
+   lyse.filebox
+   lyse.routines
+   lyse.utils
    lyse.__main__

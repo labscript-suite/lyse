@@ -13,60 +13,70 @@
 """Lyse analysis API
 """
 
-from lyse.dataframe_utilities import get_series_from_shot as _get_singleshot
-from labscript_utils.dict_diff import dict_diff
-import os
-import socket
 import pickle as pickle
 from pathlib import Path
 import sys
-import threading
 import functools
 import contextlib
+import warnings
 
 import labscript_utils.h5_lock, h5py
-from labscript_utils.labconfig import LabConfig
 import pandas
-from numpy import array, ndarray, where
-import types
+import numpy as np
 
 from .__version__ import __version__
 
 from labscript_utils import dedent
 from labscript_utils.ls_zprocess import zmq_get
+from labscript_utils.dict_diff import dict_diff
 
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
-LYSE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-# If running stand-alone, and not from within lyse, the below two variables
-# will be as follows. Otherwise lyse will override them with spinning_top =
-# True and path <name of hdf5 file being analysed>:
-spinning_top = False
-# data to be sent back to the lyse GUI if running within lyse
-_updated_data = {}
-# dictionary of plot id's to classes to use for Plot object
-_plot_classes = {}
-# A fake Plot object to subclass if we are not running in the GUI
-Plot=object
-# An empty dictionary of plots (overwritten by the analysis worker if running within lyse)
-plots = {}
-# A threading.Event to delay the 
-delay_event = threading.Event()
-# a flag to determine whether we should wait for the delay event
-_delay_flag = False
+# lyse imports
+import lyse.dataframe_utilities
+import lyse.utils
 
-# get port that lyse is using for communication
-try:
-    _labconfig = LabConfig(required_params={"ports": ["lyse"]})
-    _lyse_port = int(_labconfig.get('ports', 'lyse'))
-except Exception:
-    _lyse_port = 42519
+# Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
+from lyse.utils import LYSE_DIR
+from lyse.utils.worker import register_plot_class, delay_results_return
+
+__all__ = [
+    # interacting with lyse internals
+    'LYSE_DIR',
+    'register_plot_class',
+    'delay_results_return',
+    # lyse analysis API objects
+    'path',  # needed so old star imports know to pull `path` from the lazy loader here
+    'routine_storage',
+    'data',
+    'globals_diff',
+    'open_file',
+    'Run',
+    'Sequence',
+]
 
 if len(sys.argv) > 1:
+    warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
+                  "If you need this feature, let the developers know so it is not removed.",
+                  FutureWarning)
     path = sys.argv[1]
-else:
-    path = None
 
+if 'sphinx' in sys.modules:
+    # building docs, define path with docstring here so docs knows it's present
+    path = None
+    """Links to :attr:`lyse.utils.worker.path` which contains hdf5 filepath to be analysed.
+    
+    Automatically populated by the lyse GUI.
+    Can be passed as a command line argument, but this behavior is deprecated.
+    """
+
+# lazy import so we catch updated path from analysis subprocess
+def __getattr__(name):
+    if name == 'path':
+        from lyse.utils.worker import path
+        return path
+    else:
+        raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 class _RoutineStorage(object):
     """An empty object that analysis routines can store data in. It will
@@ -78,9 +88,17 @@ class _RoutineStorage(object):
     these cases."""
 
 routine_storage = _RoutineStorage()
+"""An empty object that analysis routines can store data in.
+
+It will persist from one run of an analysis routine to the next when the routine
+is being run from within lyse. No attempt is made to store data to disk,
+so if the routine is run multiple times from the command line instead of
+from lyse, or the lyse analysis subprocess is restarted, data will not be
+retained. An alternate method should be used to store data if desired in
+these cases."""
 
 
-def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequences=None, filter_kwargs=None):
+def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None):
     """Get data from the lyse dataframe or a file.
     
     This function allows for either extracting information from a run's hdf5
@@ -146,7 +164,7 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
         the lyse dataframe, or a subset of it, is returned.
     """    
     if filepath is not None:
-        return _get_singleshot(filepath)
+        return lyse.dataframe_utilities.get_series_from_shot(filepath)
     else:
         if n_sequences is not None:
             if not (type(n_sequences) is int and n_sequences >= 0):
@@ -161,7 +179,7 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
 
         # Allow sending 'get dataframe' (without the enclosing list) if
         # n_sequences and filter_kwargs aren't provided. This is for backwards
-        # compatability in case the server is running an outdated version of
+        # compatibility in case the server is running an outdated version of
         # lyse.
         if n_sequences is None and filter_kwargs is None:
             command = 'get dataframe'
@@ -178,34 +196,8 @@ def data(filepath=None, host='localhost', port=_lyse_port, timeout=5, n_sequence
             raise ValueError(dedent(msg))
         # Ensure conversion to multiindex is done, which needs to be done here
         # if the server is running an outdated version of lyse.
-        _rangeindex_to_multiindex(df, inplace=True)
+        lyse.dataframe_utilities.rangeindex_to_multiindex(df, inplace=True)
         return df
-
-def _rangeindex_to_multiindex(df, inplace):
-    if isinstance(df.index, pandas.MultiIndex):
-        # The dataframe has already been converted.
-        return df
-    try:
-        padding = ('',)*(df.columns.nlevels - 1)
-        try:
-            integer_indexing = _labconfig.getboolean('lyse', 'integer_indexing')
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            integer_indexing = False
-        if integer_indexing:
-            out = df.set_index(['sequence_index', 'run number', 'run repeat'], inplace=inplace, drop=False)
-            # out is None if inplace is True, and is the new dataframe is inplace is False.
-            if not inplace:
-                df = out
-        else:
-            out = df.set_index([('sequence',) + padding,('run time',) + padding], inplace=inplace, drop=False)
-            if not inplace:
-                df = out
-            df.index.names = ['sequence', 'run time']
-    except KeyError:
-        # Empty DataFrame or index column not found, so fall back to RangeIndex instead
-        pass
-    df.sort_index(inplace=True)
-    return df
 
 def globals_diff(run1, run2, group=None):
     """Take a diff of the globals between two runs.
@@ -342,7 +334,7 @@ class Run(object):
             For better performance, it would be better to combine
             these two openings into one.
 
-            >>> from lyse import *
+            >>> from lyse import Run, path
             >>> shot = Run(path)
             >>> with shot.open('r'):
             >>>     # shot processing that requires reads/writes
@@ -359,7 +351,7 @@ class Run(object):
             Open and create the shot handle for the whole analysis
             in a single line.
 
-            >>> from lyse import *
+            >>> from lyse import Run, path
             >>> with Run(path).open('r+') as shot:
             >>>     # shot processing that requires reads/writes
             >>>     t, vals = shot.get_trace('my_trace')
@@ -507,13 +499,13 @@ class Run(object):
         if raw_data:
             data = trace[()]
         else:
-            data = array(trace['t'],dtype=float),array(trace['values'],dtype=float)  
+            data = np.array(trace['t'],dtype=float), np.array(trace['values'],dtype=float)  
         
         return data
 
     @open_file('r')
     def get_wait(self, name):
-        """Returns the wait paramteres: label, timeout, duration, and time out status.
+        """Returns the wait parameters: label, timeout, duration, and time out status.
 
         Args:
             name (str): Name of the wait to get.
@@ -529,7 +521,7 @@ class Run(object):
         name=name.encode()
         if name not in self.h5_file['data']['waits']['label']:
             raise Exception('The wait \'%s\' does not exist'%name.decode())
-        name_index, =where(self.h5_file['data']['waits']['label']==name)[0]
+        name_index, = np.where(self.h5_file['data']['waits']['label']==name)[0]
         return self.h5_file['data']['waits'][name_index]
 
     @open_file('r')
@@ -567,7 +559,7 @@ class Run(object):
             raise Exception('The result group \'%s\' does not exist'%group)
         if name not in self.h5_file['results'][group]:
             raise Exception('The result array \'%s\' does not exist'%name)
-        return array(self.h5_file['results'][group][name])
+        return np.array(self.h5_file['results'][group][name])
 
     @open_file('r')            
     def get_result(self, group, name):
@@ -600,7 +592,7 @@ class Run(object):
         Args:
             group (str): Group to look in for the results. Typically the name of
                             the analysis script that created it.
-            \*names (str): Names of results to retrieve.
+            *names (str): Names of results to retrieve.
 
         Returns:
             list: List of the results, in the same order as specified by names.
@@ -651,6 +643,9 @@ class Run(object):
             PermissionError: A `PermissionError` is raised if an attribute with
                 name `name` already exists but `overwrite` is set to `False`.
         """
+        # lazy import here so they get updated values from analysis subprocess
+        from lyse.utils.worker import spinning_top, _updated_data
+
         if not group:
             if self.group is None:
                 msg = """Cannot save result; no default group set. Either
@@ -672,7 +667,7 @@ class Run(object):
                 )
             raise PermissionError(dedent(msg))
         set_attributes(self.h5_file[group], {name: value})
-            
+        
         if spinning_top:
             if self.h5_path not in _updated_data:
                 _updated_data[self.h5_path] = {}
@@ -760,7 +755,7 @@ class Run(object):
         Iteratively calls :obj:`get_trace`.
 
         Args:
-            \*names (str): Names of traces to retrieve
+            *names (str): Names of traces to retrieve
 
         Returns:
             list: List of numpy arrays.
@@ -779,7 +774,7 @@ class Run(object):
 
         Args:
             group (str): Group to obtain the results from.
-            \*names (str): Result names to retrieve.
+            *names (str): Result names to retrieve.
 
         Returns:
             list: List of results.
@@ -888,7 +883,7 @@ class Run(object):
             raise Exception('File does not contain any images with label \'%s\''%label)
         if image not in self.h5_file['images'][orientation][label]:
             raise Exception('Image \'%s\' not found in file'%image)
-        return array(self.h5_file['images'][orientation][label][image])
+        return np.array(self.h5_file['images'][orientation][label][image])
 
     @open_file('r')    
     def get_images(self, orientation, label, *images):
@@ -1200,58 +1195,3 @@ class Sequence(Run):
             Not implemented, but could be.
         """
         raise NotImplementedError('If you want to use this feature please ask me to implement it! -Chris')     
-
-
-def figure_to_clipboard(figure=None, **kwargs):
-    """Copy a matplotlib figure to the clipboard as a png. 
-
-    If figure is None,
-    the current figure will be copied. Copying the figure is implemented by
-    calling figure.savefig() and then copying the image data from the
-    resulting file. If bbox_inches keyword arg is not provided,
-    bbox_inches='tight' will be used.
-
-    Args:
-        figure (:obj:`matplotlib:matplotlib.figure`, optional): 
-            Figure to copy to the clipboard. If `None`, copies the current figure.
-        **kwargs: Passed to `figure.savefig()` as kwargs.
-    """
-    
-    import matplotlib.pyplot as plt
-    from zprocess import start_daemon
-    import tempfile
-
-    if 'bbox_inches' not in kwargs:
-        kwargs['bbox_inches'] = 'tight'
-               
-    if figure is None:
-        figure = plt.gcf()
-
-    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
-        tempfile_name = f.name
-
-    figure.savefig(tempfile_name, **kwargs)
-
-    tempfile2clipboard = os.path.join(LYSE_DIR, 'tempfile2clipboard.py')
-    start_daemon([sys.executable, tempfile2clipboard, '--delete', tempfile_name])
-
-
-def register_plot_class(identifier, cls):
-    if not spinning_top:
-        msg = """Warning: lyse.register_plot_class has no effect on scripts not run with
-            the lyse GUI.
-            """
-        sys.stderr.write(dedent(msg))
-    _plot_classes[identifier] = cls
-
-def get_plot_class(identifier):
-    return _plot_classes.get(identifier, None)
-
-def delay_results_return():
-    global _delay_flag
-    if not spinning_top:
-        msg = """Warning: lyse.delay_results_return has no effect on scripts not run 
-            with the lyse GUI.
-            """
-        sys.stderr.write(dedent(msg))
-    _delay_flag = True
