@@ -25,7 +25,7 @@ import traceback
 import time
 from types import ModuleType
 
-from qtutils.qt import QtCore, QtGui, QtWidgets
+from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV
 from qtutils.qt.QtCore import pyqtSignal as Signal
 
 from qtutils import inmain, inmain_decorator, UiLoader
@@ -77,6 +77,17 @@ class PlotWindow(QtWidgets.QWidget):
             event.accept()
         else:
             event.ignore()
+
+    def changeEvent(self, event):
+        
+        # theme update only for PySide6
+        if QT_ENV == 'PySide6' and event.type() == QtCore.QEvent.Type.ThemeChange:
+            for widget in self.findChildren(QtWidgets.QWidget):
+                # Complex widgets, like TreeView and TableView require triggering styleSheet and palette updates
+                widget.setStyleSheet(widget.styleSheet())
+                widget.setPalette(widget.palette())
+
+        return super().changeEvent(event)
         
 
 class Plot(object):
