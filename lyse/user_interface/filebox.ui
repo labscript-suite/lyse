@@ -14,71 +14,7 @@
    <string>Form</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QPushButton {
-     border: none;
-     padding: 4px;
- }
-
-QPushButton:hover {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
- QPushButton:pressed {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QPushButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QPushButton:hover:checked {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton {
-     border: none;
-     padding: 2px;
- }
-
-QToolButton:hover {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #f6f7fa, stop: 1 #dadbde);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
- QToolButton:pressed {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton:checked {
-     background-color: #dadbde;
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QToolButton:hover:checked {
-     background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
-                                       stop: 0 #dadbde, stop: 1 #f6f7fa);
-     border: 1px solid #8f8f91;
-     border-radius: 3px;
- }
-
-QGroupBox
+   <string notr="true">QGroupBox
 {
     font-weight: bold;
 }</string>

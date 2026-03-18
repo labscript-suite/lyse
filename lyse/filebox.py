@@ -142,7 +142,7 @@ class EditColumns(object):
         menu = QtWidgets.QMenu(self.ui)
         menu.addAction(self.action_set_selected_visible)
         menu.addAction(self.action_set_selected_hidden)
-        menu.exec_(QtGui.QCursor.pos())
+        menu.exec(QtGui.QCursor.pos())
 
     def on_set_selected_triggered(self, visible):
         selected_indexes = self.ui.treeView.selectedIndexes()
@@ -373,7 +373,7 @@ class DataFrameModel(QtCore.QObject):
     def on_view_context_menu_requested(self, point):
         menu = QtWidgets.QMenu(self._view)
         menu.addAction(self.action_remove_selected)
-        menu.exec_(QtGui.QCursor.pos())
+        menu.exec(QtGui.QCursor.pos())
 
     def on_double_click(self, index):
         filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
