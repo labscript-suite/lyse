@@ -105,8 +105,8 @@ class PlotWindow(QtWidgets.QWidget):
     
     def changeEvent(self, event):
         
-        # theme update only for PySide6
-        if QT_ENV == 'PySide6' and event.type() == QtCore.QEvent.Type.ThemeChange:
+        # theme update only for PySide6/PyQt6
+        if QT_ENV.endswith('6') and event.type() == QtCore.QEvent.Type.ThemeChange:
             for widget in self.findChildren(QtWidgets.QWidget):
                 # Complex widgets, like TreeView and TableView require triggering styleSheet and palette updates
                 widget.setStyleSheet(widget.styleSheet())
