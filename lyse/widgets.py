@@ -49,11 +49,11 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
         self.ROLE_STATUS_PERCENT = role_status_percent
         QtWidgets.QStyledItemDelegate.__init__(self)
 
-    def sizeHint(self, *args):
+    def sizeHint(self, *args, **kwargs):
         fontmetrics = QtGui.QFontMetrics(self.view.font())
         text_height = fontmetrics.height()
         row_height = text_height + self.EXTRA_ROW_HEIGHT
-        size = QtWidgets.QStyledItemDelegate.sizeHint(self, *args)
+        size = QtWidgets.QStyledItemDelegate.sizeHint(self, *args, **kwargs)
         return QtCore.QSize(size.width(), row_height)
 
     def paint(self, painter, option, index):
@@ -97,8 +97,8 @@ class TableView(QtWidgets.QTableView):
     are forced to duplicate code instead of sharing code with the extremely
     similar TreeView class in this module"""
 
-    def __init__(self, *args):
-        QtWidgets.QTableView.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        QtWidgets.QTableView.__init__(self, *args, **kwargs)
         self._pressed_index = None
         self._double_click = False
 
@@ -143,8 +143,8 @@ class TreeView(QtWidgets.QTreeView):
     click on a valid index, and doubleLeftClicked(index) (in addition) on
     double click."""
 
-    def __init__(self, *args):
-        QtWidgets.QTreeView.__init__(self, *args)
+    def __init__(self, *args, **kwargs):
+        QtWidgets.QTreeView.__init__(self, *args, **kwargs)
         self._pressed_index = None
         self._double_click = False
 
