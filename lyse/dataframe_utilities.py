@@ -66,6 +66,10 @@ def get_nested_dict_from_shot(filepath):
             for groupname in h5_file['results']:
                 resultsgroup = h5_file['results'][groupname]
                 row[groupname] = get_attributes(resultsgroup)
+        if 'data' in h5_file:
+            for groupname in h5_file['data']:
+                datagroup = h5_file['data'][groupname]
+                row[groupname] = get_attributes(datagroup)
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
                 if isinstance(h5_file['images'][orientation], h5py.Group):
