@@ -43,7 +43,12 @@ splash.update_text('importing zprocess (zlog and zlock must be running)')
 from labscript_utils.ls_zprocess import ProcessTree
 
 splash.update_text('importing labscript suite modules')
-from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
+from labscript_utils.labconfig import (
+    LabConfig,
+    LabscriptApplication,
+    save_appconfig,
+    load_appconfig,
+)
 from labscript_utils.setup_logging import setup_logging
 from labscript_utils.qtwidgets.outputbox import OutputBox
 from labscript_utils import dedent
@@ -114,7 +119,10 @@ class LyseMainWindow(QtWidgets.QMainWindow):
 
         return super().changeEvent(event)
 
-class Lyse(object):
+class Lyse(LabscriptApplication):
+
+    app_name = 'lyse'
+    default_config_filename = 'lyse.ini'
 
     def __init__(self, qapplication):
         # First: Start logging
@@ -142,6 +150,7 @@ class Lyse(object):
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
         self.logger.info('UI loaded')
+        self.init_config_window_title()
 
         self.connect_signals()
 
@@ -181,11 +190,13 @@ class Lyse(object):
         self.ui.splitter_vertical.setSizes([300, 600])
 
         # autoload a config file, if labconfig is set to do so:
+        active_config_file = self.get_default_config_file()
         try:
             autoload_config_file = self.exp_config.get('lyse', 'autoload_config_file')
         except (LabConfig.NoOptionError, LabConfig.NoSectionError):
             self.output_box.output('Ready.\n\n')
         else:
+            active_config_file = autoload_config_file
             self.ui.setEnabled(False)
             self.output_box.output('Loading default config file %s...' % autoload_config_file)
 
@@ -213,6 +224,7 @@ class Lyse(object):
             self.ui.firstPaint.connect(lambda: QtCore.QTimer.singleShot(50, load_the_config_file))
         self.logger.info('lyse configuration loaded')
 
+        self.set_config_window_title(active_config_file)
         self.ui.show()
 
     def terminate_all_workers(self):
@@ -274,15 +286,7 @@ class Lyse(object):
         if self.last_save_config_file is not None:
             default = self.last_save_config_file
         else:
-            try:
-                default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
-            except LabConfig.NoOptionError:
-                self.exp_config.set('DEFAULT', 'app_saved_configs', os.path.join('%(labscript_suite)s', 'userlib', 'app_saved_configs', '%(apparatus_name)s'))
-                default_path = os.path.join(self.exp_config.get('DEFAULT', 'app_saved_configs'), 'lyse')
-            if not os.path.exists(default_path):
-                os.makedirs(default_path)
-
-            default = os.path.join(default_path, 'lyse.ini')
+            default = self.get_default_config_file(ensure_directory=True)
         save_file = QtWidgets.QFileDialog.getSaveFileName(self.ui,
                                                       'Select  file to save current lyse configuration',
                                                       default,
@@ -337,6 +341,7 @@ class Lyse(object):
         self.last_save_config_file = save_file
         self.last_save_data = save_data
         save_appconfig(save_file, {'lyse_state': save_data})
+        self.set_config_window_title(save_file)
 
     def on_load_configuration_triggered(self):
         save_data = self.get_save_data()
@@ -353,7 +358,7 @@ class Lyse(object):
         if self.last_save_config_file is not None:
             default = self.last_save_config_file
         else:
-            default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'lyse.ini')
+            default = self.get_default_config_file()
 
         file = QtWidgets.QFileDialog.getOpenFileName(self.ui,
                                                  'Select lyse configuration file to load',
@@ -394,6 +399,7 @@ class Lyse(object):
         self.last_save_data = save_data
         self.ui.actionSave_configuration_as.setEnabled(True)
         self.ui.actionRevert_configuration.setEnabled(True)
+        self.set_config_window_title(filename)
 
     def load_window_geometry_configuration(self, filename):
         """Load only the window geometry from the config file. It's useful to have this
