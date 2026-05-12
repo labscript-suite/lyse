@@ -16,13 +16,18 @@ import os
 import labscript_utils.excepthook
 import importlib.metadata
 
+APPLICATION_NAME = 'lyse'
+LYSE_DIR = os.path.dirname(__file__)
+
 # Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
 import desktop_app
-desktop_app.set_process_appid('lyse')
+desktop_app.set_process_appid(APPLICATION_NAME)
 
 # Splash screen
 import labscript_utils.splash
-splash = labscript_utils.splash.Splash(os.path.join(os.path.dirname(__file__), 'lyse.svg'))
+splash = labscript_utils.splash.Splash(
+    os.path.join(LYSE_DIR, 'lyse.svg'), application_name=APPLICATION_NAME
+)
 splash.show()
 
 splash.update_text('importing standard library modules')
@@ -118,7 +123,7 @@ class Lyse(object):
 
     def __init__(self, qapplication):
         # First: Start logging
-        self.logger = setup_logging('lyse')
+        self.logger = setup_logging(APPLICATION_NAME)
         labscript_utils.excepthook.set_logger(self.logger)
         self.logger.info('\n\n===============starting===============\n')
         self.logger.info(f'Qt Environment: {QT_ENV}')
@@ -130,7 +135,7 @@ class Lyse(object):
 
         # Third: connect to zprocess and set a meaningful name for zlock client id:
         self.process_tree = ProcessTree.instance()
-        self.process_tree.zlock_client.set_process_name('lyse')
+        self.process_tree.zlock_client.set_process_name(APPLICATION_NAME)
 
         # Forth: start remote communication server
         self.port = int(self.exp_config.get('ports', 'lyse'))

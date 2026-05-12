@@ -15,6 +15,7 @@
  
 import labscript_utils.excepthook # I do magic stuff, so import must be in place
 import labscript_utils.h5_lock, h5py
+import labscript_utils.splash
 
 from labscript_utils.ls_zprocess import ProcessTree
 
@@ -520,6 +521,12 @@ if __name__ == '__main__':
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
+    qapplication.setProperty(
+        '_labscript_icon_path', os.path.join(lyse.utils.LYSE_DIR, 'lyse.svg')
+    )
+    qapplication.setApplicationName('lyse')
+    qapplication.setApplicationDisplayName('lyse')
+    labscript_utils.splash.configure_qapplication(qapplication)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec()
         
