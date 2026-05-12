@@ -1,4 +1,4 @@
 {
     "product_name": "Labscript Suite",
-    "modules": {"lyse": {"display_name": "lyse - the labscript suite"}}
+    "modules": {"lyse": {"display_name": "lyse - the labscript suite", "short_display_name": "lyse"}}
 }
