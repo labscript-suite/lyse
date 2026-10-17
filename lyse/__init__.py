@@ -45,8 +45,11 @@ __all__ = [
     'LYSE_DIR',
     'register_plot_class',
     'delay_results_return',
-    # lyse analysis API objects
-    'path',  # needed so old star imports know to pull `path` from the lazy loader here
+    # lyse analysis API objects, which the lazy loader below reads from
+    # lyse.utils.worker so that star imports see the values set by the analysis
+    # subprocess
+    'path',
+    'spinning_top',
     'routine_storage',
     'data',
     'globals_diff',
@@ -70,11 +73,12 @@ if 'sphinx' in sys.modules:
     Can be passed as a command line argument, but this behavior is deprecated.
     """
 
-# lazy import so we catch updated path from analysis subprocess
+# path and spinning_top are read from lyse.utils.worker on each access, so that the
+# values set by the analysis subprocess are seen.
 def __getattr__(name):
-    if name == 'path':
-        from lyse.utils.worker import path
-        return path
+    if name in ('path', 'spinning_top'):
+        import lyse.utils.worker
+        return getattr(lyse.utils.worker, name)
     else:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
