@@ -62,10 +62,17 @@ def asdatetime(timestr):
 def get_nested_dict_from_shot(filepath):
     row = get_shot_globals(filepath)
     with h5py.File(filepath,'r') as h5_file:
+        # Attributes of the groups under 'data' and 'results' share one namespace in the
+        # dataframe, keyed by group name. A results attribute overrides a data attribute
+        # of the same name.
+        if 'data' in h5_file:
+            for groupname in h5_file['data']:
+                datagroup = h5_file['data'][groupname]
+                row.setdefault(groupname, {}).update(get_attributes(datagroup))
         if 'results' in h5_file:
             for groupname in h5_file['results']:
                 resultsgroup = h5_file['results'][groupname]
-                row[groupname] = get_attributes(resultsgroup)
+                row.setdefault(groupname, {}).update(get_attributes(resultsgroup))
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
                 if isinstance(h5_file['images'][orientation], h5py.Group):
