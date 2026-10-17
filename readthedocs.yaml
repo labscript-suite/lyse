@@ -1,0 +1,38 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set build environment options
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+  jobs:
+    # ensure full git repo is pulled so setuptools_scm gets versions correctly on install
+    # https://docs.readthedocs.com/platform/stable/build-customization.html#unshallow-git-clone
+    post_checkout:
+      - git fetch --unshallow || true
+      - git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' || true
+      - git fetch --all --tags || true
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+  builder: dirhtml
+  configuration: docs/source/conf.py
+  fail_on_warning: false
+
+# Optionally build your docs in additional formats such as PDF
+formats:
+  - pdf
+  - epub
+
+# Optionally set the requirements required to build your docs
+python:
+   install:
+      - method: pip
+        path: .
+        extra_requirements:
+            - docs
+   
