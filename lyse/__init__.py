@@ -1034,7 +1034,7 @@ class Run(object):
         """
         expansion_dict = {}
         def append_expansion(name, obj):
-            if 'expansion' in name:
+            if name.split('/')[-1] == 'expansion':
                 temp_dict = dict(obj.attrs)
                 for key, val in temp_dict.items():
                     if val:
@@ -1074,7 +1074,7 @@ class Run(object):
         # Define method that when applied to an hdf5 group adds all of its
         # globals and units to the units dict.
         def append_units(name, obj):
-            if 'units' in name:
+            if name.split('/')[-1] == 'units':
                 units.update(dict(obj.attrs))
         try:
             self.h5_file[path].visititems(append_units)
