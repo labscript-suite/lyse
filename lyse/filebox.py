@@ -387,6 +387,7 @@ class DataFrameModel(QtCore.QObject):
         # Get the current labscript file:
         if not viewer_path:
             lyse.utils.gui.error_dialog(self.app, "No hdf5 viewer specified in the labconfig.")
+            return
         if '{file}' in viewer_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             viewer_args = [arg if arg != '{file}' else shot_filepath for arg in viewer_args.split()]
