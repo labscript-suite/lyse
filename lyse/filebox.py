@@ -41,7 +41,8 @@ from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
 
 # Lyse imports
-from lyse.dataframe_utilities import concat_with_padding, get_dataframe_from_shot, replace_with_padding
+from lyse.dataframe_utilities import (concat_with_padding, get_dataframe_from_shot,
+                                      replace_with_padding, flatten_dict, pad_columns)
 import lyse.utils
 import lyse.utils.gui
 import lyse.widgets
@@ -476,9 +477,18 @@ class DataFrameModel(QtCore.QObject):
         assert filepath == self.dataframe.at[row_number, filepath_colname]
 
         if updated_row_data is not None and not dataframe_already_updated:
-            for group, name in updated_row_data:
-                column_name = (group, name) + ('',) * (self.nlevels - 2)
-                value = updated_row_data[group, name]
+            # Flatten dict values into extra column levels, as get_dataframe_from_shot()
+            # does when the shot is loaded from disk:
+            flat_row_data = {}
+            for (group, name), value in updated_row_data.items():
+                flat_row_data.update(flatten_dict({name: value}, keys=(group,)))
+            updated_row_data = flat_row_data
+            nlevels = max([self.nlevels] + [len(key) for key in updated_row_data])
+            if nlevels > self.nlevels:
+                self.dataframe = pad_columns(self.dataframe, nlevels)
+                self.update_column_levels()
+            for key, value in updated_row_data.items():
+                column_name = key + ('',) * (self.nlevels - len(key))
                 try:
                     self.dataframe.at[row_number, column_name] = value
                 except ValueError:
