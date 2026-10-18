@@ -667,13 +667,14 @@ class Run(object):
                 )
             raise PermissionError(dedent(msg))
         set_attributes(self.h5_file[group], {name: value})
-        
+
         if spinning_top:
-            if self.h5_path not in _updated_data:
-                _updated_data[self.h5_path] = {}
-            if group.startswith('results'):
-                toplevel = group.replace('results/', '', 1)
-                _updated_data[self.h5_path][toplevel, name] = value
+            # The lyse dataframe holds the attributes of the groups directly under
+            # 'data' and 'results', with the values as they are read back from the file.
+            group_path = group.strip('/').split('/')
+            if len(group_path) == 2 and group_path[0] in ('data', 'results'):
+                row_data = _updated_data.setdefault(self.h5_path, {})
+                row_data[group_path[1], name] = get_attribute(self.h5_file[group], name)
 
     @open_file('r+')
     def save_result_array(self, name, data, group=None, 
