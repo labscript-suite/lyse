@@ -486,7 +486,7 @@ class Lyse(object):
         if file.endswith('.msg'):
             # try to read msgpack in case using older pandas
             try:
-                df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                df = pandas.read_msgpack(file).sort_values("run time").reset_index(drop=True)
                 # raise a deprecation warning if this succeeds
                 msg = """msgpack support is being dropped by pandas >= 1.0.0.
                 Please resave this dataframe to use the new format."""
@@ -498,7 +498,7 @@ class Lyse(object):
                 You can then read this dataframe and resave it with the new format."""
                 raise DeprecationWarning(dedent(msg)) from err
         else:
-            df = pandas.read_pickle(file).sort_values("run time").reset_index()
+            df = pandas.read_pickle(file).sort_values("run time").reset_index(drop=True)
                 
         # Check for changes in the shot files since the dataframe was exported
         def changed_since(filepath, time):
