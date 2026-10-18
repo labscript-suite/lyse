@@ -16,12 +16,15 @@ analysis GUI code
 """
 
 import os
+import sys
 import time
 import logging
 import threading
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 
 # Labscript imports
+import zprocess
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 
 # qt imports
@@ -168,16 +171,47 @@ class RoutineBox(object):
                 routine.remove()
                 self.routines.remove(routine)
 
-        # Queue the files to be opened:
+        filepaths = []
+        checkstates = {}
         for filepath, checked in routine_files:
-            if filepath in [routine.filepath for routine in self.routines]:
+            if filepath in [routine.filepath for routine in self.routines] or filepath in filepaths:
                 self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
+                continue
+            filepaths.append(filepath)
+            checkstates[filepath] = checked
+
+        # Start the worker processes. The first child process of the process tree also
+        # creates the broker and heartbeat server shared by all children, so the first
+        # worker is started before the others, which are started concurrently.
+        worker_handles = {}
+        errors = {}
+
+        def start(filepath):
+            try:
+                worker_handles[filepath] = start_worker(self.app.process_tree, filepath,
+                                                        self.output_box_port)
+            except Exception:
+                errors[filepath] = sys.exc_info()
+
+        if filepaths:
+            start(filepaths[0])
+        if len(filepaths) > 1:
+            with ThreadPoolExecutor(max_workers=len(filepaths) - 1) as executor:
+                for filepath in filepaths[1:]:
+                    executor.submit(start, filepath)
+
+        for filepath in filepaths:
+            if filepath in errors:
                 continue
             self.logger.info(f'adding routine for {filepath}')
             routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port,
-                                      QtCore.Qt.CheckState(checked))
+                                      QtCore.Qt.CheckState(checkstates[filepath]),
+                                      worker_handles=worker_handles[filepath])
             self.routines.append(routine)
         self.update_select_all_checkstate()
+
+        for exc_info in errors.values():
+            zprocess.raise_exception_in_thread(exc_info)
         
     def on_treeview_double_left_clicked(self, index):
         # If double clicking on the the name item, open
@@ -413,9 +447,30 @@ class RoutineBox(object):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
 
 
+def start_worker(process_tree, filepath, output_box_port):
+    """Start a worker process for the analysis routine at filepath. Returns the queue to
+    the worker, the queue from the worker and the worker's Popen object. Blocks until the
+    worker has connected."""
+    logger = logging.getLogger(f'lyse.AnalysisRoutine.{os.path.basename(filepath)}')
+    logger.info('starting worker')
+    worker_path = os.path.join(lyse.utils.LYSE_DIR, 'analysis_subprocess.py')
+    to_worker, from_worker, worker = process_tree.subprocess(
+        worker_path,
+        output_redirection_port=output_box_port,
+        startup_timeout=30,
+    )
+    # Tell the worker what script it will be executing:
+    to_worker.put(filepath)
+    logger.info('analysis_subprocess started')
+    return to_worker, from_worker, worker
+
+
 class AnalysisRoutine(object):
 
-    def __init__(self, app, filepath, model, output_box_port, checked=QtCore.Qt.Checked):
+    def __init__(self, app, filepath, model, output_box_port, checked=QtCore.Qt.Checked,
+                 worker_handles=None):
+        """worker_handles is the return value of start_worker() for this routine. If it is
+        None, the worker is started here."""
         self.app = app
         self.filepath = filepath
         self.shortname = os.path.basename(self.filepath)
@@ -432,9 +487,9 @@ class AnalysisRoutine(object):
 
         self.logger = logging.getLogger(f'lyse.AnalysisRoutine.{self.shortname}')
 
-        self.logger.info('starting worker')
-        self.to_worker, self.from_worker, self.worker = self.start_worker()
-        self.logger.info('analysis_subprocess started')
+        if worker_handles is None:
+            worker_handles = self.start_worker()
+        self.to_worker, self.from_worker, self.worker = worker_handles
         
         # Make a row to put into the model:
         active_item =  QtGui.QStandardItem()
@@ -449,19 +504,7 @@ class AnalysisRoutine(object):
         self.exiting = False
         
     def start_worker(self):
-        # Start a worker process for this analysis routine:
-        worker_path = os.path.join(lyse.utils.LYSE_DIR, 'analysis_subprocess.py')
-
-        child_handles = self.app.process_tree.subprocess(
-            worker_path,
-            output_redirection_port=self.output_box_port,
-            startup_timeout=30,
-        )
-        
-        to_worker, from_worker, worker = child_handles
-        # Tell the worker what script it with be executing:
-        to_worker.put(self.filepath)
-        return to_worker, from_worker, worker
+        return start_worker(self.app.process_tree, self.filepath, self.output_box_port)
         
     def do_analysis(self, filepath):
         self.to_worker.put(['analyse', filepath])
