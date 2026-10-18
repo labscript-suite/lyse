@@ -940,7 +940,7 @@ class FileBox(object):
                     else:
                         logger.info('analysis is paused')
                         break
-                if self.multishot_required:
+                if self.multishot_required and not self.analysis_paused:
                     logger.info('doing multishot analysis')
                     self.do_multishot_analysis()
             except Exception:
