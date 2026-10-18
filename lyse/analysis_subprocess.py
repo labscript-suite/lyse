@@ -400,7 +400,10 @@ class AnalysisWorker(object):
                         dont_inherit=True,
                     )
                     exec(code, self.routine_module.__dict__)
-        except Exception:
+        except BaseException as e:
+            # sys.exit() with no status or a zero status ends the routine successfully
+            if isinstance(e, SystemExit) and e.code in (None, 0):
+                return True
             traceback_lines = traceback.format_exception(*sys.exc_info())
             print('\n'.join(traceback_lines[1:]), file=sys.stderr)
             return False
