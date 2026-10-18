@@ -459,9 +459,12 @@ class Lyse(object):
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
                 sequence_df.infer_objects()
-                for col in sequence_df.columns :
+                for col in sequence_df.columns:
                     if sequence_df[col].dtype == object:
-                        sequence_df[col] = pandas.to_numeric(sequence_df[col], errors='ignore')
+                        try:
+                            sequence_df[col] = pandas.to_numeric(sequence_df[col])
+                        except (ValueError, TypeError):
+                            pass
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
             lyse.utils.gui.error_dialog(self.app, 'Dataframe is empty')

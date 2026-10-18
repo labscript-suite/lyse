@@ -498,7 +498,7 @@ class DataFrameModel(QtCore.QObject):
                 column_name = key + ('',) * (self.nlevels - len(key))
                 try:
                     self.dataframe.at[row_number, column_name] = value
-                except ValueError:
+                except (ValueError, TypeError):
                     # did the column not already exist when we tried to set an iterable?
                     if not column_name in self.dataframe.columns:
                         # create it with a non-iterable and then overwrite with the iterable value:
