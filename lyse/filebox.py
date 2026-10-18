@@ -460,10 +460,6 @@ class DataFrameModel(QtCore.QObject):
     def update_row(self, filepath, dataframe_already_updated=False, new_row_data=None, updated_row_data=None):
         """"Updates a row in the dataframe and Qt model to the data in the HDF5 file for
         that shot."""
-        # To speed things up block signals to the model during update
-        self._model.blockSignals(True)
-
-        # Update the row in the dataframe first:
         if (new_row_data is None) == (updated_row_data is None) and not dataframe_already_updated:
             raise ValueError('Exactly one of new_row_data or updated_row_data must be provided')
 
@@ -473,6 +469,17 @@ class DataFrameModel(QtCore.QObject):
             # Row has been deleted, nothing to do here:
             return
 
+        # To speed things up block signals to the model during update
+        self._model.blockSignals(True)
+        try:
+            self._update_row(filepath, row_number, dataframe_already_updated, new_row_data, updated_row_data)
+        finally:
+            # unblock signals to the model and tell it to update
+            self._model.blockSignals(False)
+            self._model.layoutChanged.emit()
+
+    def _update_row(self, filepath, row_number, dataframe_already_updated, new_row_data, updated_row_data):
+        # Update the row in the dataframe first:
         filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
         assert filepath == self.dataframe.at[row_number, filepath_colname]
 
@@ -595,10 +602,6 @@ class DataFrameModel(QtCore.QObject):
 
         if new_column_names or defunct_column_names:
             self.columns_changed.emit()
-
-        # unblock signals to the model and tell it to update
-        self._model.blockSignals(False)
-        self._model.layoutChanged.emit()
 
     @inmain_decorator()
     def set_status_percent(self, filepath, status_percent):
