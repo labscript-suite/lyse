@@ -58,7 +58,7 @@ __all__ = [
     'Sequence',
 ]
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 1 and h5py.is_hdf5(sys.argv[1]):
     warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
                   "If you need this feature, let the developers know so it is not removed.",
                   FutureWarning)
@@ -267,6 +267,24 @@ def open_file(mode):
             
         return wrapper
     return decorator_open_file
+
+def _globals_from_attrs(group):
+    """The attributes of a globals group as a dict of Python values: None for a null
+    reference, bool for numpy bools and str for numpy and byte strings, as
+    labscript_utils.shot_utils.get_shot_globals returns them."""
+    globals_dict = {}
+    for name, value in group.attrs.items():
+        if isinstance(value, np.bool_):
+            value = bool(value)
+        elif isinstance(value, h5py.Reference) and not value:
+            value = None
+        elif isinstance(value, np.str_):
+            value = str(value)
+        elif isinstance(value, bytes):
+            value = value.decode()
+        globals_dict[name] = value
+    return globals_dict
+
 
 class Run(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
@@ -671,13 +689,14 @@ class Run(object):
                 )
             raise PermissionError(dedent(msg))
         set_attributes(self.h5_file[group], {name: value})
-        
+
         if spinning_top:
-            if self.h5_path not in _updated_data:
-                _updated_data[self.h5_path] = {}
-            if group.startswith('results'):
-                toplevel = group.replace('results/', '', 1)
-                _updated_data[self.h5_path][toplevel, name] = value
+            # The lyse dataframe holds the attributes of the groups directly under
+            # 'data' and 'results', with the values as they are read back from the file.
+            group_path = group.strip('/').split('/')
+            if len(group_path) == 2 and group_path[0] in ('data', 'results'):
+                row_data = _updated_data.setdefault(self.h5_path, {})
+                row_data[group_path[1], name] = get_attribute(self.h5_file[group], name)
 
     @open_file('r+')
     def save_result_array(self, name, data, group=None, 
@@ -970,10 +989,10 @@ class Run(object):
             dict: Dictionary of globals and their values.
         """
         if not group:
-            return dict(self.h5_file['globals'].attrs)
+            return _globals_from_attrs(self.h5_file['globals'])
         else:
             try:
-                return dict(self.h5_file['globals'][group].attrs)
+                return _globals_from_attrs(self.h5_file['globals'][group])
             except KeyError:
                 return {}
 
@@ -1038,7 +1057,7 @@ class Run(object):
         """
         expansion_dict = {}
         def append_expansion(name, obj):
-            if 'expansion' in name:
+            if name.split('/')[-1] == 'expansion':
                 temp_dict = dict(obj.attrs)
                 for key, val in temp_dict.items():
                     if val:
@@ -1078,7 +1097,7 @@ class Run(object):
         # Define method that when applied to an hdf5 group adds all of its
         # globals and units to the units dict.
         def append_units(name, obj):
-            if 'units' in name:
+            if name.split('/')[-1] == 'units':
                 units.update(dict(obj.attrs))
         try:
             self.h5_file[path].visititems(append_units)

@@ -78,9 +78,7 @@ class WebServer(ZMQServer):
         # rather than when updating the dataframe as calling it during updating may
         # call it needlessly often, whereas it only needs to be called prior to
         # sending the dataframe to a client requesting it, as we're doing now.
-        df = self._copy_dataframe()
-        df.infer_objects()
-        return df
+        return self._copy_dataframe().infer_objects()
 
     def _extract_n_sequences_from_df(self, df, n_sequences):
         # If the dataframe is empty, just return it, otherwise accessing columns

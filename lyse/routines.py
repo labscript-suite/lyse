@@ -226,6 +226,7 @@ class RoutineBox(object):
         # Get the current labscript file:
         if not editor_path:
             lyse.utils.gui.error_dialog(self.app, "No editor specified in the labconfig.")
+            return
         if '{file}' in editor_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             editor_args = [arg if arg != '{file}' else routine_filepath for arg in editor_args.split()]

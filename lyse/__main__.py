@@ -132,12 +132,7 @@ class Lyse(object):
         self.process_tree = ProcessTree.instance()
         self.process_tree.zlock_client.set_process_name('lyse')
 
-        # Forth: start remote communication server
-        self.port = int(self.exp_config.get('ports', 'lyse'))
-        self.server = lyse.communication.WebServer(self,  self.port)
-        self.logger.info(f'Started lyse server on port {self.port}')
-
-        # Last: UI setup
+        # Fourth: UI setup
         self.qapplication = qapplication
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
@@ -161,6 +156,12 @@ class Lyse(object):
         self.filebox = lyse.filebox.FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
         self.logger.info('Boxes loaded')
+
+        # Last: start the remote communication server, which puts submitted shots in the
+        # filebox's incoming queue:
+        self.port = int(self.exp_config.get('ports', 'lyse'))
+        self.server = lyse.communication.WebServer(self, self.port)
+        self.logger.info(f'Started lyse server on port {self.port}')
 
         self.last_save_config_file = None
         self.last_save_data = None
@@ -268,7 +269,7 @@ class Lyse(object):
             elif reply == QtWidgets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
-            lyse.utils.gui.error_dialog(self.app, 'no changes to revert')
+            lyse.utils.gui.error_dialog(self, 'no changes to revert')
 
     def on_save_configuration_as_triggered(self):
         if self.last_save_config_file is not None:
@@ -458,16 +459,16 @@ class Lyse(object):
                 filename = "dataframe_{}_{}.pkl".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
-                sequence_df.infer_objects()
                 for col in sequence_df.columns:
                     if sequence_df[col].dtype == object:
                         try:
                             sequence_df[col] = pandas.to_numeric(sequence_df[col])
                         except (ValueError, TypeError):
                             pass
+                sequence_df = sequence_df.infer_objects()
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
-            lyse.utils.gui.error_dialog(self.app, 'Dataframe is empty')
+            lyse.utils.gui.error_dialog(self, 'Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
         default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')
@@ -486,7 +487,7 @@ class Lyse(object):
         if file.endswith('.msg'):
             # try to read msgpack in case using older pandas
             try:
-                df = pandas.read_msgpack(file).sort_values("run time").reset_index()
+                df = pandas.read_msgpack(file).sort_values("run time").reset_index(drop=True)
                 # raise a deprecation warning if this succeeds
                 msg = """msgpack support is being dropped by pandas >= 1.0.0.
                 Please resave this dataframe to use the new format."""
@@ -498,7 +499,7 @@ class Lyse(object):
                 You can then read this dataframe and resave it with the new format."""
                 raise DeprecationWarning(dedent(msg)) from err
         else:
-            df = pandas.read_pickle(file).sort_values("run time").reset_index()
+            df = pandas.read_pickle(file).sort_values("run time").reset_index(drop=True)
                 
         # Check for changes in the shot files since the dataframe was exported
         def changed_since(filepath, time):

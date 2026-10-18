@@ -21,6 +21,7 @@ import subprocess
 import time
 import traceback
 import queue
+import warnings
 
 # 3rd party imports:
 import numpy as np
@@ -386,6 +387,7 @@ class DataFrameModel(QtCore.QObject):
         # Get the current labscript file:
         if not viewer_path:
             lyse.utils.gui.error_dialog(self.app, "No hdf5 viewer specified in the labconfig.")
+            return
         if '{file}' in viewer_args:
             # Split the args on spaces into a list, replacing {file} with the labscript file
             viewer_args = [arg if arg != '{file}' else shot_filepath for arg in viewer_args.split()]
@@ -653,7 +655,7 @@ class DataFrameModel(QtCore.QObject):
                 for col in header_cols:
                     val = self.dataframe[col].values[row_number]
                     if pandas.notna(val):
-                        header_strings.append('{:04d}'.format(val))
+                        header_strings.append('{:04d}'.format(int(val)))
                     else:
                         header_strings.append('----')
                 vert_header_text += ' | '.join(header_strings)
@@ -887,14 +889,21 @@ class FileBox(object):
                 filepaths = sorted(set(filepaths), key=filepaths.index) # Inefficient but readable
                 # We open the HDF5 files here outside the GUI thread so as not to hang the GUI:
                 dataframes = []
-                indices_of_files_not_found = []
+                indices_of_files_skipped = []
                 for i, filepath in enumerate(filepaths):
                     try:
-                        dataframe = get_dataframe_from_shot(filepath)
+                        with warnings.catch_warnings(record=True) as caught_warnings:
+                            warnings.simplefilter('always')
+                            dataframe = get_dataframe_from_shot(filepath)
                         dataframes.append(dataframe)
+                        for warning in caught_warnings:
+                            self.app.output_box.output('Warning: %s: %s\n' % (filepath, warning.message), red=True)
                     except IOError:
                         self.app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
-                        indices_of_files_not_found.append(i)
+                        indices_of_files_skipped.append(i)
+                    except Exception as e:
+                        self.app.output_box.output('Warning: Ignoring shot file %s: %s: %s\n' % (filepath, e.__class__.__name__, e), red=True)
+                        indices_of_files_skipped.append(i)
                     n_shots_added += 1
                     shots_remaining = self.incoming_queue.qsize()
                     total_shots = n_shots_added + shots_remaining + len(filepaths) - (i + 1)
@@ -905,10 +914,10 @@ class FileBox(object):
                 else:
                     new_row_data = None
 
-                # Do not add the shots that were not found on disk. Reverse
+                # Do not add the shots that could not be read. Reverse
                 # loop so that removing an item doesn't change the indices of
                 # subsequent removals:
-                for i in reversed(indices_of_files_not_found):
+                for i in reversed(indices_of_files_skipped):
                     del filepaths[i]
                 if filepaths:
                     self.shots_model.add_files(filepaths, new_row_data)
@@ -921,6 +930,8 @@ class FileBox(object):
             except Exception:
                 # Keep this incoming loop running at all costs, but make the
                 # otherwise uncaught exception visible to the user:
+                self.set_add_shots_progress(None, None, None)
+                n_shots_added = 0
                 zprocess.raise_exception_in_thread(sys.exc_info())
 
     def analysis_loop(self):
