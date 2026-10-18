@@ -132,12 +132,7 @@ class Lyse(object):
         self.process_tree = ProcessTree.instance()
         self.process_tree.zlock_client.set_process_name('lyse')
 
-        # Forth: start remote communication server
-        self.port = int(self.exp_config.get('ports', 'lyse'))
-        self.server = lyse.communication.WebServer(self,  self.port)
-        self.logger.info(f'Started lyse server on port {self.port}')
-
-        # Last: UI setup
+        # Fourth: UI setup
         self.qapplication = qapplication
         loader = UiLoader()
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/main.ui'), LyseMainWindow(self))
@@ -161,6 +156,12 @@ class Lyse(object):
         self.filebox = lyse.filebox.FileBox(self, self.ui.verticalLayout_filebox, self.exp_config,
                                to_singleshot, from_singleshot, to_multishot, from_multishot)
         self.logger.info('Boxes loaded')
+
+        # Last: start the remote communication server, which puts submitted shots in the
+        # filebox's incoming queue:
+        self.port = int(self.exp_config.get('ports', 'lyse'))
+        self.server = lyse.communication.WebServer(self, self.port)
+        self.logger.info(f'Started lyse server on port {self.port}')
 
         self.last_save_config_file = None
         self.last_save_data = None
