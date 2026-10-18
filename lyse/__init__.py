@@ -55,7 +55,7 @@ __all__ = [
     'Sequence',
 ]
 
-if len(sys.argv) > 1:
+if len(sys.argv) > 1 and h5py.is_hdf5(sys.argv[1]):
     warnings.warn("Running standalone single-shot lyse scripts is deprecated. "
                   "If you need this feature, let the developers know so it is not removed.",
                   FutureWarning)
