@@ -458,13 +458,13 @@ class Lyse(object):
                 filename = "dataframe_{}_{}.pkl".format(sequence.to_pydatetime().strftime("%Y%m%dT%H%M%S"),labscript[:-3])
                 if not choose_folder:
                     save_path = os.path.dirname(sequence_df['filepath'].iloc[0])
-                sequence_df.infer_objects()
                 for col in sequence_df.columns:
                     if sequence_df[col].dtype == object:
                         try:
                             sequence_df[col] = pandas.to_numeric(sequence_df[col])
                         except (ValueError, TypeError):
                             pass
+                sequence_df = sequence_df.infer_objects()
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
             lyse.utils.gui.error_dialog(self.app, 'Dataframe is empty')
