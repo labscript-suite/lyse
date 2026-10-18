@@ -268,7 +268,7 @@ class Lyse(object):
             elif reply == QtWidgets.QMessageBox.Yes:
                 self.load_configuration(self.last_save_config_file)
         else:
-            lyse.utils.gui.error_dialog(self.app, 'no changes to revert')
+            lyse.utils.gui.error_dialog(self, 'no changes to revert')
 
     def on_save_configuration_as_triggered(self):
         if self.last_save_config_file is not None:
@@ -467,7 +467,7 @@ class Lyse(object):
                 sequence_df = sequence_df.infer_objects()
                 sequence_df.to_pickle(os.path.join(save_path, filename))
         else:
-            lyse.utils.gui.error_dialog(self.app, 'Dataframe is empty')
+            lyse.utils.gui.error_dialog(self, 'Dataframe is empty')
 
     def on_load_dataframe_triggered(self):
         default = os.path.join(self.exp_config.get('paths', 'experiment_shot_storage'), 'dataframe.pkl')
