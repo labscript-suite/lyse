@@ -264,6 +264,24 @@ def open_file(mode):
         return wrapper
     return decorator_open_file
 
+def _globals_from_attrs(group):
+    """The attributes of a globals group as a dict of Python values: None for a null
+    reference, bool for numpy bools and str for numpy and byte strings, as
+    labscript_utils.shot_utils.get_shot_globals returns them."""
+    globals_dict = {}
+    for name, value in group.attrs.items():
+        if isinstance(value, np.bool_):
+            value = bool(value)
+        elif isinstance(value, h5py.Reference) and not value:
+            value = None
+        elif isinstance(value, np.str_):
+            value = str(value)
+        elif isinstance(value, bytes):
+            value = value.decode()
+        globals_dict[name] = value
+    return globals_dict
+
+
 class Run(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
 
@@ -967,10 +985,10 @@ class Run(object):
             dict: Dictionary of globals and their values.
         """
         if not group:
-            return dict(self.h5_file['globals'].attrs)
+            return _globals_from_attrs(self.h5_file['globals'])
         else:
             try:
-                return dict(self.h5_file['globals'][group].attrs)
+                return _globals_from_attrs(self.h5_file['globals'][group])
             except KeyError:
                 return {}
 
