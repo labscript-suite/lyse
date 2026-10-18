@@ -13,6 +13,8 @@
 """Lyse dataframe utilities
 """
 
+import warnings
+
 import labscript_utils.h5_lock, h5py
 import pandas
 import tzlocal
@@ -64,15 +66,17 @@ def get_nested_dict_from_shot(filepath):
     with h5py.File(filepath,'r') as h5_file:
         # Attributes of the groups under 'data' and 'results' share one namespace in the
         # dataframe, keyed by group name. A results attribute overrides a data attribute
-        # of the same name.
-        if 'data' in h5_file:
-            for groupname in h5_file['data']:
-                datagroup = h5_file['data'][groupname]
-                row.setdefault(groupname, {}).update(get_attributes(datagroup))
-        if 'results' in h5_file:
-            for groupname in h5_file['results']:
-                resultsgroup = h5_file['results'][groupname]
-                row.setdefault(groupname, {}).update(get_attributes(resultsgroup))
+        # of the same name, and a group replaces a global of the same name.
+        groups = {}
+        for toplevel in ('data', 'results'):
+            if toplevel in h5_file:
+                for groupname, group in h5_file[toplevel].items():
+                    groups.setdefault(groupname, {}).update(get_attributes(group))
+        for groupname in groups:
+            if groupname in row:
+                warnings.warn(f"The group '{groupname}' has the same name as a global; "
+                              "the global is not included in the dataframe")
+        row.update(groups)
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
                 if isinstance(h5_file['images'][orientation], h5py.Group):
@@ -85,32 +89,38 @@ def get_nested_dict_from_shot(filepath):
                             for key, val in get_attributes(group[image]).items():
                                 if not isinstance(val, h5py.Reference):
                                     row[orientation][label][image][key] = val
-        row['filepath'] = _ensure_str(filepath)
-        row['agnostic_path'] = labscript_utils.shared_drive.path_to_agnostic(filepath)
+        shot = {}
+        shot['filepath'] = _ensure_str(filepath)
+        shot['agnostic_path'] = labscript_utils.shared_drive.path_to_agnostic(filepath)
         seq_id = _ensure_str(h5_file.attrs['sequence_id'])
-        row['sequence'] = asdatetime(seq_id.split('_')[0])
+        shot['sequence'] = asdatetime(seq_id.split('_')[0])
         try:
-            row['sequence_index'] = h5_file.attrs['sequence_index']
+            shot['sequence_index'] = h5_file.attrs['sequence_index']
         except KeyError:
-            row['sequence_index'] = None
+            shot['sequence_index'] = None
         if 'script' in h5_file: 
-            row['labscript'] = _ensure_str(h5_file['script'].attrs['name'])
+            shot['labscript'] = _ensure_str(h5_file['script'].attrs['name'])
         try:
-            row['run time'] = asdatetime(_ensure_str(h5_file.attrs['run time']))
+            shot['run time'] = asdatetime(_ensure_str(h5_file.attrs['run time']))
         except KeyError:
-            row['run time'] = float('nan')
+            shot['run time'] = float('nan')
         try:    
-            row['run number'] = h5_file.attrs['run number']
+            shot['run number'] = h5_file.attrs['run number']
         except KeyError:
-            row['run number'] = float('nan')
+            shot['run number'] = float('nan')
         try:
-            row['run repeat'] = h5_file.attrs['run repeat']
+            shot['run repeat'] = h5_file.attrs['run repeat']
         except KeyError:
-            row['run repeat'] = 0
+            shot['run repeat'] = 0
         try:
-            row['n_runs'] = h5_file.attrs['n_runs']
+            shot['n_runs'] = h5_file.attrs['n_runs']
         except KeyError:
-            row['n_runs'] = float('nan')
+            shot['n_runs'] = float('nan')
+        for name in shot:
+            if name in row:
+                warnings.warn(f"'{name}' is a reserved column name; the global or group "
+                              "of that name is not included in the dataframe")
+        row.update(shot)
         return row
             
 def flatten_dict(dictionary, keys=tuple()):

@@ -21,6 +21,7 @@ import subprocess
 import time
 import traceback
 import queue
+import warnings
 
 # 3rd party imports:
 import numpy as np
@@ -890,8 +891,12 @@ class FileBox(object):
                 indices_of_files_skipped = []
                 for i, filepath in enumerate(filepaths):
                     try:
-                        dataframe = get_dataframe_from_shot(filepath)
+                        with warnings.catch_warnings(record=True) as caught_warnings:
+                            warnings.simplefilter('always')
+                            dataframe = get_dataframe_from_shot(filepath)
                         dataframes.append(dataframe)
+                        for warning in caught_warnings:
+                            self.app.output_box.output('Warning: %s: %s\n' % (filepath, warning.message), red=True)
                     except IOError:
                         self.app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
                         indices_of_files_skipped.append(i)
