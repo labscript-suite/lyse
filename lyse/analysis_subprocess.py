@@ -38,6 +38,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 
 # Labscript imports
 from labscript_utils.modulewatcher import ModuleWatcher
+from labscript_utils.labconfig import LabConfig
 from labscript_utils import dedent
 
 
@@ -57,9 +58,26 @@ if (
 ):
     multiprocessing.set_start_method('spawn')
 
-# read labconfig once for plot window locations
-autoload_config_file = lyse.utils.LABCONFIG.get('lyse', 'autoload_config_file')
-config_dir = os.path.dirname(autoload_config_file)
+def plot_settings_dir():
+    """The directory of the ini files that hold the plot window geometry: the directory
+    of the autoload config file, or the lyse app_saved_configs directory if the labconfig
+    has no autoload config file."""
+    try:
+        return os.path.dirname(lyse.utils.LABCONFIG.get('lyse', 'autoload_config_file'))
+    except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+        pass
+    try:
+        app_saved_configs = lyse.utils.LABCONFIG.get('DEFAULT', 'app_saved_configs')
+    except LabConfig.NoOptionError:
+        app_saved_configs = os.path.join(
+            lyse.utils.LABCONFIG.get('DEFAULT', 'labscript_suite'),
+            'userlib',
+            'app_saved_configs',
+            lyse.utils.LABCONFIG.get('DEFAULT', 'apparatus_name'),
+        )
+    return os.path.join(app_saved_configs, 'lyse')
+
+config_dir = plot_settings_dir()
 
 class PlotWindowCloseEvent(QtGui.QCloseEvent):
     def __init__(self, force, *args, **kwargs):
