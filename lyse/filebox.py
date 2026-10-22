@@ -338,20 +338,24 @@ class DataFrameModel(QtCore.QObject):
         self.remove_selection()
 
     def remove_selection(self, confirm=True):
-        selection_model = self._view.selectionModel()
-        selected_indexes = selection_model.selectedRows()
-        selected_name_items = [self._model.itemFromIndex(index) for index in selected_indexes]
-        if not selected_name_items:
+        selected_rows = set()
+        for selection_range in self._view.selectionModel().selection():
+            selected_rows.update(range(selection_range.top(), selection_range.bottom() + 1))
+        selected_rows = sorted(selected_rows)
+        if not selected_rows:
             return
-        if confirm and not lyse.utils.gui.question_dialog(self.app, "Remove %d shots?" % len(selected_name_items)):
+        if confirm and not lyse.utils.gui.question_dialog(self.app, "Remove %d shots?" % len(selected_rows)):
             return
         # Remove from DataFrame first:
-        self.dataframe = self.dataframe.drop(index.row() for index in selected_indexes)
+        self.dataframe = self.dataframe.drop(selected_rows)
         self.dataframe.index = pandas.Index(range(len(self.dataframe)))
-        # Delete one at a time from Qt model:
-        for name_item in selected_name_items:
-            row = name_item.row()
-            self._model.removeRow(row)
+        # Remove each contiguous block of rows from the Qt model with one call, starting
+        # with the last block:
+        block_end = len(selected_rows)
+        for i in reversed(range(len(selected_rows))):
+            if i == 0 or selected_rows[i - 1] != selected_rows[i] - 1:
+                self._model.removeRows(selected_rows[i], block_end - i)
+                block_end = i
         self.renumber_rows()
 
     def mark_selection_not_done(self):
@@ -644,6 +648,10 @@ class DataFrameModel(QtCore.QObject):
         if add_from == 0:
             self.row_number_by_filepath = {}
 
+        if self.integer_indexing:
+            header_cols = ['sequence_index', 'run number', 'run repeat']
+            header_values = [self.dataframe[col].values for col in header_cols]
+
         for row_number in range(add_from, self._model.rowCount()):
             vertical_header_item = self._model.verticalHeaderItem(row_number)
             row_number_str = str(row_number).rjust(n_digits)
@@ -652,10 +660,9 @@ class DataFrameModel(QtCore.QObject):
             filepath = filepath_item.text()
             self.row_number_by_filepath[filepath] = row_number
             if self.integer_indexing:
-                header_cols = ['sequence_index', 'run number', 'run repeat']
                 header_strings = []
-                for col in header_cols:
-                    val = self.dataframe[col].values[row_number]
+                for values in header_values:
+                    val = values[row_number]
                     if pandas.notna(val):
                         header_strings.append('{:04d}'.format(int(val)))
                     else:
