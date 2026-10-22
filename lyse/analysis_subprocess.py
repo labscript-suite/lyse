@@ -18,9 +18,11 @@ labscript_utils.excepthook.install()
 import labscript_utils.h5_lock, h5py
 
 from labscript_utils.ls_zprocess import ProcessTree
+from zprocess import KillLock, interrupt_main_thread
 
 import sys
 import os
+import signal
 import threading
 import traceback
 import time
@@ -329,7 +331,17 @@ class AnalysisWorker(object):
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
-        
+
+        # Set while the main thread is running the user's routine. on_sigint() raises
+        # KeyboardInterrupt only while this is set, so that the interrupt is raised in
+        # the routine and not in the code that runs after it:
+        self.routine_running = False
+        signal.signal(signal.SIGINT, self.on_sigint)
+
+        # Set when no analysis task is running:
+        self.idle = threading.Event()
+        self.idle.set()
+
         # Start the thread that listens for instructions from the
         # parent process:
         self.mainloop_thread = threading.Thread(target=self.mainloop)
@@ -345,19 +357,55 @@ class AnalysisWorker(object):
         while True:
             task, data = self.from_parent.get()
             if task == 'quit':
+                self.abort_analysis()
+                if not self.idle.wait(lyse.utils.worker._ABORT_TIMEOUT):
+                    print(
+                        'The routine did not stop after %d seconds. The worker will '
+                        'exit when it has no HDF5 file open, or after %d seconds.'
+                        % (
+                            lyse.utils.worker._ABORT_TIMEOUT,
+                            lyse.utils.worker._KILL_LOCK_TIMEOUT,
+                        ),
+                        file=sys.stderr,
+                    )
+                    KillLock().exit_when_released(
+                        timeout=lyse.utils.worker._KILL_LOCK_TIMEOUT
+                    )
                 self.close_plots()
                 inmain(qapplication.quit)
             elif task == 'analyse':
-                path = data
-                success = self.do_analysis(path)
-                if success:
-                    if lyse.utils.worker._delay_flag:
-                        lyse.utils.worker.delay_event.wait()
-                    self.to_parent.put(['done', lyse.utils.worker._updated_data])
-                else:
-                    self.to_parent.put(['error', lyse.utils.worker._updated_data])
+                self.idle.clear()
+                # In a thread, so that an abort can be received while the routine runs:
+                thread = threading.Thread(target=self.analysis_task, args=(data,))
+                thread.daemon = True
+                thread.start()
+            elif task == 'abort':
+                self.abort_analysis()
             else:
                 self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    def analysis_task(self, path):
+        try:
+            success = self.do_analysis(path)
+            if success:
+                if lyse.utils.worker._delay_flag:
+                    lyse.utils.worker.delay_event.wait()
+                self.to_parent.put(['done', lyse.utils.worker._updated_data])
+            else:
+                self.to_parent.put(['error', lyse.utils.worker._updated_data])
+        finally:
+            self.idle.set()
+
+    def abort_analysis(self):
+        """Raise KeyboardInterrupt in the routine if one is running, and end a wait in
+        delay_results_return()."""
+        if not self.idle.is_set():
+            interrupt_main_thread()
+        lyse.utils.worker.delay_event.set()
+
+    def on_sigint(self, signum, frame):
+        if self.routine_running:
+            raise KeyboardInterrupt
 
     @inmain_decorator()
     def close_plots(self):
@@ -406,8 +454,15 @@ class AnalysisWorker(object):
                         dont_inherit=True,
                     )
                     self.routine_source = source
-                # Actually run the user's analysis!
-                exec(self.routine_code, self.routine_module.__dict__)
+                try:
+                    self.routine_running = True
+                    # Actually run the user's analysis!
+                    exec(self.routine_code, self.routine_module.__dict__)
+                finally:
+                    self.routine_running = False
+        except KeyboardInterrupt:
+            print('Interrupted', file=sys.stderr)
+            return False
         except BaseException as e:
             # sys.exit() with no status or a zero status ends the routine successfully
             if isinstance(e, SystemExit) and e.code in (None, 0):
