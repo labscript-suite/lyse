@@ -799,7 +799,7 @@ class FileBox(object):
             # User cancelled selection
             return
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
-        shot_files = [os.path.abspath(shot_file) for shot_file in shot_files]
+        shot_files = sorted(os.path.abspath(shot_file) for shot_file in shot_files)
 
         # Save the containing folder for use next time we open the dialog box:
         self.last_opened_shots_folder = os.path.dirname(shot_files[0])
