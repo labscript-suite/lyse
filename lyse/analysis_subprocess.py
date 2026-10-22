@@ -13,7 +13,8 @@
 """Analysis subprocess definitions and routines
 """
  
-import labscript_utils.excepthook # I do magic stuff, so import must be in place
+import labscript_utils.excepthook
+labscript_utils.excepthook.install()
 import labscript_utils.h5_lock, h5py
 
 from labscript_utils.ls_zprocess import ProcessTree
