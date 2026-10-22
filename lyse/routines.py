@@ -71,10 +71,11 @@ class RoutineBox(object):
         else:
             self.ui.groupBox.setTitle('Singleshot routines')
 
-        self.model = lyse.widgets.UneditableModel()
+        self.model = QtGui.QStandardItemModel()
         self.header = HorizontalHeaderViewWithWidgets(self.model)
         self.ui.treeView.setHeader(self.header)
         self.ui.treeView.setModel(self.model)
+        self.ui.treeView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         
         active_item = QtGui.QStandardItem()
         active_item.setToolTip('Whether the analysis routine should run')
