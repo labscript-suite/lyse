@@ -17,13 +17,6 @@
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils.qt.QtCore import pyqtSignal as Signal
 
-class UneditableModel(QtGui.QStandardItemModel):
-
-    def flags(self, index):
-        """Return flags as normal except that the ItemIsEditable
-        flag is always False"""
-        result = QtGui.QStandardItemModel.flags(self, index)
-        return result & ~QtCore.Qt.ItemIsEditable
 
 class EditColumnsDialog(QtWidgets.QDialog):
     close_signal = Signal()
