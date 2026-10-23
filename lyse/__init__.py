@@ -31,6 +31,7 @@ from labscript_utils.ls_zprocess import zmq_get
 from labscript_utils.dict_diff import dict_diff
 
 from labscript_utils.properties import get_attributes, get_attribute, set_attributes
+from labscript_utils.shot_utils import get_shot_globals
 
 # lyse imports
 import lyse.dataframe_utilities
@@ -203,7 +204,7 @@ def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, 
         lyse.dataframe_utilities.rangeindex_to_multiindex(df, inplace=True)
         return df
 
-def globals_diff(run1, run2, group=None):
+def globals_diff(run1, run2):
     """Take a diff of the globals between two runs.
 
     Uses the :obj:`labscript-utils:dict_diff` function.
@@ -211,15 +212,13 @@ def globals_diff(run1, run2, group=None):
     Args:
         run1 (:obj:`Run`): First Run to compare.
         run2 (:obj:`Run`): Second Run to compare.
-        group (str, optional): When `None` (default), compare all groups.
-            Otherwise, only compare globals in `group`.
 
     Returns:
         dict: Dictionary of differences between globals in the form `key:[val1,val2]`
         pairs. Keys unique to either dictionary are returned as `key:[val1,'-']` or
         `key:['-',val2]`.
     """
-    return dict_diff(run1.get_globals(group), run2.get_globals(group))
+    return dict_diff(run1.get_globals(), run2.get_globals())
  
 def open_file(mode):
     """Decorator for lyse functions to allow using previously opened file with context manager.
@@ -267,24 +266,6 @@ def open_file(mode):
             
         return wrapper
     return decorator_open_file
-
-def _globals_from_attrs(group):
-    """The attributes of a globals group as a dict of Python values: None for a null
-    reference, bool for numpy bools and str for numpy and byte strings, as
-    labscript_utils.shot_utils.get_shot_globals returns them."""
-    globals_dict = {}
-    for name, value in group.attrs.items():
-        if isinstance(value, np.bool_):
-            value = bool(value)
-        elif isinstance(value, h5py.Reference) and not value:
-            value = None
-        elif isinstance(value, np.str_):
-            value = str(value)
-        elif isinstance(value, bytes):
-            value = value.decode()
-        globals_dict[name] = value
-    return globals_dict
-
 
 class Run(object):
     """A class for saving/retrieving data to/from a shot's hdf5 file.
@@ -978,23 +959,13 @@ class Run(object):
         return get_attributes(self.h5_file['images'][orientation])
 
     @open_file('r')
-    def get_globals(self, group=None):
+    def get_globals(self):
         """Get globals from the shot.
-
-        Args:
-            group (str, optional): If `None`, return all global variables.
-                If defined, only return globals from `group`.
 
         Returns:
             dict: Dictionary of globals and their values.
         """
-        if not group:
-            return _globals_from_attrs(self.h5_file['globals'])
-        else:
-            try:
-                return _globals_from_attrs(self.h5_file['globals'][group])
-            except KeyError:
-                return {}
+        return get_shot_globals(self.h5_file)
 
     @open_file('r')
     def get_globals_raw(self, group=None):
@@ -1117,20 +1088,18 @@ class Run(object):
         except KeyError:
             return []
                 
-    def globals_diff(self, other_run, group=None):
+    def globals_diff(self, other_run):
         """Take a diff between this run and another run.
 
-        This calls :obj:`globals_diff(self, other_run, group) <globals_diff>`.
+        This calls :obj:`globals_diff(self, other_run) <globals_diff>`.
 
         Args:
             other_run (:obj:`Run`): Run to compare to.
-            group (str, optional): When `None` (default), compare all globals.
-                Otherwise only compare globals in `group`. 
 
         Returns:
             dict: Dictionary of different globals.
         """
-        return globals_diff(self, other_run, group)            
+        return globals_diff(self, other_run)            
     
         
 class Sequence(Run):
