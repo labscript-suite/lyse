@@ -318,6 +318,11 @@ class AnalysisWorker(object):
         self.routine_module_clean_dict = self.routine_module.__dict__.copy()
         sys.modules[self.routine_module.__name__] = self.routine_module
 
+        # The source of the user's routine when it was last compiled, and the code
+        # object compiled from it:
+        self.routine_source = None
+        self.routine_code = None
+
         # Plot objects, keyed by matplotlib Figure object:
         self.plots = {}
 
@@ -392,15 +397,18 @@ class AnalysisWorker(object):
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
-                # Actually run the user's analysis!
                 with open(self.filepath) as f:
-                    code = compile(
-                        f.read(),
+                    source = f.read()
+                if source != self.routine_source:
+                    self.routine_code = compile(
+                        source,
                         self.routine_module.__file__,
                         'exec',
                         dont_inherit=True,
                     )
-                    exec(code, self.routine_module.__dict__)
+                    self.routine_source = source
+                # Actually run the user's analysis!
+                exec(self.routine_code, self.routine_module.__dict__)
         except BaseException as e:
             # sys.exit() with no status or a zero status ends the routine successfully
             if isinstance(e, SystemExit) and e.code in (None, 0):
