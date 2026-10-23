@@ -73,7 +73,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 progress_bar_option.state = QtWidgets.QStyle.State_Enabled
                 progress_bar_option.direction = self.app.qapplication.layoutDirection()
                 progress_bar_option.rect = option.rect
-                progress_bar_option.fontMetrics = self.app.qapplication.fontMetrics()
+                progress_bar_option.fontMetrics = QtGui.QFontMetrics(self.app.qapplication.font())
                 progress_bar_option.minimum = 0
                 progress_bar_option.maximum = 100
                 progress_bar_option.textAlignment = QtCore.Qt.AlignCenter
