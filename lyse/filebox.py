@@ -526,6 +526,7 @@ class DataFrameModel(QtCore.QObject):
 
         # To speed things up block signals to the model during update
         self._model.blockSignals(True)
+        changed_region = None
         try:
             new_column_numbers = self._add_new_columns()
             for column_name, (rows, _) in rows_by_column.items():
@@ -534,10 +535,22 @@ class DataFrameModel(QtCore.QObject):
                 for row_number, value in zip(rows, values):
                     self._set_item(row_number, column_number, value)
             self._resize_new_columns(new_column_numbers)
+            if not new_column_numbers:
+                all_rows = [row for rows, _ in rows_by_column.values() for row in rows]
+                column_numbers = [self.column_indices[name] for name in rows_by_column]
+                changed_region = (
+                    self._model.index(min(all_rows), min(column_numbers)),
+                    self._model.index(max(all_rows), max(column_numbers)),
+                )
         finally:
             # unblock signals to the model and tell it to update
             self._model.blockSignals(False)
-            self._model.layoutChanged.emit()
+            if changed_region is None:
+                self._model.layoutChanged.emit()
+            else:
+                # Only item data changed, so the view does not need to lay out the
+                # table again:
+                self._model.dataChanged.emit(*changed_region)
 
     def _set_dataframe_values(self, column_name, rows, values):
         """Set the values of one dataframe column in the given rows"""
@@ -1067,13 +1080,16 @@ class FileBox(object):
             self.shots_model.mark_as_deleted_off_disk(filepath)
             return
         self.to_singleshot.put(filepath)
+        previous_status_percent = None
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
-            self.shots_model.update_rows(updated_data)
+            if updated_data:
+                self.shots_model.update_rows(updated_data)
             # Update the status percent for the the row on which analysis is actually
             # running:
-            if status_percent is not None:
+            if status_percent is not None and status_percent != previous_status_percent:
                 self.shots_model.set_status_percent(filepath, status_percent)
+                previous_status_percent = status_percent
             if signal == 'done':
                 return
             if signal == 'error':
@@ -1092,7 +1108,8 @@ class FileBox(object):
         self.to_multishot.put(None)
         while True:
             signal, _, updated_data = self.from_multishot.get()
-            self.shots_model.update_rows(updated_data)
+            if updated_data:
+                self.shots_model.update_rows(updated_data)
             if signal == 'done':
                 self.multishot_required = False
                 return
