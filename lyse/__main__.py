@@ -14,6 +14,7 @@
 """
 import os
 import labscript_utils.excepthook
+labscript_utils.excepthook.install()
 import importlib.metadata
 
 # Associate app windows with OS menu shortcuts, must be before any GUI calls, apparently
