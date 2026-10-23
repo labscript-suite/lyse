@@ -43,7 +43,7 @@ import qtutils.icons
 
 # Lyse imports
 from lyse.dataframe_utilities import (concat_with_padding, get_dataframe_from_shot,
-                                      replace_with_padding, flatten_dict, pad_columns)
+                                      flatten_dict, pad_columns)
 import lyse.utils
 import lyse.utils.gui
 import lyse.widgets
@@ -465,72 +465,128 @@ class DataFrameModel(QtCore.QObject):
         self.dataframe = self.dataframe.infer_objects()
 
     @inmain_decorator()
-    def update_row(self, filepath, dataframe_already_updated=False, new_row_data=None, updated_row_data=None):
-        """"Updates a row in the dataframe and Qt model to the data in the HDF5 file for
-        that shot."""
-        if (new_row_data is None) == (updated_row_data is None) and not dataframe_already_updated:
-            raise ValueError('Exactly one of new_row_data or updated_row_data must be provided')
-
+    def update_row(self, filepath):
+        """Update the Qt model row for a shot from the data in the dataframe"""
         try:
             row_number = self.row_number_by_filepath[filepath]
         except KeyError:
             # Row has been deleted, nothing to do here:
             return
+        filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
+        assert filepath == self.dataframe.at[row_number, filepath_colname]
 
         # To speed things up block signals to the model during update
         self._model.blockSignals(True)
         try:
-            self._update_row(filepath, row_number, dataframe_already_updated, new_row_data, updated_row_data)
+            new_column_numbers = self._add_new_columns()
+            dataframe_row = self.dataframe.iloc[row_number].to_dict()
+            for column_number, column_name in self.column_names.items():
+                if not isinstance(column_name, tuple):
+                    # One of our special columns, does not correspond to a column in the dataframe:
+                    continue
+                self._set_item(row_number, column_number, dataframe_row[column_name])
+            self._resize_new_columns(new_column_numbers)
         finally:
             # unblock signals to the model and tell it to update
             self._model.blockSignals(False)
             self._model.layoutChanged.emit()
 
-    def _update_row(self, filepath, row_number, dataframe_already_updated, new_row_data, updated_row_data):
-        # Update the row in the dataframe first:
-        filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
-        assert filepath == self.dataframe.at[row_number, filepath_colname]
-
-        if updated_row_data is not None and not dataframe_already_updated:
-            # Flatten dict values into extra column levels, as get_dataframe_from_shot()
-            # does when the shot is loaded from disk:
-            flat_row_data = {}
-            for (group, name), value in updated_row_data.items():
-                flat_row_data.update(flatten_dict({name: value}, keys=(group,)))
-            updated_row_data = flat_row_data
-            nlevels = max([self.nlevels] + [len(key) for key in updated_row_data])
-            if nlevels > self.nlevels:
-                self.dataframe = pad_columns(self.dataframe, nlevels)
-                self.update_column_levels()
-            for key, value in updated_row_data.items():
-                column_name = key + ('',) * (self.nlevels - len(key))
-                try:
-                    self.dataframe.at[row_number, column_name] = value
-                except (ValueError, TypeError):
-                    # did the column not already exist when we tried to set an iterable?
-                    if not column_name in self.dataframe.columns:
-                        # create it with a non-iterable and then overwrite with the iterable value:
-                        self.dataframe.at[row_number, column_name] = None
-                    else:
-                        # Incompatible datatype - convert the datatype of the column to
-                        # 'object'
-                        self.dataframe[column_name] = self.dataframe[column_name].astype('object')
-                    # Now that the column exists and has dtype object, we can set the value:
-                    self.dataframe.at[row_number, column_name] = value
-
-            dataframe_already_updated = True
-
-        if not dataframe_already_updated:
-            if new_row_data is None:
-                raise ValueError("If dataframe_already_updated is False, then new_row_data, as returned "
-                                 "by dataframe_utils.get_dataframe_from_shot(filepath) must be provided.")
-            self.dataframe = replace_with_padding(self.dataframe, new_row_data, row_number)
+    @inmain_decorator()
+    def update_rows(self, updated_data):
+        """Update the dataframe and Qt model with results saved by an analysis
+        routine. updated_data is a dict mapping shot filepaths to dicts of
+        {(group, name): value}."""
+        # Flatten dict values into extra column levels, as get_dataframe_from_shot()
+        # does when the shot is loaded from disk, and collect the rows and values of
+        # each column:
+        rows_by_column = {}
+        for filepath, row_data in updated_data.items():
+            try:
+                row_number = self.row_number_by_filepath[filepath]
+            except KeyError:
+                # Row has been deleted, nothing to do here:
+                continue
+            for (group, name), value in row_data.items():
+                for key, flat_value in flatten_dict({name: value}, keys=(group,)).items():
+                    rows, values = rows_by_column.setdefault(key, ([], []))
+                    rows.append(row_number)
+                    values.append(flat_value)
+        if not rows_by_column:
+            return
+        nlevels = max([self.nlevels] + [len(key) for key in rows_by_column])
+        if nlevels > self.nlevels:
+            self.dataframe = pad_columns(self.dataframe, nlevels)
             self.update_column_levels()
+        rows_by_column = {
+            key + ('',) * (self.nlevels - len(key)): rows_and_values
+            for key, rows_and_values in rows_by_column.items()
+        }
+        for column_name, (rows, values) in rows_by_column.items():
+            self._set_dataframe_values(column_name, rows, values)
 
-        # Check and create necessary new columns in the Qt model:
+        # To speed things up block signals to the model during update
+        self._model.blockSignals(True)
+        try:
+            new_column_numbers = self._add_new_columns()
+            for column_name, (rows, _) in rows_by_column.items():
+                column_number = self.column_indices[column_name]
+                values = self.dataframe[column_name].loc[rows].tolist()
+                for row_number, value in zip(rows, values):
+                    self._set_item(row_number, column_number, value)
+            self._resize_new_columns(new_column_numbers)
+        finally:
+            # unblock signals to the model and tell it to update
+            self._model.blockSignals(False)
+            self._model.layoutChanged.emit()
+
+    def _set_dataframe_values(self, column_name, rows, values):
+        """Set the values of one dataframe column in the given rows"""
+        if column_name not in self.dataframe.columns:
+            # Create the column from its first value, so that it gets the dtype that
+            # pandas infers for that value:
+            self._set_dataframe_value(rows[0], column_name, values[0])
+            rows, values = rows[1:], values[1:]
+            if not rows:
+                return
+        column = self.dataframe[column_name]
+        if column.dtype == object:
+            column_values = column.to_numpy(copy=True)
+            for row_number, value in zip(rows, values):
+                column_values[row_number] = value
+            self.dataframe[column_name] = pandas.Series(column_values, index=column.index, dtype=object)
+            return
+        new_values = pandas.Series(values, index=rows)
+        if new_values.dtype != object:
+            try:
+                self.dataframe.loc[rows, column_name] = new_values
+                return
+            except (ValueError, TypeError):
+                pass
+        for row_number, value in zip(rows, values):
+            self._set_dataframe_value(row_number, column_name, value)
+
+    def _set_dataframe_value(self, row_number, column_name, value):
+        try:
+            self.dataframe.at[row_number, column_name] = value
+        except (ValueError, TypeError):
+            # did the column not already exist when we tried to set an iterable?
+            if not column_name in self.dataframe.columns:
+                # create it with a non-iterable and then overwrite with the iterable value:
+                self.dataframe.at[row_number, column_name] = None
+            else:
+                # Incompatible datatype - convert the datatype of the column to
+                # 'object'
+                self.dataframe[column_name] = self.dataframe[column_name].astype('object')
+            # Now that the column exists and has dtype object, we can set the value:
+            self.dataframe.at[row_number, column_name] = value
+
+    def _add_new_columns(self):
+        """Add Qt model columns for the dataframe columns that the model does not
+        have. Returns the numbers of the new columns."""
         new_column_names = set(self.dataframe.columns) - set(self.column_names.values())
         new_columns_start = self._model.columnCount()
         self._model.insertColumns(new_columns_start, len(new_column_names))
+        new_column_numbers = []
         for i, column_name in enumerate(sorted(new_column_names)):
             # Set the header label of the new column:
             column_number = new_columns_start + i
@@ -549,10 +605,16 @@ class DataFrameModel(QtCore.QObject):
             header_item = QtGui.QStandardItem(column_name_as_string)
             header_item.setToolTip(column_name_as_string)
             self._model.setHorizontalHeaderItem(column_number, header_item)
+            new_column_numbers.append(column_number)
+        return new_column_numbers
 
-        # Check and remove any no-longer-needed columns in the Qt model:
+    def _remove_defunct_columns(self):
+        """Remove the Qt model columns that are no longer in the dataframe. This happens
+        when new shots are added after all shots have been removed."""
         defunct_column_names = (set(self.column_names.values()) - set(self.dataframe.columns)
                                 - {self.column_names[self.COL_STATUS], self.column_names[self.COL_FILEPATH]})
+        if not defunct_column_names:
+            return
         defunct_column_indices = [self.column_indices[column_name] for column_name in defunct_column_names]
         for column_number in sorted(defunct_column_indices, reverse=True):
             # Remove columns from the Qt model. In reverse order so that
@@ -564,52 +626,40 @@ class DataFrameModel(QtCore.QObject):
             self.deleted_columns_visible[self.column_names[column_number]] = self.columns_visible[column_number]
             del self.column_names[column_number]
             del self.columns_visible[column_number]
+        # Renumber the keys of self.columns_visible and self.column_names to reflect deletions:
+        self.column_names = {newindex: name for newindex, (oldindex, name) in enumerate(sorted(self.column_names.items()))}
+        self.columns_visible = {newindex: visible for newindex, (oldindex, visible) in enumerate(sorted(self.columns_visible.items()))}
+        # Update the inverse mapping of self.column_names:
+        self.column_indices = {name: index for index, name in self.column_names.items()}
+        self.columns_changed.emit()
 
-        if defunct_column_indices:
-            # Renumber the keys of self.columns_visible and self.column_names to reflect deletions:
-            self.column_names = {newindex: name for newindex, (oldindex, name) in enumerate(sorted(self.column_names.items()))}
-            self.columns_visible = {newindex: visible for newindex, (oldindex, visible) in enumerate(sorted(self.columns_visible.items()))}
-            # Update the inverse mapping of self.column_names:
-            self.column_indices = {name: index for index, name in self.column_names.items()}
-
-        # Update the data in the Qt model:
-        dataframe_row = self.dataframe.iloc[row_number].to_dict()
-        for column_number, column_name in self.column_names.items():
-            if not isinstance(column_name, tuple):
-                # One of our special columns, does not correspond to a column in the dataframe:
-                continue
-            if updated_row_data is not None:
-                # Must remove empty strings from tuple to compare with updated_row_data:
-                if tuple(s for s in column_name if s) not in updated_row_data:
-                    continue
-            value = dataframe_row[column_name]
-            if isinstance(value, float):
-                value_str = lyse.utils.gui.scientific_notation(value)
-            else:
-                value_str = str(value)
-            lines = value_str.splitlines()
-            if len(lines) > 1:
-                short_value_str = lines[0] + ' ...'
-            else:
-                short_value_str = value_str
-
-            item = self._model.item(row_number, column_number)
-            if item is None:
-                # This is the first time we've written a value to this part of the model:
-                item = QtGui.QStandardItem(short_value_str)
-                item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
-                self._model.setItem(row_number, column_number, item)
-            else:
-                item.setText(short_value_str)
-            item.setToolTip(repr(value))
-
-        for i, column_name in enumerate(sorted(new_column_names)):
-            # Resize any new columns to fit contents:
-            column_number = new_columns_start + i
+    def _resize_new_columns(self, new_column_numbers):
+        for column_number in new_column_numbers:
             self._view.resizeColumnToContents(column_number)
-
-        if new_column_names or defunct_column_names:
+        if new_column_numbers:
             self.columns_changed.emit()
+
+    def _set_item(self, row_number, column_number, value):
+        """Set the text and tooltip of a Qt model item to a dataframe value"""
+        if isinstance(value, float):
+            value_str = lyse.utils.gui.scientific_notation(value)
+        else:
+            value_str = str(value)
+        lines = value_str.splitlines()
+        if len(lines) > 1:
+            short_value_str = lines[0] + ' ...'
+        else:
+            short_value_str = value_str
+
+        item = self._model.item(row_number, column_number)
+        if item is None:
+            # This is the first time we've written a value to this part of the model:
+            item = QtGui.QStandardItem(short_value_str)
+            item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
+            self._model.setItem(row_number, column_number, item)
+        else:
+            item.setText(short_value_str)
+        item.setToolTip(repr(value))
 
     @inmain_decorator()
     def set_status_percent(self, filepath, status_percent):
@@ -697,6 +747,7 @@ class DataFrameModel(QtCore.QObject):
             # Update the dataframe:
             self.dataframe = concat_with_padding(self.dataframe, new_row_data)
             self.update_column_levels()
+            self._remove_defunct_columns()
 
         self.app.filebox.set_add_shots_progress(None, None, "updating filebox")
 
@@ -711,7 +762,7 @@ class DataFrameModel(QtCore.QObject):
 
         # Update the Qt model:
         for filepath in to_add:
-            self.update_row(filepath, dataframe_already_updated=True)
+            self.update_row(filepath)
 
         self.app.filebox.set_add_shots_progress(None, None, None)        
             
@@ -1012,9 +1063,7 @@ class FileBox(object):
         self.to_singleshot.put(filepath)
         while True:
             signal, status_percent, updated_data = self.from_singleshot.get()
-            for file in updated_data:
-                # Update the data for all the rows with new data:
-                self.shots_model.update_row(file, updated_row_data=updated_data[file])
+            self.shots_model.update_rows(updated_data)
             # Update the status percent for the the row on which analysis is actually
             # running:
             if status_percent is not None:
@@ -1037,8 +1086,7 @@ class FileBox(object):
         self.to_multishot.put(None)
         while True:
             signal, _, updated_data = self.from_multishot.get()
-            for file in updated_data:
-                self.shots_model.update_row(file, updated_row_data=updated_data[file])
+            self.shots_model.update_rows(updated_data)
             if signal == 'done':
                 self.multishot_required = False
                 return
