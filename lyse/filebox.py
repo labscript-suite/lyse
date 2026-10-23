@@ -555,6 +555,12 @@ class DataFrameModel(QtCore.QObject):
                 column_values[row_number] = value
             self.dataframe[column_name] = pandas.Series(column_values, index=column.index, dtype=object)
             return
+        # Setting each value with .at is faster than one .loc assignment for up to
+        # about 30 rows:
+        if len(rows) <= 20:
+            for row_number, value in zip(rows, values):
+                self._set_dataframe_value(row_number, column_name, value)
+            return
         new_values = pandas.Series(values, index=rows)
         if new_values.dtype != object:
             try:
