@@ -555,6 +555,9 @@ class DataFrameModel(QtCore.QObject):
                 column_values[row_number] = value
             self.dataframe[column_name] = pandas.Series(column_values, index=column.index, dtype=object)
             return
+        if len(rows) == 1:
+            self._set_dataframe_value(rows[0], column_name, values[0])
+            return
         new_values = pandas.Series(values, index=rows)
         if new_values.dtype != object:
             try:
