@@ -167,53 +167,8 @@ class RoutineBox(object):
         tuples containing the filepath and whether the routine is enabled or
         not when it is added. if clear_existing == True, then any existing
         analysis routines will be cleared before the new ones are added."""
-        if clear_existing:
-            for routine in self.routines[:]:
-                routine.remove()
-                self.routines.remove(routine)
+        add_routines([(self, routine_files, clear_existing)])
 
-        filepaths = []
-        checkstates = {}
-        for filepath, checked in routine_files:
-            if filepath in [routine.filepath for routine in self.routines] or filepath in filepaths:
-                self.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
-                continue
-            filepaths.append(filepath)
-            checkstates[filepath] = checked
-
-        # Start the worker processes. The first child process of the process tree also
-        # creates the broker and heartbeat server shared by all children, so the first
-        # worker is started before the others, which are started concurrently.
-        worker_handles = {}
-        errors = {}
-
-        def start(filepath):
-            try:
-                worker_handles[filepath] = start_worker(self.app.process_tree, filepath,
-                                                        self.output_box_port)
-            except Exception:
-                errors[filepath] = sys.exc_info()
-
-        if filepaths:
-            start(filepaths[0])
-        if len(filepaths) > 1:
-            with ThreadPoolExecutor(max_workers=len(filepaths) - 1) as executor:
-                for filepath in filepaths[1:]:
-                    executor.submit(start, filepath)
-
-        for filepath in filepaths:
-            if filepath in errors:
-                continue
-            self.logger.info(f'adding routine for {filepath}')
-            routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port,
-                                      QtCore.Qt.CheckState(checkstates[filepath]),
-                                      worker_handles=worker_handles[filepath])
-            self.routines.append(routine)
-        self.update_select_all_checkstate()
-
-        for exc_info in errors.values():
-            zprocess.raise_exception_in_thread(exc_info)
-        
     def on_treeview_double_left_clicked(self, index):
         # If double clicking on the the name item, open
         # the routine in the specified text editor:
@@ -457,6 +412,55 @@ class RoutineBox(object):
                 self.select_all_checkbox.setCheckState(QtCore.Qt.Unchecked)
             else:
                 self.select_all_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
+
+
+def add_routines(additions):
+    """Add routines to one or more routine boxes, starting all their worker processes
+    concurrently. additions is a list of tuples (routinebox, routine_files,
+    clear_existing), with the arguments of RoutineBox.add_routines()."""
+    new_routines = []
+    for routinebox, routine_files, clear_existing in additions:
+        if clear_existing:
+            for routine in routinebox.routines[:]:
+                routine.remove()
+                routinebox.routines.remove(routine)
+        filepaths = []
+        for filepath, checked in routine_files:
+            if filepath in [routine.filepath for routine in routinebox.routines] or filepath in filepaths:
+                routinebox.app.output_box.output('Warning: Ignoring duplicate analysis routine %s\n'%filepath, red=True)
+                continue
+            filepaths.append(filepath)
+            new_routines.append((routinebox, filepath, checked))
+
+    worker_handles = {}
+    errors = {}
+
+    def start(i):
+        routinebox, filepath, _ = new_routines[i]
+        try:
+            worker_handles[i] = start_worker(routinebox.app.process_tree, filepath,
+                                             routinebox.output_box_port)
+        except Exception:
+            errors[i] = sys.exc_info()
+
+    if new_routines:
+        with ThreadPoolExecutor(max_workers=len(new_routines)) as executor:
+            for i in range(len(new_routines)):
+                executor.submit(start, i)
+
+    for i, (routinebox, filepath, checked) in enumerate(new_routines):
+        if i in errors:
+            continue
+        routinebox.logger.info(f'adding routine for {filepath}')
+        routine = AnalysisRoutine(routinebox.app, filepath, routinebox.model,
+                                  routinebox.output_box_port, QtCore.Qt.CheckState(checked),
+                                  worker_handles=worker_handles[i])
+        routinebox.routines.append(routine)
+    for routinebox, _, _ in additions:
+        routinebox.update_select_all_checkstate()
+
+    for exc_info in errors.values():
+        zprocess.raise_exception_in_thread(exc_info)
 
 
 def start_worker(process_tree, filepath, output_box_port):

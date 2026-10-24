@@ -387,12 +387,14 @@ class Lyse(object):
         self.last_save_config_file = filename
         self.ui.actionSave_configuration.setText('Save configuration %s' % filename)
         save_data = load_appconfig(filename).get('lyse_state', {})
+        additions = []
         if 'singleshot' in save_data:
-            self.singleshot_routinebox.add_routines(save_data['singleshot'], clear_existing=True)
+            additions.append((self.singleshot_routinebox, save_data['singleshot'], True))
+        if 'multishot' in save_data:
+            additions.append((self.multishot_routinebox, save_data['multishot'], True))
+        lyse.routines.add_routines(additions)
         if 'lastsingleshotfolder' in save_data:
             self.singleshot_routinebox.last_opened_routine_folder = save_data['lastsingleshotfolder']
-        if 'multishot' in save_data:
-            self.multishot_routinebox.add_routines(save_data['multishot'], clear_existing=True)
         if 'lastmultishotfolder' in save_data:
             self.multishot_routinebox.last_opened_routine_folder = save_data['lastmultishotfolder']
         if 'lastfileboxfolder' in save_data:
