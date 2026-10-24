@@ -204,7 +204,7 @@ class RoutineBox(object):
         for filepath in filepaths:
             if filepath in errors:
                 continue
-            self.logger.info(f'adding routine for {filepath}')
+            self.logger.info('adding routine for %s', filepath)
             routine = AnalysisRoutine(self.app, filepath, self.model, self.output_box_port,
                                       QtCore.Qt.CheckState(checkstates[filepath]),
                                       worker_handles=worker_handles[filepath])
@@ -256,7 +256,7 @@ class RoutineBox(object):
             if routine.filepath in filepaths:
                 routine.remove()
                 self.routines.remove(routine)
-                self.logger.info(f'removing routine for {routine.filepath}')
+                self.logger.info('removing routine for %s', routine.filepath)
         self.update_select_all_checkstate()
         
     def on_model_item_changed(self, item):
@@ -379,7 +379,7 @@ class RoutineBox(object):
                 assert filepath is None
                 # TODO: get the filepath of the output h5 file: 
                 # filepath = self.filechooserentry.get_text()
-            self.logger.info('got a file to process: %s'%filepath)
+            self.logger.info('got a file to process: %s', filepath)
             self.do_analysis(filepath)
     
     def _start_next_routine(self):
@@ -425,7 +425,7 @@ class RoutineBox(object):
         updated_data = {}
         routine = self.start_analysis()
         while routine is not None:
-            self.logger.info('running analysis routine %s'%routine.shortname)
+            self.logger.info('running analysis routine %s', routine.shortname)
             success, updated_data = routine.do_analysis(filepath)
             routine, status_percent = self.end_routine(routine, success)
             if not success:
@@ -438,7 +438,7 @@ class RoutineBox(object):
             self.to_filebox.put(['error', None, updated_data])
         else:
             self.to_filebox.put(['done', 100.0, {}])
-        self.logger.debug('completed analysis of %s'%filepath)
+        self.logger.debug('completed analysis of %s', filepath)
             
     def reorder(self, order):
         assert len(order) == len(set(order)), 'ordering contains non-unique elements'

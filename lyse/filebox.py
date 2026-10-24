@@ -964,7 +964,8 @@ class FileBox(object):
                         filepaths.append(filepath)
                         if len(filepaths) >= batch_size:
                             break
-                logger.info('adding:\n%s' % '\n'.join(filepaths))
+                if logger.isEnabledFor(logging.INFO):
+                    logger.info('adding:\n%s', '\n'.join(filepaths))
                 if n_shots_added == 0:
                     total_shots = self.incoming_queue.qsize() + len(filepaths)
                     self.set_add_shots_progress(1, total_shots, "reading shot files")
@@ -1040,7 +1041,7 @@ class FileBox(object):
                         # Find the first shot that has not finished being analysed:
                         filepath = self.shots_model.get_first_incomplete()
                         if filepath is not None:
-                            logger.info('analysing: %s'%filepath)
+                            logger.info('analysing: %s', filepath)
                             self.do_singleshot_analysis(filepath)
                             at_least_one_shot_analysed = True
                         if filepath is None and at_least_one_shot_analysed:
