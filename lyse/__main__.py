@@ -42,6 +42,7 @@ import pandas
 # Labscript imports
 splash.update_text('importing zprocess (zlog and zlock must be running)')
 from labscript_utils.ls_zprocess import ProcessTree
+from zprocess import port_in_use
 
 splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
@@ -128,6 +129,16 @@ class Lyse(object):
 
         # Second: read lyse config
         self.setup_config()
+        port = int(self.exp_config.get('ports', 'lyse'))
+        if port_in_use(port):
+            message = (
+                f"lyse cannot start because port {port}, which is the lyse port in the "
+                "labconfig, is in use. Another copy of lyse is probably running."
+            )
+            self.logger.error(message)
+            splash.hide()
+            QtWidgets.QMessageBox.critical(None, 'lyse', message)
+            sys.exit(1)
 
         # Third: connect to zprocess and set a meaningful name for zlock client id:
         self.process_tree = ProcessTree.instance()
