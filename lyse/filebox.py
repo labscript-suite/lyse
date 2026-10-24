@@ -586,12 +586,16 @@ class DataFrameModel(QtCore.QObject):
 
     def _set_dataframe_value(self, row_number, column_name, value):
         try:
-            self.dataframe.at[row_number, column_name] = value
+            if column_name in self.dataframe.columns:
+                self.dataframe.at[row_number, column_name] = value
+            else:
+                # pandas deprecates creating a column with .at:
+                self.dataframe.loc[row_number, column_name] = value
         except (ValueError, TypeError):
             # did the column not already exist when we tried to set an iterable?
             if not column_name in self.dataframe.columns:
                 # create it with a non-iterable and then overwrite with the iterable value:
-                self.dataframe.at[row_number, column_name] = None
+                self.dataframe.loc[row_number, column_name] = None
             else:
                 # Incompatible datatype - convert the datatype of the column to
                 # 'object'
