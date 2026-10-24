@@ -357,6 +357,11 @@ class RoutineBox(object):
                 i_unselected += 1
         self.reorder(order)
         
+    def abort(self):
+        """Interrupt the routine that is running, if any."""
+        for routine in self.routines:
+            routine.abort()
+
     def on_restart_selected_triggered(self):
         selected_indexes = self.ui.treeView.selectedIndexes()
         selected_rows = set(index.row() for index in selected_indexes)
@@ -469,6 +474,10 @@ def start_worker(process_tree, filepath, output_box_port):
 
 class AnalysisRoutine(object):
 
+    # Duration in seconds for which abort() waits for the routine to stop before
+    # restarting its worker.
+    ABORT_TIMEOUT = 5
+
     def __init__(self, app, filepath, model, output_box_port, checked=QtCore.Qt.Checked,
                  worker_handles=None):
         """worker_handles is the return value of start_worker() for this routine. If it is
@@ -486,6 +495,10 @@ class AnalysisRoutine(object):
         
         self.error = False
         self.done = False
+        self.working = False
+        # Incremented each time the routine starts running, so that abort() can tell
+        # whether the run it interrupted is still the one running:
+        self.run_number = 0
 
         self.logger = logging.getLogger(f'lyse.AnalysisRoutine.{self.shortname}')
 
@@ -520,6 +533,9 @@ class AnalysisRoutine(object):
         
     @inmain_decorator()
     def set_status(self, status):
+        self.working = status == 'working'
+        if self.working:
+            self.run_number += 1
         index = self.get_row_index()
         if index is None:
             # Yelp, we've just been deleted. Nothing to do here.
@@ -560,6 +576,28 @@ class AnalysisRoutine(object):
             fullpath = name_item.data(self.ROLE_FULLPATH)
             if fullpath == self.filepath:
                 return row
+
+    def abort(self):
+        """Interrupt the routine if it is running. If it has not stopped after
+        ABORT_TIMEOUT seconds, restart its worker."""
+        if not self.working or self.exiting:
+            return
+        try:
+            self.to_worker.put(['abort', None], timeout=1)
+        except TimeoutError:
+            # The worker is not receiving; the restart below replaces it.
+            pass
+        run_number = self.run_number
+        QtCore.QTimer.singleShot(
+            self.ABORT_TIMEOUT * 1000, lambda: self.check_aborted(run_number)
+        )
+
+    def check_aborted(self, run_number):
+        if self.working and self.run_number == run_number and not self.exiting:
+            self.app.output_box.output(
+                '%s did not stop, restarting its worker\n' % self.shortname, red=True
+            )
+            self.restart()
 
     def restart(self):
         # TODO set status to 'restarting' or an icon or something, and gray out the item?

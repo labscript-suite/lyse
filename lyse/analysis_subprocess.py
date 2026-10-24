@@ -21,7 +21,9 @@ from labscript_utils.ls_zprocess import ProcessTree
 
 import sys
 import os
+import signal
 import threading
+import _thread
 import traceback
 import time
 from types import ModuleType
@@ -324,7 +326,13 @@ class AnalysisWorker(object):
         # An object with a method to unload user modules if any have
         # changed on disk:
         self.modulewatcher = ModuleWatcher()
-        
+
+        # Set while the main thread is running the user's routine. abort_analysis()
+        # interrupts the main thread only while this is set, so that the interrupt is
+        # raised in the routine and not in the code that runs after it:
+        self.routine_running = False
+        self.abort_lock = threading.Lock()
+
         # Start the thread that listens for instructions from the
         # parent process:
         self.mainloop_thread = threading.Thread(target=self.mainloop)
@@ -340,19 +348,35 @@ class AnalysisWorker(object):
         while True:
             task, data = self.from_parent.get()
             if task == 'quit':
+                self.abort_analysis()
                 self.close_plots()
                 inmain(qapplication.quit)
             elif task == 'analyse':
-                path = data
-                success = self.do_analysis(path)
-                if success:
-                    if lyse.utils.worker._delay_flag:
-                        lyse.utils.worker.delay_event.wait()
-                    self.to_parent.put(['done', lyse.utils.worker._updated_data])
-                else:
-                    self.to_parent.put(['error', lyse.utils.worker._updated_data])
+                # In a thread, so that an abort can be received while the routine runs:
+                thread = threading.Thread(target=self.analysis_task, args=(data,))
+                thread.daemon = True
+                thread.start()
+            elif task == 'abort':
+                self.abort_analysis()
             else:
                 self.to_parent.put(['error','invalid task %s'%str(task)])
+
+    def analysis_task(self, path):
+        success = self.do_analysis(path)
+        if success:
+            if lyse.utils.worker._delay_flag:
+                lyse.utils.worker.delay_event.wait()
+            self.to_parent.put(['done', lyse.utils.worker._updated_data])
+        else:
+            self.to_parent.put(['error', lyse.utils.worker._updated_data])
+
+    def abort_analysis(self):
+        """Raise KeyboardInterrupt in the routine if one is running, and end a wait in
+        delay_results_return()."""
+        with self.abort_lock:
+            if self.routine_running:
+                _thread.interrupt_main()
+        lyse.utils.worker.delay_event.set()
 
     @inmain_decorator()
     def close_plots(self):
@@ -391,7 +415,6 @@ class AnalysisWorker(object):
         # Do not let the modulewatcher unload any modules whilst we're working:
         try:
             with self.modulewatcher.lock:
-                # Actually run the user's analysis!
                 with open(self.filepath) as f:
                     code = compile(
                         f.read(),
@@ -399,7 +422,17 @@ class AnalysisWorker(object):
                         'exec',
                         dont_inherit=True,
                     )
+                with self.abort_lock:
+                    self.routine_running = True
+                try:
+                    # Actually run the user's analysis!
                     exec(code, self.routine_module.__dict__)
+                finally:
+                    with self.abort_lock:
+                        self.routine_running = False
+        except KeyboardInterrupt:
+            print('Interrupted', file=sys.stderr)
+            return False
         except BaseException as e:
             # sys.exit() with no status or a zero status ends the routine successfully
             if isinstance(e, SystemExit) and e.code in (None, 0):
@@ -540,6 +573,13 @@ if __name__ == '__main__':
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
+
+    # AnalysisWorker.abort_analysis() interrupts the routine with
+    # _thread.interrupt_main(), which raises KeyboardInterrupt only if this handler is
+    # installed. Python does not install it if SIGINT was ignored when the process
+    # started, as it is in a process started in the background by a shell script:
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec()
         

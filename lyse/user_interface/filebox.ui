@@ -70,6 +70,20 @@
            </widget>
           </item>
           <item>
+           <widget class="QPushButton" name="pushButton_abort">
+            <property name="toolTip">
+             <string>Interrupt the analysis routine that is running and pause analysis</string>
+            </property>
+            <property name="text">
+             <string>Abort</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>:/qtutils/fugue/cross-octagon.png</normaloff>:/qtutils/fugue/cross-octagon.png</iconset>
+            </property>
+           </widget>
+          </item>
+          <item>
            <widget class="QPushButton" name="pushButton_mark_as_not_done">
             <property name="text">
              <string>Mark as not done</string>
