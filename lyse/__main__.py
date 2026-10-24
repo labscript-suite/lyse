@@ -41,7 +41,7 @@ import pandas
 
 # Labscript imports
 splash.update_text('importing zprocess (zlog and zlock must be running)')
-from labscript_utils.ls_zprocess import ProcessTree
+from labscript_utils.ls_zprocess import ProcessTree, exit_if_port_in_use
 
 splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
@@ -128,6 +128,7 @@ class Lyse(object):
 
         # Second: read lyse config
         self.setup_config()
+        exit_if_port_in_use('lyse', int(self.exp_config.get('ports', 'lyse')), splash)
 
         # Third: connect to zprocess and set a meaningful name for zlock client id:
         self.process_tree = ProcessTree.instance()
