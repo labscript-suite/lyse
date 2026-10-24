@@ -339,21 +339,20 @@ class AnalysisWorker(object):
         h5py._errors.silence_errors()
         while True:
             task, data = self.from_parent.get()
-            with kill_lock:
-                if task == 'quit':
-                    self.close_plots()
-                    inmain(qapplication.quit)
-                elif task == 'analyse':
-                    path = data
-                    success = self.do_analysis(path)
-                    if success:
-                        if lyse.utils.worker._delay_flag:
-                            lyse.utils.worker.delay_event.wait()
-                        self.to_parent.put(['done', lyse.utils.worker._updated_data])
-                    else:
-                        self.to_parent.put(['error', lyse.utils.worker._updated_data])
+            if task == 'quit':
+                self.close_plots()
+                inmain(qapplication.quit)
+            elif task == 'analyse':
+                path = data
+                success = self.do_analysis(path)
+                if success:
+                    if lyse.utils.worker._delay_flag:
+                        lyse.utils.worker.delay_event.wait()
+                    self.to_parent.put(['done', lyse.utils.worker._updated_data])
                 else:
-                    self.to_parent.put(['error','invalid task %s'%str(task)])
+                    self.to_parent.put(['error', lyse.utils.worker._updated_data])
+            else:
+                self.to_parent.put(['error','invalid task %s'%str(task)])
 
     @inmain_decorator()
     def close_plots(self):
@@ -526,7 +525,6 @@ if __name__ == '__main__':
     process_tree = ProcessTree.connect_to_parent()
     to_parent = process_tree.to_parent
     from_parent = process_tree.from_parent
-    kill_lock = process_tree.kill_lock
     filepath = from_parent.get()
 
     # Rename this module to _analysis_subprocess and put it in sys.modules
