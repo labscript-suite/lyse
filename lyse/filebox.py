@@ -22,7 +22,6 @@ import subprocess
 import time
 import traceback
 import queue
-import warnings
 
 # 3rd party imports:
 import numpy as np
@@ -920,6 +919,9 @@ class FileBox(object):
             # Ensure a repaint when only the message changes:
             self.ui.progressBar_add_shots.repaint()
 
+    def _shot_warning(self, message):
+        self.app.output_box.output('Warning: %s\n' % message, red=True)
+
     def incoming_buffer_loop(self):
         """We use a queue as a buffer for incoming shots. We don't want to hang and not
         respond to a client submitting shots, so we just let shots pile up here until we can get to them.
@@ -966,16 +968,12 @@ class FileBox(object):
                 indices_of_files_skipped = []
                 for i, filepath in enumerate(filepaths):
                     try:
-                        with warnings.catch_warnings(record=True) as caught_warnings:
-                            warnings.simplefilter('always')
-                            dataframe = get_dataframe_from_shot(filepath)
+                        dataframe = get_dataframe_from_shot(filepath, warn=self._shot_warning)
                         if dataframe['run time'].isna().values.all():
                             self.app.output_box.output('Warning: Ignoring shot file that has not been run %s\n' % filepath, red=True)
                             indices_of_files_skipped.append(i)
                         else:
                             dataframes.append(dataframe)
-                            for warning in caught_warnings:
-                                self.app.output_box.output('Warning: %s: %s\n' % (filepath, warning.message), red=True)
                     except IOError:
                         self.app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
                         indices_of_files_skipped.append(i)
