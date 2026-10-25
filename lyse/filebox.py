@@ -14,6 +14,7 @@
 """
 
 import os
+import re
 import sys
 import logging
 import threading
@@ -47,6 +48,13 @@ from lyse.dataframe_utilities import (concat_with_padding, get_dataframe_from_sh
 import lyse.utils
 import lyse.utils.gui
 import lyse.widgets
+
+
+def natural_sort_key(path):
+    """Sort key for a string that compares runs of digits by their integer value"""
+    parts = re.split(r'(\d+)', path)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 
 class EditColumns(object):
@@ -863,7 +871,9 @@ class FileBox(object):
             # User cancelled selection
             return
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
-        shot_files = sorted(os.path.abspath(shot_file) for shot_file in shot_files)
+        shot_files = sorted(
+            (os.path.abspath(shot_file) for shot_file in shot_files), key=natural_sort_key
+        )
 
         # Save the containing folder for use next time we open the dialog box:
         self.last_opened_shots_folder = os.path.dirname(shot_files[0])
