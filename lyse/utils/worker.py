@@ -40,6 +40,11 @@ delay_event = threading.Event()
 """A threading.Event to signal a delay"""
 _delay_flag = False
 """Flag to determine whether we should wait for the delay event"""
+_ABORT_TIMEOUT = 5
+"""Duration in seconds for which lyse waits for an interrupted routine to stop"""
+_KILL_LOCK_TIMEOUT = 60
+"""Duration in seconds for which a worker with a routine that did not stop waits for its
+HDF5 files to be closed before it exits"""
 
 
 utils_dir = os.path.dirname(os.path.realpath(__file__))
