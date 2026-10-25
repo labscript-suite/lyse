@@ -600,11 +600,17 @@ class DataFrameModel(QtCore.QObject):
             if not column_name in self.dataframe.columns:
                 # create it with a non-iterable and then overwrite with the iterable value:
                 self.dataframe.loc[row_number, column_name] = None
+            elif (
+                pandas.api.types.is_integer_dtype(self.dataframe[column_name].dtype)
+                and isinstance(value, (float, np.floating))
+            ):
+                # A float in an integer column - convert the column to float:
+                self.dataframe[column_name] = self.dataframe[column_name].astype('float64')
             else:
                 # Incompatible datatype - convert the datatype of the column to
                 # 'object'
                 self.dataframe[column_name] = self.dataframe[column_name].astype('object')
-            # Now that the column exists and has dtype object, we can set the value:
+            # Now that the column exists and has a compatible dtype, we can set the value:
             self.dataframe.at[row_number, column_name] = value
 
     def _add_new_columns(self):
