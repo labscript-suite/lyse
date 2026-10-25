@@ -61,7 +61,10 @@ def asdatetime(timestr):
     tz = tzlocal.get_localzone()
     return pandas.Timestamp(timestr, tz=tz)
 
-def get_nested_dict_from_shot(filepath):
+def get_nested_dict_from_shot(filepath, warn=warnings.warn):
+    """Returns the globals, results and attributes of the shot as a nested dictionary.
+    warn is called with a message for a results group named like a global, or a global
+    or group named like a reserved column."""
     row = get_shot_globals(filepath)
     with h5py.File(filepath,'r') as h5_file:
         # Attributes of the groups under 'data' and 'results' share one namespace in the
@@ -74,8 +77,8 @@ def get_nested_dict_from_shot(filepath):
                     groups.setdefault(groupname, {}).update(get_attributes(group))
         for groupname in groups:
             if groupname in row:
-                warnings.warn(f"The group '{groupname}' has the same name as a global; "
-                              "the global is not included in the dataframe")
+                warn(f"{filepath}: the group '{groupname}' has the same name as a global; "
+                     "the global is not included in the dataframe")
         row.update(groups)
         if 'images' in h5_file:
             for orientation in h5_file['images'].keys():
@@ -118,8 +121,8 @@ def get_nested_dict_from_shot(filepath):
             shot['n_runs'] = float('nan')
         for name in shot:
             if name in row:
-                warnings.warn(f"'{name}' is a reserved column name; the global or group "
-                              "of that name is not included in the dataframe")
+                warn(f"{filepath}: '{name}' is a reserved column name; the global or group "
+                     "of that name is not included in the dataframe")
         row.update(shot)
         return row
             
@@ -162,8 +165,8 @@ def flat_dict_to_flat_series(dictionary):
         (len(item),) + item if isinstance(item, tuple) else (1,item))
     return pandas.Series(result,index=keys)  
           
-def get_dataframe_from_shot(filepath):
-    nested_dict = get_nested_dict_from_shot(filepath)
+def get_dataframe_from_shot(filepath, warn=warnings.warn):
+    nested_dict = get_nested_dict_from_shot(filepath, warn)
     flat_dict =  flatten_dict(nested_dict)
     df = flat_dict_to_hierarchical_dataframe(flat_dict)
     return df

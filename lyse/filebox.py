@@ -14,6 +14,7 @@
 """
 
 import os
+import re
 import sys
 import logging
 import threading
@@ -21,7 +22,6 @@ import subprocess
 import time
 import traceback
 import queue
-import warnings
 
 # 3rd party imports:
 import numpy as np
@@ -47,6 +47,13 @@ from lyse.dataframe_utilities import (concat_with_padding, get_dataframe_from_sh
 import lyse.utils
 import lyse.utils.gui
 import lyse.widgets
+
+
+def natural_sort_key(path):
+    """Sort key for a string that compares runs of digits by their integer value"""
+    parts = re.split(r'(\d+)', path)
+    parts[1::2] = map(int, parts[1::2])
+    return parts
 
 
 class EditColumns(object):
@@ -863,7 +870,9 @@ class FileBox(object):
             # User cancelled selection
             return
         # Convert to standard platform specific path, otherwise Qt likes forward slashes:
-        shot_files = sorted(os.path.abspath(shot_file) for shot_file in shot_files)
+        shot_files = sorted(
+            (os.path.abspath(shot_file) for shot_file in shot_files), key=natural_sort_key
+        )
 
         # Save the containing folder for use next time we open the dialog box:
         self.last_opened_shots_folder = os.path.dirname(shot_files[0])
@@ -909,6 +918,9 @@ class FileBox(object):
         if completed is None and total is None and message is not None:
             # Ensure a repaint when only the message changes:
             self.ui.progressBar_add_shots.repaint()
+
+    def _shot_warning(self, message):
+        self.app.output_box.output('Warning: %s\n' % message, red=True)
 
     def incoming_buffer_loop(self):
         """We use a queue as a buffer for incoming shots. We don't want to hang and not
@@ -956,16 +968,12 @@ class FileBox(object):
                 indices_of_files_skipped = []
                 for i, filepath in enumerate(filepaths):
                     try:
-                        with warnings.catch_warnings(record=True) as caught_warnings:
-                            warnings.simplefilter('always')
-                            dataframe = get_dataframe_from_shot(filepath)
+                        dataframe = get_dataframe_from_shot(filepath, warn=self._shot_warning)
                         if dataframe['run time'].isna().values.all():
                             self.app.output_box.output('Warning: Ignoring shot file that has not been run %s\n' % filepath, red=True)
                             indices_of_files_skipped.append(i)
                         else:
                             dataframes.append(dataframe)
-                            for warning in caught_warnings:
-                                self.app.output_box.output('Warning: %s: %s\n' % (filepath, warning.message), red=True)
                     except IOError:
                         self.app.output_box.output('Warning: Ignoring shot file not found or not readable %s\n' % filepath, red=True)
                         indices_of_files_skipped.append(i)
