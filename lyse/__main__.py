@@ -414,7 +414,7 @@ class Lyse(object):
         """Load only the window geometry from the config file. It's useful to have this
         separate from the rest of load_configuration so that it can be called before the
         window is shown."""
-        save_data = load_appconfig(filename)['lyse_state']
+        save_data = load_appconfig(filename).get('lyse_state', {})
         if 'screen_geometry' not in save_data:
             return
         screen_geometry = save_data['screen_geometry']
