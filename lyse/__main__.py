@@ -47,6 +47,7 @@ from zprocess import port_in_use
 splash.update_text('importing labscript suite modules')
 from labscript_utils.labconfig import LabConfig, save_appconfig, load_appconfig
 from labscript_utils.setup_logging import setup_logging
+from labscript_utils.qtwidgets.application import setup_application
 from labscript_utils.qtwidgets.outputbox import OutputBox
 from labscript_utils import dedent
 
@@ -568,6 +569,7 @@ if __name__ == "__main__":
         current_style = qapplication.styleSheet()
         qapplication.setStyleSheet(current_style + extra_styles)
 
+    setup_application(qapplication)
     app = Lyse(qapplication)
 
     # Let the interpreter run every 500ms so it sees Ctrl-C interrupts:

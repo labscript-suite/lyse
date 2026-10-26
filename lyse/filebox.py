@@ -26,6 +26,7 @@ import queue
 # 3rd party imports:
 import numpy as np
 import labscript_utils.h5_lock, h5py # use patched h5py
+from labscript_utils.qtwidgets.application import monospace_font
 import pandas
 
 # Labscript imports
@@ -412,12 +413,11 @@ class DataFrameModel(QtCore.QObject):
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
         self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
 
-        # Smaller font for headers:
-        font = self._vertheader.font()
-        font.setPointSize(10 if sys.platform == 'darwin' else 8)
+        # Smaller font for the headers:
+        font = self._header.font()
+        font.setPixelSize(11)
         self._header.setFont(font)
-        font.setFamily('Ubuntu Mono')
-        self._vertheader.setFont(font)
+        self._vertheader.setFont(monospace_font(11))
 
         self._vertheader.setHighlightSections(True)
         self._vertheader.setSectionsClickable(True)
