@@ -123,9 +123,9 @@ class Lyse(object):
         self.logger = setup_logging('lyse')
         labscript_utils.excepthook.set_logger(self.logger)
         self.logger.info('\n\n===============starting===============\n')
-        self.logger.info(f'Qt Environment: {QT_ENV}')
-        self.logger.info(f'PySide/PyQt version: {PYQT_VERSION_STR}')
-        self.logger.info(f'Qt version: {QT_VERSION_STR}')
+        self.logger.info('Qt Environment: %s', QT_ENV)
+        self.logger.info('PySide/PyQt version: %s', PYQT_VERSION_STR)
+        self.logger.info('Qt version: %s', QT_VERSION_STR)
 
         # Second: read lyse config
         self.setup_config()
@@ -173,7 +173,7 @@ class Lyse(object):
         # filebox's incoming queue:
         self.port = int(self.exp_config.get('ports', 'lyse'))
         self.server = lyse.communication.WebServer(self, self.port)
-        self.logger.info(f'Started lyse server on port {self.port}')
+        self.logger.info('Started lyse server on port %s', self.port)
 
         self.last_save_config_file = None
         self.last_save_data = None
