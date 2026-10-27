@@ -582,3 +582,19 @@ if __name__ == "__main__":
 
     # Shutdown the webserver.
     app.server.shutdown()
+
+    app.output_box.shutdown()
+
+    # Delete the windows now, rather than in PyQt's QObject cleanup at exit, during which
+    # Python code that creates or destroys wrapped Qt objects can crash the interpreter
+    # (https://github.com/Python-SIP/sip/pull/121). This can be removed once PyQt5-sip
+    # and PyQt6-sip releases include that fix.
+    from qtutils.qt import PYQT_LIBS
+    if QT_ENV in PYQT_LIBS:
+        import importlib
+        sip = importlib.import_module(f'{QT_ENV}.sip')
+        for widget in qapplication.topLevelWidgets():
+            # Other top-level widgets are owned by C++ objects, which delete them
+            if sip.ispyowned(widget):
+                widget.deleteLater()
+        qapplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
