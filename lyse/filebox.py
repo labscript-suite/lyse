@@ -256,7 +256,109 @@ class EditColumns(object):
     def make_it_so(self):
         self.ui.hide()
 
-        
+
+def format_value(value):
+    """Return the text of a dataframe value for the shots table: the first line of its
+    string, in scientific notation if it is a float"""
+    if isinstance(value, float):
+        value_str = lyse.utils.gui.scientific_notation(value)
+    else:
+        value_str = str(value)
+    lines = value_str.splitlines()
+    if len(lines) > 1:
+        return lines[0] + ' ...'
+    return value_str
+
+
+def role_number(role):
+    """Return the number of a Qt.ItemDataRole, which is the type of the role argument
+    of QAbstractItemModel.data()"""
+    return int(getattr(role, 'value', role))
+
+
+class ShotsTableModel(QtCore.QAbstractTableModel):
+    """The Qt model of the shots table of a DataFrameModel. There is one row per shot,
+    and the columns are the analysis status followed by the dataframe columns, numbered
+    as in DataFrameModel.column_names. Values are read from the dataframe and formatted
+    when the view requests them."""
+
+    DISPLAY_ROLE = role_number(QtCore.Qt.DisplayRole)
+    DECORATION_ROLE = role_number(QtCore.Qt.DecorationRole)
+    TOOLTIP_ROLE = role_number(QtCore.Qt.ToolTipRole)
+    TEXT_ALIGNMENT_ROLE = role_number(QtCore.Qt.TextAlignmentRole)
+
+    def __init__(self, shots):
+        QtCore.QAbstractTableModel.__init__(self)
+        self.shots = shots
+        # Positions of the columns in the dataframe, by column number:
+        self._positions = {}
+        self._status_icon = QtGui.QIcon(':qtutils/fugue/information')
+        self._tick_icon = QtGui.QIcon(':qtutils/fugue/tick')
+        self._deleted_icon = QtGui.QIcon(':qtutils/fugue/drive--minus')
+        self._alignment = QtCore.Qt.AlignCenter
+
+    def dataframe_changed(self):
+        """Must be called when the dataframe is replaced or its columns are renumbered"""
+        self._positions = {}
+
+    def value(self, row, column):
+        """Return the dataframe value of a cell of the table, as a Python scalar if it is
+        a NumPy scalar"""
+        try:
+            position = self._positions[column]
+        except KeyError:
+            column_name = self.shots.column_names[column]
+            position = self.shots.dataframe.columns.get_loc(column_name)
+            self._positions[column] = position
+        value = self.shots.dataframe.iat[row, position]
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
+    def rowCount(self, parent=QtCore.QModelIndex()):
+        return 0 if parent.isValid() else len(self.shots.filepaths)
+
+    def columnCount(self, parent=QtCore.QModelIndex()):
+        return 0 if parent.isValid() else len(self.shots.column_names)
+
+    def data(self, index, role=DISPLAY_ROLE):
+        shots = self.shots
+        row = index.row()
+        if index.column() == shots.COL_STATUS:
+            if role == shots.ROLE_STATUS_PERCENT:
+                return shots.status_percent[row]
+            if role == shots.ROLE_DELETED_OFF_DISK:
+                return shots.deleted_off_disk[row]
+            if role == self.DECORATION_ROLE:
+                return self._deleted_icon if shots.deleted_off_disk[row] else self._tick_icon
+            if role == self.TOOLTIP_ROLE and shots.deleted_off_disk[row]:
+                return "Shot has been deleted off disk or is unreadable"
+            return None
+        if role == self.DISPLAY_ROLE:
+            return format_value(self.value(row, index.column()))
+        if role == self.TOOLTIP_ROLE:
+            return repr(self.value(row, index.column()))
+        if role == self.TEXT_ALIGNMENT_ROLE and index.column() != shots.COL_FILEPATH:
+            return self._alignment
+        return None
+
+    def headerData(self, section, orientation, role=DISPLAY_ROLE):
+        shots = self.shots
+        if orientation == QtCore.Qt.Vertical:
+            if role == self.DISPLAY_ROLE:
+                return shots.row_label(section)
+            return None
+        if section == shots.COL_STATUS:
+            if role == self.DECORATION_ROLE:
+                return self._status_icon
+            if role == self.TOOLTIP_ROLE:
+                return 'status/progress of single-shot analysis'
+            return None
+        if role == self.DISPLAY_ROLE or role == self.TOOLTIP_ROLE:
+            return '\n'.join(shots.column_names[section]).strip()
+        return None
+
+
 class DataFrameModel(QtCore.QObject):
 
     COL_STATUS = 0
@@ -264,7 +366,7 @@ class DataFrameModel(QtCore.QObject):
 
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
     ROLE_DELETED_OFF_DISK = QtCore.Qt.UserRole + 2
-    
+
     columns_changed = Signal()
 
     def __init__(self, app, view, exp_config):
@@ -272,11 +374,41 @@ class DataFrameModel(QtCore.QObject):
         self.app = app
         self._view = view
         self.exp_config = exp_config
-        self._model = QtGui.QStandardItemModel()
-        self.row_number_by_filepath = {}
-        self._previous_n_digits = 0
 
+        # Check if integer indexing is to be used
+        try:
+            self.integer_indexing = self.exp_config.getboolean('lyse', 'integer_indexing')
+        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
+            self.integer_indexing = False
+
+        # This dataframe will contain all the scalar data
+        # from the shot files that are currently open:
+        index = pandas.MultiIndex.from_tuples([('filepath', '')])
+        self.dataframe = pandas.DataFrame({'filepath': []}, columns=index)
+        # How many levels the dataframe's multiindex has:
+        self.nlevels = self.dataframe.columns.nlevels
+
+        # The file path, the percentage of single-shot analysis completed, and whether
+        # the file is missing from disk, of each shot by row:
+        self.filepaths = []
+        self.status_percent = []
+        self.deleted_off_disk = []
+        self.row_number_by_filepath = {}
+        # Every row before this one has been analysed:
+        self._first_incomplete = 0
+
+        # Column indices to names and vice versa for fast lookup:
+        self.column_indices = {'__status': self.COL_STATUS, ('filepath', ''): self.COL_FILEPATH}
+        self.column_names = {self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath', '')}
+        self.columns_visible = {self.COL_STATUS: True, self.COL_FILEPATH: True}
+
+        # Whether or not a deleted column was visible at the time it was deleted (by name):
+        self.deleted_columns_visible = {}
+
+        self._model = ShotsTableModel(self)
         self._header = HorizontalHeaderViewWithWidgets(self._model)
+        # Column widths are fitted to the rows that are visible:
+        self._header.setResizeContentsPrecision(0)
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
         self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
 
@@ -298,39 +430,9 @@ class DataFrameModel(QtCore.QObject):
         self._view.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         self._view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
-        # Check if integer indexing is to be used
-        try:
-            self.integer_indexing = self.exp_config.getboolean('lyse', 'integer_indexing')
-        except (LabConfig.NoOptionError, LabConfig.NoSectionError):
-            self.integer_indexing = False
-
-        # This dataframe will contain all the scalar data
-        # from the shot files that are currently open:
-        index = pandas.MultiIndex.from_tuples([('filepath', '')])
-        self.dataframe = pandas.DataFrame({'filepath': []}, columns=index)
-        # How many levels the dataframe's multiindex has:
-        self.nlevels = self.dataframe.columns.nlevels
-
-        status_item = QtGui.QStandardItem()
-        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
-        status_item.setToolTip('status/progress of single-shot analysis')
-        self._model.setHorizontalHeaderItem(self.COL_STATUS, status_item)
-
-        filepath_item = QtGui.QStandardItem('filepath')
-        filepath_item.setToolTip('filepath')
-        self._model.setHorizontalHeaderItem(self.COL_FILEPATH, filepath_item)
-
         self._view.setColumnWidth(self.COL_STATUS, 70)
         self._view.setColumnWidth(self.COL_FILEPATH, 100)
 
-        # Column indices to names and vice versa for fast lookup:
-        self.column_indices = {'__status': self.COL_STATUS, ('filepath', ''): self.COL_FILEPATH}
-        self.column_names = {self.COL_STATUS: '__status', self.COL_FILEPATH: ('filepath', '')}
-        self.columns_visible = {self.COL_STATUS: True, self.COL_FILEPATH: True}
-
-        # Whether or not a deleted column was visible at the time it was deleted (by name):
-        self.deleted_columns_visible = {}
-        
         # Make the actions for the context menu:
         self.action_remove_selected = QtWidgets.QAction(
             QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
@@ -344,11 +446,15 @@ class DataFrameModel(QtCore.QObject):
     def on_remove_selection(self):
         self.remove_selection()
 
-    def remove_selection(self, confirm=True):
+    def _selected_rows(self):
+        """Return the sorted numbers of the selected rows"""
         selected_rows = set()
         for selection_range in self._view.selectionModel().selection():
             selected_rows.update(range(selection_range.top(), selection_range.bottom() + 1))
-        selected_rows = sorted(selected_rows)
+        return sorted(selected_rows)
+
+    def remove_selection(self, confirm=True):
+        selected_rows = self._selected_rows()
         if not selected_rows:
             return
         if confirm and not lyse.utils.gui.question_dialog(self.app, "Remove %d shots?" % len(selected_rows)):
@@ -356,44 +462,51 @@ class DataFrameModel(QtCore.QObject):
         # Remove from DataFrame first:
         self.dataframe = self.dataframe.drop(selected_rows)
         self.dataframe.index = pandas.Index(range(len(self.dataframe)))
-        # Remove each contiguous block of rows from the Qt model with one call, starting
-        # with the last block:
+        # Remove each contiguous block of rows from the Qt model, starting with the last
+        # block:
         block_end = len(selected_rows)
         for i in reversed(range(len(selected_rows))):
             if i == 0 or selected_rows[i - 1] != selected_rows[i] - 1:
-                self._model.removeRows(selected_rows[i], block_end - i)
+                first, last = selected_rows[i], selected_rows[block_end - 1]
+                self._model.beginRemoveRows(QtCore.QModelIndex(), first, last)
+                del self.filepaths[first:last + 1]
+                del self.status_percent[first:last + 1]
+                del self.deleted_off_disk[first:last + 1]
+                self._model.endRemoveRows()
                 block_end = i
-        self.renumber_rows()
+        self.row_number_by_filepath = {filepath: row for row, filepath in enumerate(self.filepaths)}
+        self._first_incomplete = 0
+
+    def _set_status_percent(self, row, status_percent):
+        self.status_percent[row] = status_percent
+        if status_percent != 100:
+            self._first_incomplete = min(self._first_incomplete, row)
 
     def mark_selection_not_done(self):
-        selected_indexes = self._view.selectedIndexes()
-        selected_rows = set(index.row() for index in selected_indexes)
+        selected_rows = self._selected_rows()
         for row in selected_rows:
-            status_item = self._model.item(row, self.COL_STATUS)
-            if status_item.data(self.ROLE_DELETED_OFF_DISK):
+            if self.deleted_off_disk[row]:
                 # If the shot was previously not readable on disk, check to
                 # see if it's readable now. It may have been undeleted or
                 # perhaps it being unreadable before was due to a network
                 # glitch or similar.
-                filepath = self._model.item(row, self.COL_FILEPATH).text()
-                if not os.path.exists(filepath):
+                if not os.path.exists(self.filepaths[row]):
                     continue
                 # Shot file is accesible again:
-                status_item.setData(False, self.ROLE_DELETED_OFF_DISK)
-                status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
-                status_item.setToolTip(None)
+                self.deleted_off_disk[row] = False
+            self._set_status_percent(row, 0)
+        if selected_rows:
+            self._model.dataChanged.emit(self._model.index(selected_rows[0], self.COL_STATUS),
+                                         self._model.index(selected_rows[-1], self.COL_STATUS))
 
-            status_item.setData(0, self.ROLE_STATUS_PERCENT)
-        
     def on_view_context_menu_requested(self, point):
         menu = QtWidgets.QMenu(self._view)
         menu.addAction(self.action_remove_selected)
         menu.exec(QtGui.QCursor.pos())
 
     def on_double_click(self, index):
-        filepath_item = self._model.item(index.row(), self.COL_FILEPATH)
-        shot_filepath = filepath_item.text()
-        
+        shot_filepath = self.filepaths[index.row()]
+
         # get path to text editor
         viewer_path = self.exp_config.get('programs', 'hdf5_viewer')
         viewer_args = self.exp_config.get('programs', 'hdf5_viewer_arguments')
@@ -444,22 +557,20 @@ class DataFrameModel(QtCore.QObject):
     def mark_as_deleted_off_disk(self, filepath):
         # Confirm the shot hasn't been removed from lyse (we are in the main
         # thread so there is no race condition in checking first)
-        if not filepath in self.dataframe['filepath'].values:
+        try:
+            row_number = self.row_number_by_filepath[filepath]
+        except KeyError:
             # Shot has been removed from FileBox, nothing to do here:
             return
-
-        row_number = self.row_number_by_filepath[filepath]
-        status_item = self._model.item(row_number, self.COL_STATUS)
-        already_marked_as_deleted = status_item.data(self.ROLE_DELETED_OFF_DISK)
-        if already_marked_as_deleted:
+        if self.deleted_off_disk[row_number]:
             return
         # Icon only displays if percent completion is 100. This is also
         # important so that the shot is not picked up as analysis
         # incomplete and analysis re-attempted on it.
-        status_item.setData(True, self.ROLE_DELETED_OFF_DISK)
-        status_item.setData(100, self.ROLE_STATUS_PERCENT)
-        status_item.setToolTip("Shot has been deleted off disk or is unreadable")
-        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/drive--minus'))
+        self.deleted_off_disk[row_number] = True
+        self._set_status_percent(row_number, 100)
+        index = self._model.index(row_number, self.COL_STATUS)
+        self._model.dataChanged.emit(index, index)
         self.app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
 
     @inmain_decorator()
@@ -470,33 +581,6 @@ class DataFrameModel(QtCore.QObject):
         non-mixed numerical data, which it might choke on.
         """
         self.dataframe = self.dataframe.infer_objects()
-
-    @inmain_decorator()
-    def update_row(self, filepath):
-        """Update the Qt model row for a shot from the data in the dataframe"""
-        try:
-            row_number = self.row_number_by_filepath[filepath]
-        except KeyError:
-            # Row has been deleted, nothing to do here:
-            return
-        filepath_colname = ('filepath',) + ('',) * (self.nlevels - 1)
-        assert filepath == self.dataframe.at[row_number, filepath_colname]
-
-        # To speed things up block signals to the model during update
-        self._model.blockSignals(True)
-        try:
-            new_column_numbers = self._add_new_columns()
-            dataframe_row = self.dataframe.iloc[row_number].to_dict()
-            for column_number, column_name in self.column_names.items():
-                if not isinstance(column_name, tuple):
-                    # One of our special columns, does not correspond to a column in the dataframe:
-                    continue
-                self._set_item(row_number, column_number, dataframe_row[column_name])
-            self._resize_new_columns(new_column_numbers)
-        finally:
-            # unblock signals to the model and tell it to update
-            self._model.blockSignals(False)
-            self._model.layoutChanged.emit()
 
     @inmain_decorator()
     def update_rows(self, updated_data):
@@ -523,6 +607,7 @@ class DataFrameModel(QtCore.QObject):
         nlevels = max([self.nlevels] + [len(key) for key in rows_by_column])
         if nlevels > self.nlevels:
             self.dataframe = pad_columns(self.dataframe, nlevels)
+            self._model.dataframe_changed()
             self.update_column_levels()
         rows_by_column = {
             key + ('',) * (self.nlevels - len(key)): rows_and_values
@@ -531,33 +616,12 @@ class DataFrameModel(QtCore.QObject):
         for column_name, (rows, values) in rows_by_column.items():
             self._set_dataframe_values(column_name, rows, values)
 
-        # To speed things up block signals to the model during update
-        self._model.blockSignals(True)
-        changed_region = None
-        try:
-            new_column_numbers = self._add_new_columns()
-            for column_name, (rows, _) in rows_by_column.items():
-                column_number = self.column_indices[column_name]
-                values = self.dataframe[column_name].loc[rows].tolist()
-                for row_number, value in zip(rows, values):
-                    self._set_item(row_number, column_number, value)
-            self._resize_new_columns(new_column_numbers)
-            if not new_column_numbers:
-                all_rows = [row for rows, _ in rows_by_column.values() for row in rows]
-                column_numbers = [self.column_indices[name] for name in rows_by_column]
-                changed_region = (
-                    self._model.index(min(all_rows), min(column_numbers)),
-                    self._model.index(max(all_rows), max(column_numbers)),
-                )
-        finally:
-            # unblock signals to the model and tell it to update
-            self._model.blockSignals(False)
-            if changed_region is None:
-                self._model.layoutChanged.emit()
-            else:
-                # Only item data changed, so the view does not need to lay out the
-                # table again:
-                self._model.dataChanged.emit(*changed_region)
+        new_column_numbers = self._add_new_columns()
+        self._resize_new_columns(new_column_numbers)
+        all_rows = [row for rows, _ in rows_by_column.values() for row in rows]
+        column_numbers = [self.column_indices[name] for name in rows_by_column]
+        self._model.dataChanged.emit(self._model.index(min(all_rows), min(column_numbers)),
+                                     self._model.index(max(all_rows), max(column_numbers)))
 
     def _set_dataframe_values(self, column_name, rows, values):
         """Set the values of one dataframe column in the given rows"""
@@ -617,28 +681,21 @@ class DataFrameModel(QtCore.QObject):
         """Add Qt model columns for the dataframe columns that the model does not
         have. Returns the numbers of the new columns."""
         new_column_names = set(self.dataframe.columns) - set(self.column_names.values())
-        new_columns_start = self._model.columnCount()
-        self._model.insertColumns(new_columns_start, len(new_column_names))
-        new_column_numbers = []
-        for i, column_name in enumerate(sorted(new_column_names)):
-            # Set the header label of the new column:
-            column_number = new_columns_start + i
+        if not new_column_names:
+            return []
+        new_columns_start = len(self.column_names)
+        new_column_numbers = list(range(new_columns_start, new_columns_start + len(new_column_names)))
+        self._model.beginInsertColumns(QtCore.QModelIndex(), new_column_numbers[0], new_column_numbers[-1])
+        for column_number, column_name in zip(new_column_numbers, sorted(new_column_names)):
             self.column_names[column_number] = column_name
             self.column_indices[column_name] = column_number
-            if column_name in self.deleted_columns_visible:
-                # Restore the former visibility of this column if we've
-                # seen one with its name before:
-                visible = self.deleted_columns_visible[column_name]
-                self.columns_visible[column_number] = visible
-                self._view.setColumnHidden(column_number, not visible)
-            else:
-                # new columns are visible by default:
-                self.columns_visible[column_number] = True
-            column_name_as_string = '\n'.join(column_name).strip()
-            header_item = QtGui.QStandardItem(column_name_as_string)
-            header_item.setToolTip(column_name_as_string)
-            self._model.setHorizontalHeaderItem(column_number, header_item)
-            new_column_numbers.append(column_number)
+            # Restore the former visibility of this column if we've seen one with its
+            # name before. New columns are visible by default:
+            self.columns_visible[column_number] = self.deleted_columns_visible.get(column_name, True)
+        self._model.endInsertColumns()
+        for column_number in new_column_numbers:
+            if not self.columns_visible[column_number]:
+                self._view.setColumnHidden(column_number, True)
         return new_column_numbers
 
     def _remove_defunct_columns(self):
@@ -653,15 +710,17 @@ class DataFrameModel(QtCore.QObject):
             # Remove columns from the Qt model. In reverse order so that
             # removals do not change the position of columns yet to be
             # removed.
-            self._model.removeColumn(column_number)
+            self._model.beginRemoveColumns(QtCore.QModelIndex(), column_number, column_number)
             # Save whether or not the column was visible when it was
             # removed (so that if it is re-added the visibility will be retained):
             self.deleted_columns_visible[self.column_names[column_number]] = self.columns_visible[column_number]
-            del self.column_names[column_number]
-            del self.columns_visible[column_number]
-        # Renumber the keys of self.columns_visible and self.column_names to reflect deletions:
-        self.column_names = {newindex: name for newindex, (oldindex, name) in enumerate(sorted(self.column_names.items()))}
-        self.columns_visible = {newindex: visible for newindex, (oldindex, visible) in enumerate(sorted(self.columns_visible.items()))}
+            # Renumber the columns after the removed one:
+            self.column_names = {index - (index > column_number): name
+                                 for index, name in self.column_names.items() if index != column_number}
+            self.columns_visible = {index - (index > column_number): visible
+                                    for index, visible in self.columns_visible.items() if index != column_number}
+            self._model.dataframe_changed()
+            self._model.endRemoveColumns()
         # Update the inverse mapping of self.column_names:
         self.column_indices = {name: index for index, name in self.column_names.items()}
         self.columns_changed.emit()
@@ -672,28 +731,6 @@ class DataFrameModel(QtCore.QObject):
         if new_column_numbers:
             self.columns_changed.emit()
 
-    def _set_item(self, row_number, column_number, value):
-        """Set the text and tooltip of a Qt model item to a dataframe value"""
-        if isinstance(value, float):
-            value_str = lyse.utils.gui.scientific_notation(value)
-        else:
-            value_str = str(value)
-        lines = value_str.splitlines()
-        if len(lines) > 1:
-            short_value_str = lines[0] + ' ...'
-        else:
-            short_value_str = value_str
-
-        item = self._model.item(row_number, column_number)
-        if item is None:
-            # This is the first time we've written a value to this part of the model:
-            item = QtGui.QStandardItem(short_value_str)
-            item.setData(QtCore.Qt.AlignCenter, QtCore.Qt.TextAlignmentRole)
-            self._model.setItem(row_number, column_number, item)
-        else:
-            item.setText(short_value_str)
-        item.setToolTip(repr(value))
-
     @inmain_decorator()
     def set_status_percent(self, filepath, status_percent):
         try:
@@ -701,71 +738,38 @@ class DataFrameModel(QtCore.QObject):
         except KeyError:
             # Row has been deleted, nothing to do here:
             return
-        status_item = self._model.item(row_number, self.COL_STATUS)
-        status_item.setData(status_percent, self.ROLE_STATUS_PERCENT)
+        self._set_status_percent(row_number, status_percent)
+        index = self._model.index(row_number, self.COL_STATUS)
+        self._model.dataChanged.emit(index, index)
 
-    def new_row(self, filepath, done=False):
-        status_item = QtGui.QStandardItem()
-        if done:
-            status_item.setData(100, self.ROLE_STATUS_PERCENT)
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
-        else:
-            status_item.setData(0, self.ROLE_STATUS_PERCENT)
-        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/tick'))
-        name_item = QtGui.QStandardItem(filepath)
-        return [status_item, name_item]
-
-    def renumber_rows(self, add_from=0):
-        """Add/update row indices - the rows are numbered in simple sequential
-        order for easy comparison with the dataframe. add_from allows you to
-        only add numbers for new rows from the given index as a performance
-        optimisation, though if the number of digits changes, all rows will
-        still be renumbered. add_from should not be used if rows have been
-        deleted."""
-        n_digits = len(str(self._model.rowCount()))
-        if n_digits != self._previous_n_digits:
-            # All labels must be updated:
-            add_from = 0
-        self._previous_n_digits = n_digits
-
-        if add_from == 0:
-            self.row_number_by_filepath = {}
-
+    def row_label(self, row):
+        """Return the vertical header text of a row: the row number, followed by the
+        file name, or by the sequence index, run number and run repeat if integer
+        indexing is used"""
+        n_digits = len(str(len(self.filepaths)))
+        label = '{}. '.format(str(row).rjust(n_digits))
         if self.integer_indexing:
-            header_cols = ['sequence_index', 'run number', 'run repeat']
-            header_values = [self.dataframe[col].values for col in header_cols]
+            header_strings = []
+            for name in ['sequence_index', 'run number', 'run repeat']:
+                value = self.dataframe.at[row, (name,) + ('',) * (self.nlevels - 1)]
+                if pandas.notna(value):
+                    header_strings.append('{:04d}'.format(int(value)))
+                else:
+                    header_strings.append('----')
+            return label + ' | '.join(header_strings)
+        return label + os.path.splitext(os.path.basename(self.filepaths[row]))[0]
 
-        for row_number in range(add_from, self._model.rowCount()):
-            vertical_header_item = self._model.verticalHeaderItem(row_number)
-            row_number_str = str(row_number).rjust(n_digits)
-            vert_header_text = '{}. '.format(row_number_str)
-            filepath_item = self._model.item(row_number, self.COL_FILEPATH)
-            filepath = filepath_item.text()
-            self.row_number_by_filepath[filepath] = row_number
-            if self.integer_indexing:
-                header_strings = []
-                for values in header_values:
-                    val = values[row_number]
-                    if pandas.notna(val):
-                        header_strings.append('{:04d}'.format(int(val)))
-                    else:
-                        header_strings.append('----')
-                vert_header_text += ' | '.join(header_strings)
-            else:
-                basename = os.path.splitext(os.path.basename(filepath))[0]
-                vert_header_text += basename
-            vertical_header_item.setText(vert_header_text)
-    
     @inmain_decorator()
     def add_files(self, filepaths, new_row_data, done=False):
         """Add files to the dataframe model. New_row_data should be a
         dataframe containing the new rows."""
 
         to_add = []
+        to_add_set = set()
 
         # Check for duplicates:
         for filepath in filepaths:
-            if filepath in self.row_number_by_filepath or filepath in to_add:
+            if filepath in self.row_number_by_filepath or filepath in to_add_set:
                 self.app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
                 if new_row_data is not None:
                     df_row_index = np.where(new_row_data['filepath'].values == filepath)
@@ -773,44 +777,60 @@ class DataFrameModel(QtCore.QObject):
                     new_row_data.index = pandas.Index(range(len(new_row_data)))
             else:
                 to_add.append(filepath)
+                to_add_set.add(filepath)
 
         assert len(new_row_data) == len(to_add)
 
-        if to_add:
-            # Update the dataframe:
-            self.dataframe = concat_with_padding(self.dataframe, new_row_data)
-            self.update_column_levels()
-            self._remove_defunct_columns()
+        if not to_add:
+            return
+
+        # Whether shots were already being added when this method was called:
+        adding_shots = self.app.filebox.add_shots_start_time is not None
+
+        # Update the dataframe:
+        self.dataframe = concat_with_padding(self.dataframe, new_row_data)
+        self._model.dataframe_changed()
+        self.update_column_levels()
+        self._remove_defunct_columns()
 
         self.app.filebox.set_add_shots_progress(None, None, "updating filebox")
 
-        for filepath in to_add:
-            # Add the new rows to the Qt model:
-            self._model.appendRow(self.new_row(filepath, done=done))
-            vert_header_item = QtGui.QStandardItem('...loading...')
-            self._model.setVerticalHeaderItem(self._model.rowCount() - 1, vert_header_item)
-            self._view.resizeRowToContents(self._model.rowCount() - 1)
+        new_column_numbers = self._add_new_columns()
+        first_new_row = len(self.filepaths)
+        self._model.beginInsertRows(QtCore.QModelIndex(), first_new_row, first_new_row + len(to_add) - 1)
+        for row_number, filepath in enumerate(to_add, first_new_row):
+            self.filepaths.append(filepath)
+            self.status_percent.append(100 if done else 0)
+            self.deleted_off_disk.append(False)
+            self.row_number_by_filepath[filepath] = row_number
+        if not done:
+            self._first_incomplete = min(self._first_incomplete, first_new_row)
+        self._model.endInsertRows()
+        if first_new_row == 0:
+            # All rows have the height of the first:
+            self._view.resizeRowToContents(0)
+            self._vertheader.setDefaultSectionSize(self._view.rowHeight(0))
+        self._resize_new_columns(new_column_numbers)
 
-        self.renumber_rows(add_from=self._model.rowCount()-len(to_add))
-
-        # Update the Qt model:
-        for filepath in to_add:
-            self.update_row(filepath)
-
-        self.app.filebox.set_add_shots_progress(None, None, None)        
-            
+        if not adding_shots:
+            self.app.filebox.set_add_shots_progress(None, None, None)
 
     @inmain_decorator()
     def get_first_incomplete(self):
         """Returns the filepath of the first shot in the model that has not
         been analysed"""
-        for row in range(self._model.rowCount()):
-            status_item = self._model.item(row, self.COL_STATUS)
-            if status_item.data(self.ROLE_STATUS_PERCENT) != 100:
-                filepath_item = self._model.item(row, self.COL_FILEPATH)
-                return filepath_item.text()
+        while (self._first_incomplete < len(self.status_percent)
+               and self.status_percent[self._first_incomplete] == 100):
+            self._first_incomplete += 1
+        if self._first_incomplete < len(self.filepaths):
+            return self.filepaths[self._first_incomplete]
+        return None
 
 class FileBox(object):
+
+    # Time for which shots must have been being added before the progress bar is shown,
+    # in seconds:
+    ADD_SHOTS_PROGRESS_DELAY = 0.5
 
     def __init__(self, app, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
         self.app = app
@@ -828,6 +848,11 @@ class FileBox(object):
         loader.registerCustomWidget(lyse.widgets.TableView)
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/filebox.ui'))
         self.ui.progressBar_add_shots.hide()
+        # The monotonic time at which the shots being added began to be added, or None:
+        self.add_shots_start_time = None
+        self.add_shots_progress_timer = QtCore.QTimer()
+        self.add_shots_progress_timer.setSingleShot(True)
+        self.add_shots_progress_timer.timeout.connect(self.ui.progressBar_add_shots.show)
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.app, self.ui.tableView, self.exp_config)
         set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
@@ -933,19 +958,31 @@ class FileBox(object):
 
     @inmain_decorator()
     def set_add_shots_progress(self, completed, total, message):
-        self.ui.progressBar_add_shots.setFormat("Adding shots: [{}] %v/%m (%p%)".format(message))
+        """Update the progress bar of adding shots, or hide it if completed equals total
+        and message is None. The progress bar is shown once shots have been being added
+        for ADD_SHOTS_PROGRESS_DELAY seconds."""
+        progress_bar = self.ui.progressBar_add_shots
+        progress_bar.setFormat("Adding shots: [{}] %v/%m (%p%)".format(message))
         if completed == total and message is None:
-            self.ui.progressBar_add_shots.hide()
-        else:
-            if total is not None:
-                self.ui.progressBar_add_shots.setMaximum(total)
-            if completed is not None:
-                self.ui.progressBar_add_shots.setValue(completed)
-            if self.ui.progressBar_add_shots.isHidden():
-                self.ui.progressBar_add_shots.show()
-        if completed is None and total is None and message is not None:
+            self.add_shots_start_time = None
+            self.add_shots_progress_timer.stop()
+            progress_bar.hide()
+            return
+        if total is not None:
+            progress_bar.setMaximum(total)
+        if completed is not None:
+            progress_bar.setValue(completed)
+        if self.add_shots_start_time is None:
+            self.add_shots_start_time = time.monotonic()
+            self.add_shots_progress_timer.start(int(1000 * self.ADD_SHOTS_PROGRESS_DELAY))
+        elif progress_bar.isHidden():
+            # The timer does not fire while the main thread is adding shots:
+            if time.monotonic() - self.add_shots_start_time >= self.ADD_SHOTS_PROGRESS_DELAY:
+                self.add_shots_progress_timer.stop()
+                progress_bar.show()
+        if not progress_bar.isHidden() and completed is None and total is None and message is not None:
             # Ensure a repaint when only the message changes:
-            self.ui.progressBar_add_shots.repaint()
+            progress_bar.repaint()
 
     def _shot_warning(self, message):
         self.app.output_box.output('Warning: %s\n' % message, red=True)
