@@ -103,7 +103,8 @@ retained. An alternate method should be used to store data if desired in
 these cases."""
 
 
-def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None):
+def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, n_sequences=None, filter_kwargs=None,
+         columns=None):
     """Get data from the lyse dataframe or a file.
     
     This function allows for either extracting information from a run's hdf5
@@ -112,14 +113,15 @@ def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, 
     `filepath` is not provided then the dataframe in lyse, or a portion of it,
     will be returned.
     
-    Often only part of the lyse dataframe is needed, so the `n_sequences` and
-    `filter_kwargs` arguments provide ways to restrict what parts of the lyse
-    dataframe are returned. The dataframe can be quite large, so only requesting
-    a small part of it can speed up the execution of `lyse.data()` noticeably.
-    Setting `n_sequences` makes this function return only the rows of the lyse
-    dataframe that correspond to the `n_sequences` most recent sequences, where
-    one sequence corresponds to one call to engage in runmanager. Additionally,
-    the `Dataframe.filter()` method can be called on the dataframe before it is
+    Often only part of the lyse dataframe is needed, so the `n_sequences`,
+    `columns` and `filter_kwargs` arguments provide ways to restrict what parts of
+    the lyse dataframe are returned. The dataframe can be quite large, so only
+    requesting a small part of it can speed up the execution of `lyse.data()`
+    noticeably. Setting `n_sequences` makes this function return only the rows of
+    the lyse dataframe that correspond to the `n_sequences` most recent sequences,
+    where one sequence corresponds to one call to engage in runmanager. Setting
+    `columns` makes it return only the named columns. Additionally, the
+    `Dataframe.filter()` method can be called on the dataframe before it is
     transmitted, and the arguments specified in `filter_kwargs` are passed to
     that method.
 
@@ -154,13 +156,25 @@ def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, 
             then `Dataframe.filter()` will not be called. See
             :meth:`pandas:pandas.DataFrame.filter` for more information.
             Defaults to `None`.
+        columns (list, optional): The names of the columns to return. A name is
+            a string, or a tuple of strings for a column with a hierarchical
+            name, such as `('fit', 'amplitude')`. A name does not need the empty
+            strings that pad the column names of the dataframe to the same
+            length. A name that is not the name of a column selects every column
+            with a name that begins with it, so that `'fit'` selects all the
+            results saved by an analysis routine named `fit`. The columns used
+            as the index of the rows are always included. The columns are
+            returned sorted by name. If set to `None`, then all columns are
+            returned. Defaults to `None`.
 
     Raises:
         ValueError: If `n_sequences` isn't `None` or a nonnegative integer, then
             a `ValueError` is raised. Note that no `ValueError` is raised if
             `n_sequences` is greater than the number of sequences available. In
             that case as all available sequences are returned, i.e. the entire
-            lyse dataframe is returned.
+            lyse dataframe is returned. A `ValueError` is also raised if
+            `columns` isn't `None` or a list or tuple of names.
+        KeyError: If a name in `columns` names no columns of the dataframe.
 
     Returns:
         :obj:`pandas:pandas.DataFrame` or :obj:`pandas:pandas.Series`: If
@@ -181,23 +195,34 @@ def data(filepath=None, host='localhost', port=lyse.utils.LYSE_PORT, timeout=5, 
                 msg = """filter must be None or a dictionary but was 
                     {filter_kwargs}.""".format(filter_kwargs=filter_kwargs)
                 raise ValueError(dedent(msg))
+        if columns is not None:
+            if not isinstance(columns, (list, tuple)) or not all(
+                isinstance(name, str)
+                or (isinstance(name, tuple) and all(isinstance(part, str) for part in name))
+                for name in columns
+            ):
+                msg = """columns must be None or a list of strings and tuples of
+                    strings but was {columns}.""".format(columns=columns)
+                raise ValueError(dedent(msg))
 
         # Allow sending 'get dataframe' (without the enclosing list) if
-        # n_sequences and filter_kwargs aren't provided. This is for backwards
-        # compatibility in case the server is running an outdated version of
-        # lyse.
-        if n_sequences is None and filter_kwargs is None:
+        # n_sequences and filter_kwargs aren't provided, and the command without
+        # columns if they are not provided. This is for backwards compatibility in
+        # case the server is running an outdated version of lyse.
+        if n_sequences is None and filter_kwargs is None and columns is None:
             command = 'get dataframe'
-        else:
+        elif columns is None:
             command = ('get dataframe', n_sequences, filter_kwargs)
+        else:
+            command = ('get dataframe', n_sequences, filter_kwargs, list(columns))
         df = zmq_get(port, host, command, timeout)
         if isinstance(df, str) and df.startswith('error: operation not supported'):
             # Sending a tuple for command to an outdated lyse servers causes it
             # to reply with an error message.
-            msg = """The lyse server does not support n_sequences or filter_kwargs.
-                Call this function without providing those arguments to communicate
-                with this server, or upgrade the version of lyse running on the
-                server."""
+            msg = """The lyse server does not support n_sequences, filter_kwargs or
+                columns. Call this function without providing those arguments to
+                communicate with this server, or upgrade the version of lyse running
+                on the server."""
             raise ValueError(dedent(msg))
         # Ensure conversion to multiindex is done, which needs to be done here
         # if the server is running an outdated version of lyse.
