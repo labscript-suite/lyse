@@ -40,6 +40,7 @@ from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
 from qtutils.auto_scroll_to_end import set_auto_scroll_to_end
 import qtutils.icons
+from qtutils.icons import Icon
 
 # Lyse imports
 from lyse.dataframe_utilities import (concat_with_padding, get_dataframe_from_shot,
@@ -89,9 +90,9 @@ class EditColumns(object):
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
         self.action_set_selected_visible = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'Show selected columns',  self.ui)
+            Icon(':qtutils/fugue/ui-check-box'), 'Show selected columns',  self.ui)
         self.action_set_selected_hidden = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'Hide selected columns',  self.ui)
+            Icon(':qtutils/fugue/ui-check-box-uncheck'), 'Hide selected columns',  self.ui)
 
         self.connect_signals()
         self.populate_model(column_names, self.columns_visible)
@@ -292,9 +293,9 @@ class ShotsTableModel(QtCore.QAbstractTableModel):
         self.shots = shots
         # Positions of the columns in the dataframe, by column number:
         self._positions = {}
-        self._status_icon = QtGui.QIcon(':qtutils/fugue/information')
-        self._tick_icon = QtGui.QIcon(':qtutils/fugue/tick')
-        self._deleted_icon = QtGui.QIcon(':qtutils/fugue/drive--minus')
+        self._status_icon = Icon(':qtutils/fugue/information')
+        self._tick_icon = Icon(':qtutils/fugue/tick')
+        self._deleted_icon = Icon(':qtutils/fugue/drive--minus')
         self._alignment = QtCore.Qt.AlignCenter
 
     def dataframe_changed(self):
@@ -435,7 +436,7 @@ class DataFrameModel(QtCore.QObject):
 
         # Make the actions for the context menu:
         self.action_remove_selected = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
+            Icon(':qtutils/fugue/minus'), 'Remove selected shots',  self._view)
 
         self.connect_signals()
 
@@ -936,11 +937,11 @@ class FileBox(object):
     def on_analysis_running_toggled(self, pressed):
         if pressed:
             self.analysis_paused = True
-            self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
+            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
             self.ui.pushButton_analysis_running.setText('Analysis paused')
         else:
             self.analysis_paused = False
-            self.ui.pushButton_analysis_running.setIcon(QtGui.QIcon(':qtutils/fugue/control'))
+            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
             self.ui.pushButton_analysis_running.setText('Analysis running')
             self.analysis_pending.set()
      

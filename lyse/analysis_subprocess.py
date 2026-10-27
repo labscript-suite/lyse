@@ -34,6 +34,7 @@ from qtutils.qt.QtCore import QSettings, QByteArray
 
 from qtutils import inmain, inmain_decorator, UiLoader
 import qtutils.icons
+from qtutils.icons import Icon
 
 import multiprocessing
 
@@ -152,13 +153,13 @@ class Plot(object):
         self.navigation_toolbar = NavigationToolbar(self.canvas, self.ui)
 
         self.lock_action = self.navigation_toolbar.addAction(
-            QtGui.QIcon(':qtutils/fugue/lock-unlock'),
+            Icon(':qtutils/fugue/lock-unlock'),
            'Lock axes', self.on_lock_axes_triggered)
         self.lock_action.setCheckable(True)
         self.lock_action.setToolTip('Lock axes')
 
         self.copy_to_clipboard_action = self.navigation_toolbar.addAction(
-            QtGui.QIcon(':qtutils/fugue/clipboard--arrow'),
+            Icon(':qtutils/fugue/clipboard--arrow'),
            'Copy to clipboard', self.on_copy_to_clipboard_triggered)
         self.copy_to_clipboard_action.setToolTip('Copy to clipboard')
         self.copy_to_clipboard_action.setShortcut(QtGui.QKeySequence.Copy)
@@ -177,10 +178,10 @@ class Plot(object):
     def on_lock_axes_triggered(self):
         if self.lock_action.isChecked():
             self.lock_axes = True
-            self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock'))
+            self.lock_action.setIcon(Icon(':qtutils/fugue/lock'))
         else:
             self.lock_axes = False
-            self.lock_action.setIcon(QtGui.QIcon(':qtutils/fugue/lock-unlock'))
+            self.lock_action.setIcon(Icon(':qtutils/fugue/lock-unlock'))
 
     def on_copy_to_clipboard_triggered(self):
         lyse.utils.worker.figure_to_clipboard(self.figure)

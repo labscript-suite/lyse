@@ -30,6 +30,7 @@ from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderVi
 # qt imports
 from qtutils.qt import QtCore, QtGui, QtWidgets
 from qtutils import inmain_decorator, UiLoader, DisconnectContextManager
+from qtutils.icons import Icon
 
 import lyse.widgets
 import lyse.utils
@@ -81,7 +82,7 @@ class RoutineBox(object):
         active_item = QtGui.QStandardItem()
         active_item.setToolTip('Whether the analysis routine should run')
         status_item = QtGui.QStandardItem()
-        status_item.setIcon(QtGui.QIcon(':qtutils/fugue/information'))
+        status_item.setIcon(Icon(':qtutils/fugue/information'))
         status_item.setToolTip('The status of this analyis routine\'s execution')
         name_item = QtGui.QStandardItem('name')
         name_item.setToolTip('The name of the python script for the analysis routine')
@@ -104,13 +105,13 @@ class RoutineBox(object):
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
         self.action_set_selected_active = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
+            Icon(':qtutils/fugue/ui-check-box'), 'set selected routines active',  self.ui)
         self.action_set_selected_inactive = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
+            Icon(':qtutils/fugue/ui-check-box-uncheck'), 'set selected routines inactive',  self.ui)
         self.action_restart_selected = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/arrow-circle'), 'restart worker process for selected routines',  self.ui)
+            Icon(':qtutils/fugue/arrow-circle'), 'restart worker process for selected routines',  self.ui)
         self.action_remove_selected = QtWidgets.QAction(
-            QtGui.QIcon(':qtutils/fugue/minus'), 'Remove selected routines',  self.ui)
+            Icon(':qtutils/fugue/minus'), 'Remove selected routines',  self.ui)
         self.last_opened_routine_folder = self.exp_config.get('paths', 'analysislib')
         
         self.routines = []
@@ -560,15 +561,15 @@ class AnalysisRoutine(object):
             return
         status_item = self.model.item(index, self.COL_STATUS)
         if status == 'done':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/tick'))
+            status_item.setIcon(Icon(':/qtutils/fugue/tick'))
             self.done = True
             self.error = False
         elif status == 'working':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/hourglass'))
+            status_item.setIcon(Icon(':/qtutils/fugue/hourglass'))
             self.done = False
             self.error = False
         elif status == 'error':
-            status_item.setIcon(QtGui.QIcon(':/qtutils/fugue/exclamation'))
+            status_item.setIcon(Icon(':/qtutils/fugue/exclamation'))
             self.error = True
             self.done = False
         elif status == 'clear':
