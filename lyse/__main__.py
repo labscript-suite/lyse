@@ -582,3 +582,5 @@ if __name__ == "__main__":
 
     # Shutdown the webserver.
     app.server.shutdown()
+
+    app.output_box.shutdown()
