@@ -765,10 +765,11 @@ class DataFrameModel(QtCore.QObject):
         dataframe containing the new rows."""
 
         to_add = []
+        to_add_set = set()
 
         # Check for duplicates:
         for filepath in filepaths:
-            if filepath in self.row_number_by_filepath or filepath in to_add:
+            if filepath in self.row_number_by_filepath or filepath in to_add_set:
                 self.app.output_box.output('Warning: Ignoring duplicate shot %s\n' % filepath, red=True)
                 if new_row_data is not None:
                     df_row_index = np.where(new_row_data['filepath'].values == filepath)
@@ -776,6 +777,7 @@ class DataFrameModel(QtCore.QObject):
                     new_row_data.index = pandas.Index(range(len(new_row_data)))
             else:
                 to_add.append(filepath)
+                to_add_set.add(filepath)
 
         assert len(new_row_data) == len(to_add)
 
