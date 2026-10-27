@@ -394,6 +394,8 @@ class DataFrameModel(QtCore.QObject):
         self.status_percent = []
         self.deleted_off_disk = []
         self.row_number_by_filepath = {}
+        # Every row before this one has been analysed:
+        self._first_incomplete = 0
 
         # Column indices to names and vice versa for fast lookup:
         self.column_indices = {'__status': self.COL_STATUS, ('filepath', ''): self.COL_FILEPATH}
@@ -473,6 +475,12 @@ class DataFrameModel(QtCore.QObject):
                 self._model.endRemoveRows()
                 block_end = i
         self.row_number_by_filepath = {filepath: row for row, filepath in enumerate(self.filepaths)}
+        self._first_incomplete = 0
+
+    def _set_status_percent(self, row, status_percent):
+        self.status_percent[row] = status_percent
+        if status_percent != 100:
+            self._first_incomplete = min(self._first_incomplete, row)
 
     def mark_selection_not_done(self):
         selected_rows = self._selected_rows()
@@ -486,7 +494,7 @@ class DataFrameModel(QtCore.QObject):
                     continue
                 # Shot file is accesible again:
                 self.deleted_off_disk[row] = False
-            self.status_percent[row] = 0
+            self._set_status_percent(row, 0)
         if selected_rows:
             self._model.dataChanged.emit(self._model.index(selected_rows[0], self.COL_STATUS),
                                          self._model.index(selected_rows[-1], self.COL_STATUS))
@@ -560,7 +568,7 @@ class DataFrameModel(QtCore.QObject):
         # important so that the shot is not picked up as analysis
         # incomplete and analysis re-attempted on it.
         self.deleted_off_disk[row_number] = True
-        self.status_percent[row_number] = 100
+        self._set_status_percent(row_number, 100)
         index = self._model.index(row_number, self.COL_STATUS)
         self._model.dataChanged.emit(index, index)
         self.app.output_box.output('Warning: Shot deleted from disk or no longer readable %s\n' % filepath, red=True)
@@ -730,7 +738,7 @@ class DataFrameModel(QtCore.QObject):
         except KeyError:
             # Row has been deleted, nothing to do here:
             return
-        self.status_percent[row_number] = status_percent
+        self._set_status_percent(row_number, status_percent)
         index = self._model.index(row_number, self.COL_STATUS)
         self._model.dataChanged.emit(index, index)
 
@@ -790,6 +798,8 @@ class DataFrameModel(QtCore.QObject):
             self.status_percent.append(100 if done else 0)
             self.deleted_off_disk.append(False)
             self.row_number_by_filepath[filepath] = row_number
+        if not done:
+            self._first_incomplete = min(self._first_incomplete, first_new_row)
         self._model.endInsertRows()
         if first_new_row == 0:
             # All rows have the height of the first:
@@ -803,9 +813,11 @@ class DataFrameModel(QtCore.QObject):
     def get_first_incomplete(self):
         """Returns the filepath of the first shot in the model that has not
         been analysed"""
-        for row_number, status_percent in enumerate(self.status_percent):
-            if status_percent != 100:
-                return self.filepaths[row_number]
+        while (self._first_incomplete < len(self.status_percent)
+               and self.status_percent[self._first_incomplete] == 100):
+            self._first_incomplete += 1
+        if self._first_incomplete < len(self.filepaths):
+            return self.filepaths[self._first_incomplete]
         return None
 
 class FileBox(object):
