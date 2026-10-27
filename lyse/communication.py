@@ -13,9 +13,6 @@
 """Code required for interprocess communication
 """
 
-# 3rd party imports:
-import numpy as np
-
 # Labscript imports
 from labscript_utils.ls_zprocess import ZMQServer
 import labscript_utils.shared_drive as shared_drive
@@ -24,7 +21,12 @@ import labscript_utils.shared_drive as shared_drive
 from qtutils import inmain_decorator
 
 # Lyse imports
-from lyse.dataframe_utilities import rangeindex_to_multiindex
+from lyse.dataframe_utilities import (rangeindex_to_multiindex, resolve_column_names,
+                                      last_sequences)
+
+# The columns that rangeindex_to_multiindex() uses as the row index, with and without
+# integer indexing:
+INDEX_COLUMNS = ['sequence', 'run time', 'sequence_index', 'run number', 'run repeat']
 
 class WebServer(ZMQServer):
 
@@ -36,13 +38,19 @@ class WebServer(ZMQServer):
         self.app.logger.info('WebServer request: %s', request_data)
         if request_data == 'hello':
             return 'hello'
-        elif isinstance(request_data, tuple) and request_data[0]=='get dataframe' and len(request_data)==3:
-            _, n_sequences, filter_kwargs = request_data
-            df = self._retrieve_dataframe()
+        elif (isinstance(request_data, tuple) and request_data[0] == 'get dataframe'
+              and len(request_data) in (3, 4)):
+            # Clients send the columns argument only if it is not None, so that a
+            # request without it is understood by older versions of lyse:
+            n_sequences, filter_kwargs = request_data[1:3]
+            columns = request_data[3] if len(request_data) == 4 else None
+            try:
+                df = self._retrieve_dataframe(n_sequences, columns)
+            except KeyError as e:
+                # A requested column is not in the dataframe. Raise the error in the
+                # client:
+                return e
             df = rangeindex_to_multiindex(df, inplace=True)
-            # Return only a subset of the dataframe if instructed to do so.
-            if n_sequences is not None:
-                df = self._extract_n_sequences_from_df(df, n_sequences)
             if filter_kwargs is not None:
                 df = df.filter(**filter_kwargs)
             return df
@@ -68,54 +76,28 @@ class WebServer(ZMQServer):
                 "'get dataframe'\n 'hello'\n {'filepath': <some_h5_filepath>}")
 
     @inmain_decorator(wait_for_return=True)
-    def _copy_dataframe(self):
-        df = self.app.filebox.shots_model.dataframe.copy(deep=True)
-        return df
+    def _copy_dataframe(self, n_sequences=None, columns=None):
+        """Return a copy of the rows of the dataframe from the n_sequences most recent
+        sequences, or all rows if n_sequences is None, and of the columns named by
+        columns and the columns used as the row index, or all columns if columns is
+        None. See resolve_column_names() for how columns are named."""
+        df = self.app.filebox.shots_model.dataframe
+        if n_sequences is not None:
+            rows = last_sequences(df, n_sequences)
+        if columns is not None and not df.empty:
+            padding = ('',) * (df.columns.nlevels - 1)
+            index_labels = [(name,) + padding for name in INDEX_COLUMNS
+                            if (name,) + padding in df.columns]
+            labels = resolve_column_names(df.columns, columns) + index_labels
+            df = df[list(dict.fromkeys(labels))].sort_index(axis=1)
+        if n_sequences is not None:
+            df = df[rows]
+        return df.copy(deep=True)
 
-    def _retrieve_dataframe(self):
+    def _retrieve_dataframe(self, n_sequences=None, columns=None):
         # infer_objects() picks fixed datatypes for columns that are compatible with
         # fixed datatypes, dramatically speeding up pickling. It is called here
         # rather than when updating the dataframe as calling it during updating may
         # call it needlessly often, whereas it only needs to be called prior to
         # sending the dataframe to a client requesting it, as we're doing now.
-        return self._copy_dataframe().infer_objects()
-
-    def _extract_n_sequences_from_df(self, df, n_sequences):
-        # If the dataframe is empty, just return it, otherwise accessing columns
-        # below will raise a KeyError.
-        if df.empty:
-            return df
-
-        # Get a list of all unique sequences, each corresponding to one call to
-        # engage in runmanager. Each sequence may contain multiple runs. The
-        # below creates strings to identify sequences. To be from the same
-        # sequence, two shots have to have the same value for 'sequence' (which
-        # makes sure that the time when engage was called are the same to within
-        # 1 second), 'labscript' (must have been generated from the same
-        # labscript), and 'sequence_index' (a counter which keeps track of how
-        # many times engage has been called and resets to 0 at the start of each
-        # day). Typically just the value for sequence, is enough. However it
-        # only records time down to the second, so if engage() is called twice
-        # quickly then two different sequences can end up with the same value
-        # there.
-        sequences = [str(sequence) for sequence in df['sequence']]
-        labscripts = [str(labscript) for labscript in df['labscript']]
-        sequence_indices = [str(index) for index in df['sequence_index']]
-        # Combine into one string.
-        criteria = zip(sequences, labscripts, sequence_indices)
-        indentity_strings = [seq + script + ind for seq, script, ind in criteria]
-
-        # Find the distinct values, maintaining their ordering.
-        unique_identities = np.intersect1d(indentity_strings, indentity_strings)
-
-        # Slice the DataFrame so that only the last n_sequences sequences
-        # remain. Note that slicing unique_identities just returns all of its
-        # entries if n_sequences is greater than its length; it doesn't raise an
-        # error.
-        if n_sequences == 0:
-            identities_included = []
-        else:
-            identities_included = unique_identities[-n_sequences:]
-        df_subset = df[[id in identities_included for id in indentity_strings]]
-
-        return df_subset
+        return self._copy_dataframe(n_sequences, columns).infer_objects()

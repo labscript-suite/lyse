@@ -16,6 +16,7 @@
 import warnings
 
 import labscript_utils.h5_lock, h5py
+import numpy as np
 import pandas
 import tzlocal
 
@@ -54,6 +55,42 @@ def rangeindex_to_multiindex(df, inplace):
         pass
     df.sort_index(inplace=True)
     return df
+
+def resolve_column_names(columns, names):
+    """Return the labels of the columns that are named by names, in the order of names
+    and without repeats. columns is a MultiIndex of column labels, and each name is a
+    string or a tuple of strings. A name selects the column with the label that is the
+    name followed by empty strings, or if there is no such column, every column with a
+    label that begins with the name. Raises KeyError if a name selects no column."""
+    labels = []
+    missing = []
+    for name in names:
+        key = (name,) if isinstance(name, str) else tuple(name)
+        padded_key = key + ('',) * (columns.nlevels - len(key))
+        if padded_key in columns:
+            matches = [padded_key]
+        else:
+            matches = [label for label in columns if label[:len(key)] == key]
+        if not matches:
+            missing.append(name)
+        labels.extend(matches)
+    if missing:
+        raise KeyError('The dataframe has no columns named ' + ', '.join(map(repr, missing)))
+    return list(dict.fromkeys(labels))
+
+def last_sequences(df, n_sequences):
+    """Return a boolean array that selects the rows of the dataframe from its n_sequences
+    most recent sequences. Shots are from the same sequence if they have the same
+    sequence time, labscript and sequence index. The sequence index counts the
+    sequences compiled each day, and distinguishes sequences compiled within the same
+    second. Sequences are ordered by these three values."""
+    padding = ('',) * (df.columns.nlevels - 1)
+    keys = [(name,) + padding for name in ['sequence', 'labscript', 'sequence_index']
+            if (name,) + padding in df.columns]
+    if df.empty or n_sequences == 0:
+        return np.zeros(len(df), dtype=bool)
+    sequence_numbers = df.groupby(keys, sort=True, dropna=False).ngroup()
+    return (sequence_numbers > sequence_numbers.max() - n_sequences).to_numpy()
 
 def asdatetime(timestr):
     if isinstance(timestr, bytes):
