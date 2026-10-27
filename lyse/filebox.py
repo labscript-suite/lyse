@@ -782,6 +782,9 @@ class DataFrameModel(QtCore.QObject):
         if not to_add:
             return
 
+        # Whether shots were already being added when this method was called:
+        adding_shots = self.app.filebox.add_shots_start_time is not None
+
         # Update the dataframe:
         self.dataframe = concat_with_padding(self.dataframe, new_row_data)
         self._model.dataframe_changed()
@@ -807,7 +810,8 @@ class DataFrameModel(QtCore.QObject):
             self._vertheader.setDefaultSectionSize(self._view.rowHeight(0))
         self._resize_new_columns(new_column_numbers)
 
-        self.app.filebox.set_add_shots_progress(None, None, None)
+        if not adding_shots:
+            self.app.filebox.set_add_shots_progress(None, None, None)
 
     @inmain_decorator()
     def get_first_incomplete(self):
@@ -821,6 +825,10 @@ class DataFrameModel(QtCore.QObject):
         return None
 
 class FileBox(object):
+
+    # Time for which shots must have been being added before the progress bar is shown,
+    # in seconds:
+    ADD_SHOTS_PROGRESS_DELAY = 0.5
 
     def __init__(self, app, container, exp_config, to_singleshot, from_singleshot, to_multishot, from_multishot):
         self.app = app
@@ -838,6 +846,11 @@ class FileBox(object):
         loader.registerCustomWidget(lyse.widgets.TableView)
         self.ui = loader.load(os.path.join(lyse.utils.LYSE_DIR, 'user_interface/filebox.ui'))
         self.ui.progressBar_add_shots.hide()
+        # The monotonic time at which the shots being added began to be added, or None:
+        self.add_shots_start_time = None
+        self.add_shots_progress_timer = QtCore.QTimer()
+        self.add_shots_progress_timer.setSingleShot(True)
+        self.add_shots_progress_timer.timeout.connect(self.ui.progressBar_add_shots.show)
         container.addWidget(self.ui)
         self.shots_model = DataFrameModel(self.app, self.ui.tableView, self.exp_config)
         set_auto_scroll_to_end(self.ui.tableView.verticalScrollBar())
@@ -943,19 +956,31 @@ class FileBox(object):
 
     @inmain_decorator()
     def set_add_shots_progress(self, completed, total, message):
-        self.ui.progressBar_add_shots.setFormat("Adding shots: [{}] %v/%m (%p%)".format(message))
+        """Update the progress bar of adding shots, or hide it if completed equals total
+        and message is None. The progress bar is shown once shots have been being added
+        for ADD_SHOTS_PROGRESS_DELAY seconds."""
+        progress_bar = self.ui.progressBar_add_shots
+        progress_bar.setFormat("Adding shots: [{}] %v/%m (%p%)".format(message))
         if completed == total and message is None:
-            self.ui.progressBar_add_shots.hide()
-        else:
-            if total is not None:
-                self.ui.progressBar_add_shots.setMaximum(total)
-            if completed is not None:
-                self.ui.progressBar_add_shots.setValue(completed)
-            if self.ui.progressBar_add_shots.isHidden():
-                self.ui.progressBar_add_shots.show()
-        if completed is None and total is None and message is not None:
+            self.add_shots_start_time = None
+            self.add_shots_progress_timer.stop()
+            progress_bar.hide()
+            return
+        if total is not None:
+            progress_bar.setMaximum(total)
+        if completed is not None:
+            progress_bar.setValue(completed)
+        if self.add_shots_start_time is None:
+            self.add_shots_start_time = time.monotonic()
+            self.add_shots_progress_timer.start(int(1000 * self.ADD_SHOTS_PROGRESS_DELAY))
+        elif progress_bar.isHidden():
+            # The timer does not fire while the main thread is adding shots:
+            if time.monotonic() - self.add_shots_start_time >= self.ADD_SHOTS_PROGRESS_DELAY:
+                self.add_shots_progress_timer.stop()
+                progress_bar.show()
+        if not progress_bar.isHidden() and completed is None and total is None and message is not None:
             # Ensure a repaint when only the message changes:
-            self.ui.progressBar_add_shots.repaint()
+            progress_bar.repaint()
 
     def _shot_warning(self, message):
         self.app.output_box.output('Warning: %s\n' % message, red=True)
