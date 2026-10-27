@@ -93,10 +93,16 @@ def last_sequences(df, n_sequences):
     return (sequence_numbers > sequence_numbers.max() - n_sequences).to_numpy()
 
 def asdatetime(timestr):
+    """Return the local time timestr as a Timestamp in the local time zone. A time in the
+    hour that repeats when daylight saving time ends is taken to be in daylight saving
+    time, and a time in the hour that is skipped when it begins is moved forward to the
+    end of that hour."""
     if isinstance(timestr, bytes):
         timestr = timestr.decode('utf-8')
     tz = tzlocal.get_localzone()
-    return pandas.Timestamp(timestr, tz=tz)
+    return pandas.Timestamp(timestr).tz_localize(
+        tz, ambiguous=True, nonexistent='shift_forward'
+    )
 
 def get_nested_dict_from_shot(filepath, warn=warnings.warn):
     """Returns the globals, results and attributes of the shot as a nested dictionary.
