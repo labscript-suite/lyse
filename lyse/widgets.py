@@ -63,7 +63,7 @@ class ItemDelegate(QtWidgets.QStyledItemDelegate):
                 # Set up a QStyleOptionProgressBar to precisely mimic the
                 # environment of a progress bar.
                 progress_bar_option = QtWidgets.QStyleOptionProgressBar()
-                progress_bar_option.state = QtWidgets.QStyle.State_Enabled
+                progress_bar_option.state = QtWidgets.QStyle.State_Enabled | QtWidgets.QStyle.State_Horizontal
                 progress_bar_option.direction = self.app.qapplication.layoutDirection()
                 progress_bar_option.rect = option.rect
                 progress_bar_option.fontMetrics = QtGui.QFontMetrics(self.app.qapplication.font())
