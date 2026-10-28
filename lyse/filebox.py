@@ -1174,9 +1174,7 @@ class FileBox(object):
                 self.multishot_required = False
                 return
             elif signal == 'error':
-                # If analysis is paused, the routines after the failed one did not run, and
-                # all the routines run again when analysis is resumed:
-                if not self.analysis_paused:
-                    self.multishot_required = False
+                # Analysis was paused when a routine failed, so the routines after it did
+                # not run. All the routines run again when analysis is resumed.
                 return
             
