@@ -39,7 +39,7 @@ Here's a screenshot of **lyse**:
 
 #. Here is where multi-shot routines can be added or removed. The file selection button at the top allows you to select what hdf5 file multi-shot routines will get given (to which they will save their results).
 
-#. Allows pausing of analysis. **lyse** by default will run all single-shot routines on a shot when it arrives (either via the HTTP server or having been manually added). After all the shots have been processed, only then will the multi-shot routines be executed. So if you load ten shots in quickly, the multi-shot routines won't run until they've all been processed by the single-shot routines. However most of the time there will be sufficient delay in between shots arriving that multi-shot routines will be executed pretty much every time a new shot arrives.
+#. Allows pausing of analysis. **lyse** by default will run all single-shot routines on a shot when it arrives (either via the HTTP server or having been manually added). After all the shots have been processed, only then will the multi-shot routines be executed. So if you load ten shots in quickly, the multi-shot routines won't run until they've all been processed by the single-shot routines. However most of the time there will be sufficient delay in between shots arriving that multi-shot routines will be executed pretty much every time a new shot arrives. If a single-shot routine raises an exception, analysis is paused, and the single-shot routines after it do not run on that shot. If a multi-shot routine raises an exception, the other multi-shot routines still run, and analysis is not paused.
 
 #. If you want to re-run single-shot analyses on some shots, select them and click this button. They'll then be processed in order.
 
