@@ -20,11 +20,11 @@ import sys
 import time
 import logging
 import threading
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 # Labscript imports
 import zprocess
+from labscript_utils.programs import open_file
 from labscript_utils.qtwidgets.headerview_with_widgets import HorizontalHeaderViewWithWidgets
 
 # qt imports
@@ -178,24 +178,11 @@ class RoutineBox(object):
             return
         name_item = self.model.item(index.row(), self.COL_NAME)
         routine_filepath = name_item.data(self.ROLE_FULLPATH)
-        # get path to text editor
-        editor_path = self.exp_config.get('programs', 'text_editor')
-        editor_args = self.exp_config.get('programs', 'text_editor_arguments')
-        # Get the current labscript file:
-        if not editor_path:
-            lyse.utils.gui.error_dialog(self.app, "No editor specified in the labconfig.")
-            return
-        if '{file}' in editor_args:
-            # Split the args on spaces into a list, replacing {file} with the labscript file
-            editor_args = [arg if arg != '{file}' else routine_filepath for arg in editor_args.split()]
-        else:
-            # Otherwise if {file} isn't already in there, append it to the other args:
-            editor_args = [routine_filepath] + editor_args.split()
         try:
-            subprocess.Popen([editor_path] + editor_args)
+            open_file(routine_filepath, 'text_editor', self.exp_config)
         except Exception as e:
-            lyse.utils.gui.error_dialog(self.app, "Unable to launch text editor specified in %s. Error was: %s" %
-                         (self.exp_config.config_path, str(e)))
+            lyse.utils.gui.error_dialog(self.app, "Unable to launch text editor. Error was: %s. The text editor is set in the [programs] section of %s." %
+                         (str(e), self.exp_config.config_path))
                          
     def on_remove_selection(self):
         self.remove_selection()
