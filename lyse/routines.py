@@ -344,7 +344,7 @@ class RoutineBox(object):
         return it. Return None if there is no such routine. Call from the main
         thread."""
         for routine in self.routines:
-            if routine.enabled() and not routine.done:
+            if routine.enabled() and not routine.done and not routine.error:
                 routine.set_status('working')
                 return routine
         return None
@@ -359,17 +359,20 @@ class RoutineBox(object):
 
     @inmain_decorator()
     def end_routine(self, routine, success):
-        """Set the status of a routine that has run. If it succeeded, start the next
-        enabled routine that has not run. Return the next routine, or None, and the
-        percentage of enabled routines that are done."""
-        if not success:
+        """Set the status of a routine that has run, and start the next enabled routine
+        that has not run. After a failure, start it only in the multishot routine box,
+        and only if analysis is not paused. Return the next routine, or None, and the
+        percentage of enabled routines that have run."""
+        if success:
+            routine.set_status('done')
+        else:
             routine.set_status('error')
-            return None, None
-        routine.set_status('done')
+            if not self.multishot or self.app.filebox.analysis_paused:
+                return None, None
         enabled_routines = [r for r in self.routines if r.enabled()]
         if enabled_routines:
-            n_done = len([r for r in enabled_routines if r.done])
-            status_percent = 100 * n_done / len(enabled_routines)
+            n_run = len([r for r in enabled_routines if r.done or r.error])
+            status_percent = 100 * n_run / len(enabled_routines)
         else:
             # All routines got deleted mid-analysis, we're done here:
             status_percent = 100.0
@@ -379,20 +382,19 @@ class RoutineBox(object):
         """Run all analysis routines once on the given filepath,
         which is a shot file if we are a singleshot routine box"""
         error = False
-        updated_data = {}
         routine = self.start_analysis()
         while routine is not None:
             self.logger.info('running analysis routine %s', routine.shortname)
             success, updated_data = routine.do_analysis(filepath)
             routine, status_percent = self.end_routine(routine, success)
-            if not success:
+            if success:
+                self.logger.debug('success')
+            else:
                 self.logger.debug('failure')
                 error = True
-                break
-            self.logger.debug('success')
             self.to_filebox.put(['progress', status_percent, updated_data])
         if error:
-            self.to_filebox.put(['error', None, updated_data])
+            self.to_filebox.put(['error', None, {}])
         else:
             self.to_filebox.put(['done', 100.0, {}])
         self.logger.debug('completed analysis of %s', filepath)
