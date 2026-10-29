@@ -14,7 +14,7 @@ The other differences listed above are conventions only (though **lyse**'s desig
 The **lyse** API
 ~~~~~~~~~~~~~~~~~
 
-So great, you've got a single filepath. What data analysis could you possibly do with that? It might seem like you have to still do the same amount of work that you would without an analysis system! Whilst that's not quite true, it's intentionally been designed that way so that you can run your code outside **lyse** with very little modification. Another motivating factor is to minimise the amount of magic black box behaviour, such that an analysis routine is actually just an ordinary ``Python`` script which makes use of an API designed for our purposes. **lyse** is both a program which executes your code, and an API that your code can call on.
+So great, you've got a single filepath. What data analysis could you possibly do with that? It might seem like you have to still do the same amount of work that you would without an analysis system! Whilst that's not quite true, it's intentionally been designed that way so that you can run your code outside **lyse** with very little modification. Another motivating factor is to minimise the amount of magic black box behaviour, such that an analysis routine is an ordinary ``Python`` script that uses the API of **lyse**. **lyse** is both a program which executes your code, and an API that your code can call on.
 
 To use the API in an analysis routine, begin your code with:
 

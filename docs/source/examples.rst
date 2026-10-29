@@ -38,7 +38,7 @@ An analysis on a single shot
 	# We might wish to plot the fit on the trace to show whether the fit is any good:
 
 	plt.plot(t,mot_fluorecence,label='data')
-	plt.plot(t,m*t + x,label='linear fit')
+	plt.plot(t,m*t + c,label='linear fit')
 	plt.xlabel('time')
 	plt.ylabel('MOT flourescence')
 	plt.legend()
@@ -91,6 +91,7 @@ An analysis on multiple shots
 
 .. code-block:: python
 
+	import os
 	import lyse
 	import matplotlib.pyplot as plt
 
@@ -117,9 +118,13 @@ An analysis on multiple shots
 	plt.plot(detunings, m*detunings + c, 'ro', label='linear fit')
 	plt.legend()
 
-	#To save this result to the output hdf5 file, we have to instantiate a
-	#Sequence object:
-	seq = lyse.Sequence(lyse.path, df)
-	seq.save_result('detuning_loadrate_slope',c)
+	# To save this result to an hdf5 file, we instantiate a Sequence object.
+	# lyse does not provide a file for the results of multi-shot routines
+	# (lyse.path is None in a multi-shot routine), so we choose one: here, a
+	# file in the folder of the most recent shot. The file is created if it
+	# does not exist.
+	h5_path = os.path.join(os.path.dirname(df['filepath'].iloc[-1]), 'load_rate.h5')
+	seq = lyse.Sequence(h5_path, df)
+	seq.save_result('detuning_loadrate_slope', m)
 
 .. sectionauthor:: Chris Billington
