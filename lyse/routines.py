@@ -362,7 +362,8 @@ class RoutineBox(object):
         """Set the status of a routine that has run, and start the next enabled routine
         that has not run. After a failure, start it only in the multishot routine box,
         and only if analysis is not paused. Return the next routine, or None, and the
-        percentage of enabled routines that have run."""
+        percentage of enabled routines that have run, or (None, None) if the routines
+        after the failed one are not run."""
         if success:
             routine.set_status('done')
         else:
@@ -381,7 +382,7 @@ class RoutineBox(object):
     def do_analysis(self, filepath):
         """Run all analysis routines once on the given filepath,
         which is a shot file if we are a singleshot routine box"""
-        error = False
+        stopped = False
         routine = self.start_analysis()
         while routine is not None:
             self.logger.info('running analysis routine %s', routine.shortname)
@@ -391,9 +392,10 @@ class RoutineBox(object):
                 self.logger.debug('success')
             else:
                 self.logger.debug('failure')
-                error = True
+                stopped = status_percent is None
             self.to_filebox.put(['progress', status_percent, updated_data])
-        if error:
+        # 'error' if a routine failed and the routines after it did not run:
+        if stopped:
             self.to_filebox.put(['error', None, {}])
         else:
             self.to_filebox.put(['done', 100.0, {}])
