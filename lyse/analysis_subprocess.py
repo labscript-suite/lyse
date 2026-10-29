@@ -468,8 +468,9 @@ class AnalysisWorker(object):
             # sys.exit() with no status or a zero status ends the routine successfully
             if isinstance(e, SystemExit) and e.code in (None, 0):
                 return True
-            traceback_lines = traceback.format_exception(*sys.exc_info())
-            print('\n'.join(traceback_lines[1:]), file=sys.stderr)
+            # Omit the frame of this function from the traceback
+            traceback_lines = traceback.format_exception(type(e), e, e.__traceback__.tb_next)
+            sys.stderr.write(''.join(traceback_lines))
             return False
         else:
             return True
@@ -555,13 +556,14 @@ class AnalysisWorker(object):
                 raise RuntimeError('The specified class must be a subclass of lyse.Plot')
             # Instantiate the plot
             self.plots[fig] = cls(fig, identifier, self.filepath)
-        except Exception:
-            traceback_lines = traceback.format_exception(*sys.exc_info())
+        except Exception as e:
+            # Omit the frame of this function from the traceback
+            traceback_lines = traceback.format_exception(type(e), e, e.__traceback__.tb_next)
             message = """Failed to instantiate custom class for plot "{identifier}".
                 Perhaps lyse.register_plot_class() was called incorrectly from your
                 script? The exception raised was:
                 """.format(identifier=identifier)
-            message = dedent(message) + '\n'.join(traceback_lines[1:])
+            message = dedent(message) + ''.join(traceback_lines)
             message += '\n'
             message += 'Due to this error, we used the default lyse.Plot class instead.\n'
             sys.stderr.write(message)
