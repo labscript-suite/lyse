@@ -26,6 +26,7 @@ import queue
 # 3rd party imports:
 import numpy as np
 import labscript_utils.h5_lock, h5py # use patched h5py
+from labscript_utils.qtwidgets.application import monospace_font
 import pandas
 
 # Labscript imports
@@ -368,6 +369,9 @@ class DataFrameModel(QtCore.QObject):
     ROLE_STATUS_PERCENT = QtCore.Qt.UserRole + 1
     ROLE_DELETED_OFF_DISK = QtCore.Qt.UserRole + 2
 
+    # In device-independent pixels:
+    ROW_HEIGHT = 20
+
     columns_changed = Signal()
 
     def __init__(self, app, view, exp_config):
@@ -412,13 +416,13 @@ class DataFrameModel(QtCore.QObject):
         self._header.setResizeContentsPrecision(0)
         self._vertheader = QtWidgets.QHeaderView(QtCore.Qt.Vertical)
         self._vertheader.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self._vertheader.setDefaultSectionSize(self.ROW_HEIGHT)
 
-        # Smaller font for headers:
-        font = self._vertheader.font()
-        font.setPointSize(10 if sys.platform == 'darwin' else 8)
+        # Smaller font for the headers:
+        font = self._header.font()
+        font.setPixelSize(11)
         self._header.setFont(font)
-        font.setFamily('Ubuntu Mono')
-        self._vertheader.setFont(font)
+        self._vertheader.setFont(monospace_font(11))
 
         self._vertheader.setHighlightSections(True)
         self._vertheader.setSectionsClickable(True)
@@ -426,7 +430,7 @@ class DataFrameModel(QtCore.QObject):
         self._view.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self._view.setHorizontalHeader(self._header)
         self._view.setVerticalHeader(self._vertheader)
-        self._delegate = lyse.widgets.ItemDelegate(self.app, self._view, self._model, self.COL_STATUS, self.ROLE_STATUS_PERCENT)
+        self._delegate = lyse.widgets.ItemDelegate(self.app, self._model, self.COL_STATUS, self.ROLE_STATUS_PERCENT)
         self._view.setItemDelegate(self._delegate)
         self._view.setSelectionBehavior(QtWidgets.QTableView.SelectRows)
         self._view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
@@ -807,10 +811,6 @@ class DataFrameModel(QtCore.QObject):
         if not done:
             self._first_incomplete = min(self._first_incomplete, first_new_row)
         self._model.endInsertRows()
-        if first_new_row == 0:
-            # All rows have the height of the first:
-            self._view.resizeRowToContents(0)
-            self._vertheader.setDefaultSectionSize(self._view.rowHeight(0))
         self._resize_new_columns(new_column_numbers)
 
         if not adding_shots:

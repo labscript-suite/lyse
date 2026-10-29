@@ -31,23 +31,14 @@ class EditColumnsDialog(QtWidgets.QDialog):
 
 class ItemDelegate(QtWidgets.QStyledItemDelegate):
 
-    """An item delegate with a fixed height and a progress bar in one column"""
-    EXTRA_ROW_HEIGHT = 2
+    """An item delegate with a progress bar in one column"""
 
-    def __init__(self, app, view, model, col_status, role_status_percent):
+    def __init__(self, app, model, col_status, role_status_percent):
         self.app = app
-        self.view = view
         self.model = model
         self.COL_STATUS = col_status
         self.ROLE_STATUS_PERCENT = role_status_percent
         QtWidgets.QStyledItemDelegate.__init__(self)
-
-    def sizeHint(self, *args, **kwargs):
-        fontmetrics = QtGui.QFontMetrics(self.view.font())
-        text_height = fontmetrics.height()
-        row_height = text_height + self.EXTRA_ROW_HEIGHT
-        size = QtWidgets.QStyledItemDelegate.sizeHint(self, *args, **kwargs)
-        return QtCore.QSize(size.width(), row_height)
 
     def paint(self, painter, option, index):
         if index.column() == self.COL_STATUS:
