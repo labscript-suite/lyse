@@ -39,7 +39,7 @@ dependencies = [
     "matplotlib>=3.5",
     "numpy",
     "pandas>=1.5",
-    "qtutils>=4.4.1",
+    "qtutils>=4.4.3",
     "scipy",
     "tzlocal",
     "zprocess>=3.0.1",
