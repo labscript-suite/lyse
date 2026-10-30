@@ -98,9 +98,9 @@ class RoutineBox(object):
         self.model.setHorizontalHeaderItem(self.COL_NAME, name_item)
         self.model.setSortRole(self.ROLE_SORTINDEX)
         
+        self.header.setMinimumSectionSize(0)
         self.ui.treeView.resizeColumnToContents(self.COL_ACTIVE)
         self.ui.treeView.resizeColumnToContents(self.COL_STATUS)
-        self.ui.treeView.setColumnWidth(self.COL_NAME, 200)
         
         self.ui.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         # Make the actions for the context menu:
