@@ -44,6 +44,7 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from labscript_utils.modulewatcher import ModuleWatcher
 from labscript_utils.labconfig import LabConfig
 from labscript_utils import dedent
+from labscript_utils.qtwidgets.application import setup_application
 
 
 # Associate app windows with OS menu shortcuts:
@@ -606,6 +607,7 @@ if __name__ == '__main__':
     qapplication = QtWidgets.QApplication.instance()
     if qapplication is None:
         qapplication = QtWidgets.QApplication(sys.argv)
+    setup_application(qapplication)
     worker = AnalysisWorker(filepath, to_parent, from_parent)
     qapplication.exec()
         
