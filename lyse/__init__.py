@@ -39,18 +39,21 @@ import lyse.utils
 
 # Import this way so LYSE_DIR is exposed when someone does import lyse or from lyse import *
 from lyse.utils import LYSE_DIR
-from lyse.utils.worker import register_plot_class, delay_results_return
+from lyse.utils.worker import register_plot_class, delay_results_return, figure_to_clipboard
 
 __all__ = [
     # interacting with lyse internals
     'LYSE_DIR',
     'register_plot_class',
     'delay_results_return',
+    'figure_to_clipboard',
     # lyse analysis API objects, which the lazy loader below reads from
     # lyse.utils.worker so that star imports see the values set by the analysis
     # subprocess
     'path',
     'spinning_top',
+    'Plot',
+    'plots',
     'routine_storage',
     'data',
     'globals_diff',
@@ -74,10 +77,10 @@ if 'sphinx' in sys.modules:
     Can be passed as a command line argument, but this behavior is deprecated.
     """
 
-# path and spinning_top are read from lyse.utils.worker on each access, so that the
-# values set by the analysis subprocess are seen.
+# These names are read from lyse.utils.worker on each access, so that the values set by
+# the analysis subprocess are seen.
 def __getattr__(name):
-    if name in ('path', 'spinning_top'):
+    if name in ('path', 'spinning_top', 'Plot', 'plots', 'delay_event'):
         import lyse.utils.worker
         return getattr(lyse.utils.worker, name)
     else:
