@@ -77,7 +77,7 @@
         <item>
          <widget class="QToolButton" name="toolButton_run_routines">
           <property name="toolTip">
-           <string>Run the multishot analysis routines</string>
+           <string>Run the multishot analysis routines, even if analysis is paused</string>
           </property>
           <property name="text">
            <string>Run</string>
