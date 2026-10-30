@@ -48,7 +48,7 @@ Here's a screenshot of **lyse**, with two single-shot and two multi-shot routine
 
 #. If you want to re-run single-shot analyses on some shots, select them and click this button. They'll then be processed in order.
 
-#. This will rerun all the multi-shot analyses.
+#. This will rerun all the multi-shot analyses, even if analysis is paused.
 
 #. Adds shots with a file browser, and removes the selected shots.
 

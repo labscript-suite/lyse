@@ -851,6 +851,9 @@ class FileBox(object):
 
         self.analysis_paused = False
         self.multishot_required = False
+        # Whether the Run button was clicked, which runs the multishot routines even if
+        # analysis is paused:
+        self.multishot_requested = False
         
         # An Event to let the analysis thread know to check for shots that
         # need analysing, rather than using a time.sleep:
@@ -883,7 +886,7 @@ class FileBox(object):
         self.ui.pushButton_analysis_running.toggled.connect(self.on_analysis_running_toggled)
         self.ui.pushButton_abort.clicked.connect(self.on_abort_clicked)
         self.ui.pushButton_mark_as_not_done.clicked.connect(self.on_mark_selection_not_done_clicked)
-        self.ui.pushButton_run_multishot_analysis.clicked.connect(self.on_run_multishot_analysis_clicked)
+        self.app.multishot_routinebox.ui.toolButton_run_routines.clicked.connect(self.on_run_multishot_analysis_clicked)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()
@@ -921,14 +924,8 @@ class FileBox(object):
         self.app.multishot_routinebox.abort()
 
     def on_analysis_running_toggled(self, pressed):
-        if pressed:
-            self.analysis_paused = True
-            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
-            self.ui.pushButton_analysis_running.setText('Analysis paused')
-        else:
-            self.analysis_paused = False
-            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
-            self.ui.pushButton_analysis_running.setText('Analysis running')
+        self.analysis_paused = pressed
+        if not pressed:
             self.analysis_pending.set()
      
     def on_mark_selection_not_done_clicked(self):
@@ -938,6 +935,7 @@ class FileBox(object):
         
     def on_run_multishot_analysis_clicked(self):
         self.multishot_required = True
+        self.multishot_requested = True
         self.analysis_pending.set()
         
     def set_columns_visible(self, columns_visible):
@@ -1093,7 +1091,7 @@ class FileBox(object):
                     else:
                         logger.info('analysis is paused')
                         break
-                if self.multishot_required and not self.analysis_paused:
+                if self.multishot_required and (self.multishot_requested or not self.analysis_paused):
                     logger.info('doing multishot analysis')
                     self.do_multishot_analysis()
             except Exception:
@@ -1151,6 +1149,7 @@ class FileBox(object):
             raise ValueError('invalid signal %s' % str(signal))
                         
     def do_multishot_analysis(self):
+        self.multishot_requested = False
         self.to_multishot.put(None)
         while True:
             signal, _, updated_data = self.from_multishot.get()
