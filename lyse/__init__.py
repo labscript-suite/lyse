@@ -1134,6 +1134,9 @@ class Sequence(Run):
         This is typically used to save results from a multi-shot analysis to
         an independent h5 file.
 
+        The `runs` attribute is a dictionary of read-only :obj:`Run` objects, one for
+        each run, keyed by file path.
+
         Args:
             h5_path (str): Path to h5 file to save to. If file does not exist,
                 will try to create it assuming `no_write=False`. If file exists,
