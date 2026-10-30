@@ -921,14 +921,8 @@ class FileBox(object):
         self.app.multishot_routinebox.abort()
 
     def on_analysis_running_toggled(self, pressed):
-        if pressed:
-            self.analysis_paused = True
-            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
-            self.ui.pushButton_analysis_running.setText('Analysis paused')
-        else:
-            self.analysis_paused = False
-            self.ui.pushButton_analysis_running.setIcon(Icon(':qtutils/fugue/control'))
-            self.ui.pushButton_analysis_running.setText('Analysis running')
+        self.analysis_paused = pressed
+        if not pressed:
             self.analysis_pending.set()
      
     def on_mark_selection_not_done_clicked(self):

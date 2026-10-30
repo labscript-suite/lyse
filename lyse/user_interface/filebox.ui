@@ -61,11 +61,11 @@
              <string>Pause or resume analysis</string>
             </property>
             <property name="text">
-             <string>Analysis running</string>
+             <string>Pause</string>
             </property>
             <property name="icon">
              <iconset>
-              <normaloff>:/qtutils/fugue/control.png</normaloff>:/qtutils/fugue/control.png</iconset>
+              <normaloff>:/qtutils/fugue/control-pause.png</normaloff>:/qtutils/fugue/control-pause.png</iconset>
             </property>
             <property name="checkable">
              <bool>true</bool>
@@ -104,7 +104,7 @@
              <string>Mark the selected shots as not analysed, so that single-shot analysis runs on them again</string>
             </property>
             <property name="text">
-             <string>Mark as not done</string>
+             <string>Re-run shots</string>
             </property>
             <property name="icon">
              <iconset>
@@ -124,7 +124,7 @@
              <string>Run the multishot analysis routines</string>
             </property>
             <property name="text">
-             <string>Run multishot analysis</string>
+             <string>Run multishot</string>
             </property>
             <property name="icon">
              <iconset>
