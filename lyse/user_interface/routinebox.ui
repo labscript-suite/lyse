@@ -100,6 +100,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="toolButton_move_to_top">
+          <property name="toolTip">
+           <string>Move selected analysis routine(s) to the top</string>
+          </property>
           <property name="text">
            <string>...</string>
           </property>
@@ -111,6 +114,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="toolButton_move_up">
+          <property name="toolTip">
+           <string>Move selected analysis routine(s) up</string>
+          </property>
           <property name="text">
            <string>...</string>
           </property>
@@ -122,6 +128,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="toolButton_move_down">
+          <property name="toolTip">
+           <string>Move selected analysis routine(s) down</string>
+          </property>
           <property name="text">
            <string>...</string>
           </property>
@@ -133,6 +142,9 @@
         </item>
         <item>
          <widget class="QToolButton" name="toolButton_move_to_bottom">
+          <property name="toolTip">
+           <string>Move selected analysis routine(s) to the bottom</string>
+          </property>
           <property name="text">
            <string>...</string>
           </property>

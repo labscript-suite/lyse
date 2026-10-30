@@ -57,6 +57,9 @@
           </property>
           <item>
            <widget class="QPushButton" name="pushButton_analysis_running">
+            <property name="toolTip">
+             <string>Pause or resume analysis</string>
+            </property>
             <property name="text">
              <string>Analysis running</string>
             </property>
@@ -85,6 +88,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_mark_as_not_done">
+            <property name="toolTip">
+             <string>Mark the selected shots as not analysed, so that single-shot analysis runs on them again</string>
+            </property>
             <property name="text">
              <string>Mark as not done</string>
             </property>
@@ -96,6 +102,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="pushButton_run_multishot_analysis">
+            <property name="toolTip">
+             <string>Run the multishot analysis routines</string>
+            </property>
             <property name="text">
              <string>Run multishot analysis</string>
             </property>
