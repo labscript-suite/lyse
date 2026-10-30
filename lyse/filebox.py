@@ -883,7 +883,7 @@ class FileBox(object):
         self.ui.pushButton_analysis_running.toggled.connect(self.on_analysis_running_toggled)
         self.ui.pushButton_abort.clicked.connect(self.on_abort_clicked)
         self.ui.pushButton_mark_as_not_done.clicked.connect(self.on_mark_selection_not_done_clicked)
-        self.ui.pushButton_run_multishot_analysis.clicked.connect(self.on_run_multishot_analysis_clicked)
+        self.app.multishot_routinebox.ui.toolButton_run_routines.clicked.connect(self.on_run_multishot_analysis_clicked)
         
     def on_edit_columns_clicked(self):
         self.edit_columns_dialog.show()

@@ -98,46 +98,6 @@
             </property>
            </widget>
           </item>
-          <item>
-           <widget class="QToolButton" name="pushButton_mark_as_not_done">
-            <property name="toolTip">
-             <string>Mark the selected shots as not analysed, so that single-shot analysis runs on them again</string>
-            </property>
-            <property name="text">
-             <string>Re-run shots</string>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normaloff>:/qtutils/fugue/arrow-curve-180.png</normaloff>:/qtutils/fugue/arrow-curve-180.png</iconset>
-            </property>
-            <property name="toolButtonStyle">
-             <enum>Qt::ToolButtonTextBesideIcon</enum>
-            </property>
-            <property name="autoRaise">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QToolButton" name="pushButton_run_multishot_analysis">
-            <property name="toolTip">
-             <string>Run the multishot analysis routines</string>
-            </property>
-            <property name="text">
-             <string>Run multishot</string>
-            </property>
-            <property name="icon">
-             <iconset>
-              <normaloff>:/qtutils/fugue/arrow-curve.png</normaloff>:/qtutils/fugue/arrow-curve.png</iconset>
-            </property>
-            <property name="toolButtonStyle">
-             <enum>Qt::ToolButtonTextBesideIcon</enum>
-            </property>
-            <property name="autoRaise">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
          </layout>
         </widget>
        </item>
@@ -198,6 +158,26 @@
             <property name="icon">
              <iconset>
               <normaloff>:/qtutils/fugue/minus.png</normaloff>:/qtutils/fugue/minus.png</iconset>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="pushButton_mark_as_not_done">
+            <property name="toolTip">
+             <string>Mark the selected shots as not analysed, so that single-shot analysis runs on them again</string>
+            </property>
+            <property name="text">
+             <string>Re-run selected</string>
+            </property>
+            <property name="icon">
+             <iconset>
+              <normaloff>:/qtutils/fugue/arrow-curve-180.png</normaloff>:/qtutils/fugue/arrow-curve-180.png</iconset>
+            </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
             </property>
             <property name="autoRaise">
              <bool>true</bool>

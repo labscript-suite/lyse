@@ -75,6 +75,26 @@
          </widget>
         </item>
         <item>
+         <widget class="QToolButton" name="toolButton_run_routines">
+          <property name="toolTip">
+           <string>Run the multishot analysis routines</string>
+          </property>
+          <property name="text">
+           <string>Run</string>
+          </property>
+          <property name="icon">
+           <iconset>
+            <normaloff>:/qtutils/fugue/arrow-curve.png</normaloff>:/qtutils/fugue/arrow-curve.png</iconset>
+          </property>
+          <property name="toolButtonStyle">
+           <enum>Qt::ToolButtonTextBesideIcon</enum>
+          </property>
+          <property name="autoRaise">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
          <spacer name="horizontalSpacer_2">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
