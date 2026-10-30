@@ -56,7 +56,7 @@
            <number>6</number>
           </property>
           <item>
-           <widget class="QPushButton" name="pushButton_analysis_running">
+           <widget class="QToolButton" name="pushButton_analysis_running">
             <property name="toolTip">
              <string>Pause or resume analysis</string>
             </property>
@@ -70,10 +70,16 @@
             <property name="checkable">
              <bool>true</bool>
             </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_abort">
+           <widget class="QToolButton" name="pushButton_abort">
             <property name="toolTip">
              <string>Interrupt the analysis routine that is running and pause analysis</string>
             </property>
@@ -84,10 +90,16 @@
              <iconset>
               <normaloff>:/qtutils/fugue/cross-octagon.png</normaloff>:/qtutils/fugue/cross-octagon.png</iconset>
             </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_mark_as_not_done">
+           <widget class="QToolButton" name="pushButton_mark_as_not_done">
             <property name="toolTip">
              <string>Mark the selected shots as not analysed, so that single-shot analysis runs on them again</string>
             </property>
@@ -98,10 +110,16 @@
              <iconset>
               <normaloff>:/qtutils/fugue/arrow-curve-180.png</normaloff>:/qtutils/fugue/arrow-curve-180.png</iconset>
             </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_run_multishot_analysis">
+           <widget class="QToolButton" name="pushButton_run_multishot_analysis">
             <property name="toolTip">
              <string>Run the multishot analysis routines</string>
             </property>
@@ -111,6 +129,12 @@
             <property name="icon">
              <iconset>
               <normaloff>:/qtutils/fugue/arrow-curve.png</normaloff>:/qtutils/fugue/arrow-curve.png</iconset>
+            </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -158,6 +182,9 @@
              <iconset>
               <normaloff>:/qtutils/fugue/plus.png</normaloff>:/qtutils/fugue/plus.png</iconset>
             </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item>
@@ -172,10 +199,13 @@
              <iconset>
               <normaloff>:/qtutils/fugue/minus.png</normaloff>:/qtutils/fugue/minus.png</iconset>
             </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
            </widget>
           </item>
           <item>
-           <widget class="QPushButton" name="pushButton_edit_columns">
+           <widget class="QToolButton" name="pushButton_edit_columns">
             <property name="toolTip">
              <string>Edit which columns are displayed</string>
             </property>
@@ -185,6 +215,12 @@
             <property name="icon">
              <iconset>
               <normaloff>:/qtutils/fugue/table--pencil.png</normaloff>:/qtutils/fugue/table--pencil.png</iconset>
+            </property>
+            <property name="toolButtonStyle">
+             <enum>Qt::ToolButtonTextBesideIcon</enum>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
