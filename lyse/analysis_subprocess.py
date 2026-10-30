@@ -28,6 +28,8 @@ import traceback
 import time
 from types import ModuleType
 
+# Matplotlib uses the Qt binding that is already imported, so qtutils.qt must be imported
+# before any matplotlib backend:
 from qtutils.qt import QtCore, QtGui, QtWidgets, QT_ENV
 from qtutils.qt.QtCore import pyqtSignal as Signal
 from qtutils.qt.QtCore import QSettings, QByteArray
@@ -38,7 +40,7 @@ from qtutils.icons import Icon
 
 import multiprocessing
 
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 
 # Labscript imports
 from labscript_utils.modulewatcher import ModuleWatcher
@@ -580,7 +582,7 @@ class AnalysisWorker(object):
         
 if __name__ == '__main__':
 
-    os.environ['MPLBACKEND'] = "qt5agg"
+    os.environ['MPLBACKEND'] = "qtagg"
 
     lyse.utils.worker.spinning_top = True
 

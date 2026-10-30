@@ -36,7 +36,7 @@ dependencies = [
     "desktop-app>=0.1.2",
     "h5py",
     "labscript_utils>=3.4.2",
-    "matplotlib",
+    "matplotlib>=3.5",
     "numpy",
     "pandas>=1.5",
     "qtutils>=4.4.1",
