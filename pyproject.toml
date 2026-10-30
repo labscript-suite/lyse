@@ -39,10 +39,10 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pandas>=1.5",
-    "qtutils>=4.4.0",
+    "qtutils>=4.4.1",
     "scipy",
     "tzlocal",
-    "zprocess>=3.0.0",
+    "zprocess>=3.0.1",
 ]
 dynamic = ["version"]
 
