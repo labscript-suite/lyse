@@ -35,7 +35,7 @@ requires-python = ">=3.11"
 dependencies = [
     "desktop-app>=0.1.2",
     "h5py",
-    "labscript_utils>=3.4.2",
+    "labscript_utils>=3.5.0rc1",
     "matplotlib>=3.5",
     "numpy",
     "pandas>=1.5",
