@@ -138,6 +138,8 @@ class Lyse(object):
             )
             self.logger.error(message)
             splash.hide()
+            # Upon seeing a ctrl-c interrupt, close the message box:
+            signal.signal(signal.SIGINT, lambda *args: qapplication.exit())
             QtWidgets.QMessageBox.critical(None, 'lyse', message)
             sys.exit(1)
 
